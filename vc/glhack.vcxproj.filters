@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="..\glhack\glbase.cpp" />
+    <ClCompile Include="..\glhack\glhack.cpp" />
+    <ClCompile Include="..\glhack\shims_and_types.cpp" />
+    <ClCompile Include="..\glhack\allocators.cpp" />
+    <ClCompile Include="..\glhack\geometry.cpp" />
+    <ClCompile Include="..\glhack\persistent_containers.cpp" />
+    <ClCompile Include="..\glhack\math_tools.cpp" />
+    <ClCompile Include="..\glhack\managed_structures.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\glhack\glbase.h" />
+    <ClInclude Include="..\glhack\glhack.h" />
+    <ClInclude Include="..\glhack\shims_and_types.h" />
+    <ClInclude Include="..\glhack\allocators.h" />
+    <ClInclude Include="..\glhack\geometry.h" />
+    <ClInclude Include="..\glhack\math_tools.h" />
+    <ClInclude Include="..\glhack\glh_typedefs.h" />
+    <ClInclude Include="..\glhack\managed_structures.h" />
+    <ClInclude Include="..\glhack\persistent_containers.h" />
+  </ItemGroup>
+</Project>

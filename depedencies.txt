@@ -1,0 +1,9 @@
+Included software libraries:
+stb_image
+stb_image_write
+
+stb_... fonts
+
+Links with:
+glfw
+glew
