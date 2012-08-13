@@ -353,6 +353,16 @@ public:
      * chunk has been full and has some memory freed move it to the free_chunks_ list.*/
     void collect_chunks()
     {
+        for(auto chunk = begin(); chunk != end(); ++chunk)
+        {
+            uint32_t pre_used_elements = chunk.used_elements;
+            chunk->collect_marked();
+            if(chunk->used_elements != pre_used_elements && pre_used_elements == CHUNK_BUFFER_SIZE)
+            {
+                chunk->next = free_chunks_;
+                free_chunks_ = &(*chunk);
+            }
+        }
     }
 
     iterator begin(){return chunks_.begin();}
