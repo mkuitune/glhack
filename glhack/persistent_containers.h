@@ -357,6 +357,7 @@ public:
         {
             uint32_t pre_used_elements = chunk.used_elements;
             chunk->collect_marked();
+
             if(chunk->used_elements != pre_used_elements && pre_used_elements == CHUNK_BUFFER_SIZE)
             {
                 chunk->next = free_chunks_;
@@ -634,7 +635,7 @@ public:
             // fragmentation there is a fair chance that nodes have been reserved
             // linearly and that the previous chunk contains this node.
 
-            if(chunk_iterator != chunks_end && chunk_iterator->set_used_if_contains(node))
+            if(chunk_iterator != chunks_end && chunk_iterator->set_marked_if_contains(node))
             {
                 node = node->next;
                 continue;
@@ -643,14 +644,14 @@ public:
             // Find the chunk that contains the node and label used.
             for(chunk_iterator = chunks_.begin(); chunk_iterator != chunks_end; ++chunk_iterator)
             {
-                if(chunk_iterator->set_used_if_contains(node)) break;
+                if(chunk_iterator->set_marked_if_contains(node)) break;
             }
 
             node = node->next;
         }   
     }
     
-    // Mark all unvisitable nodes as empty
+    // Collect all slots taken by unvisitable nodes
     void gc()
     {
         // Currently bit expensive - the cost is 
@@ -666,9 +667,9 @@ public:
         // Now ref_count_ contains as keys the head nodes of active lists.
         for(auto r = ref_count_.begin(); r != ref_count_.end(); ++r) mark_referenced(r->first);
 
-        // Lastly, go through the blocks and move them to the free list if space has been
-        // freed
-        chunks_.refresh_free_chunk_list();
+        // Lastly, go through the blocks, deallocate free's slots and move chunks to free list
+        // if space became available on a full one
+        chunks_.collect_chunks();
     }
 
 private:
