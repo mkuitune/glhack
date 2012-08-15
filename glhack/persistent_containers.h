@@ -14,8 +14,30 @@
  *  - persistent hashmap PersistentUnorderedMap
  *      - an implementation similiar to Clojure's
  *
+ * TODO: Should be straightforward to modify chunkbuffer so it supports parallel deallocation.
  *
+ * For parallel marking, a portion of the chunks must be 'locked' so no new space can be allocated
+ * from them prior to collecting. So, to parallellize:
+ *
+ * 1) divide the chunks in chunkbuffer to gc-groups.
+ * 2) one gc-group is selected for marking and deallocation (mad)
+ * 3) during mad the gc-group is locked - no new slots can be allocated from it's chunks
+ *    (otherwise a slot could be reserved from a chunk that's alread gone through marking and would be
+ *     erroneously collected even though it should be reachable)
+ *  4) pass marked gc-group for deallocation
+ *  5) once deallocated, release gc-group once more into complete allocation pool
+ *
+ *  There could be, say, two or three allocation groups? TODO: Needs more attention.
+ *
+ * Once locked, the marking phase and deallocation phase can run in separate threads.
+ * 1) Main thread locks allocation group g for mad (markeds pushed to concurrent filo queue)
+ * 2) marking thread gets the next item from marking queue, marks them, and adds them to concurrent cleanup -queue
+ * 3) deallocation thread gets the next item from cleanup -queue, deallocates unused slots and unlocks the allocation group
+ *
+ * Should all types of chunkbuffers implement a collection -interface so two mark and deallocation queues can be used for all types of chunkbuffers.
+ * The mark thread should contain different marking implementations for all data structures (i.e. how to navigate a hash array trie forest v.s. a list forest)
  * */
+
 #pragma once
 
 
@@ -651,7 +673,7 @@ public:
         }   
     }
     
-    // Collect all slots taken by unvisitable nodes
+    // Collect all slots taken by unvisitable nodes //TODO: 
     void gc()
     {
         // Currently bit expensive - the cost is 
@@ -733,15 +755,10 @@ public:
         RefCell *ref_array; //> Pointer to an allocated sequence
 
         /** Return number of elements stored */
-        size_t size()
-        {
-           return count_bits(used);
-        }
+        size_t size(){ return count_bits(used);}
 
-        uint32_t index(uint32_t bitfield)
-        {
-            return count_bits(used & (bitfield - 1));
-        }
+        /** Return index matching the bitfield.*/
+        uint32_t index(uint32_t bitfield){return count_bits(used & (bitfield - 1));}
 
         /** Return reference matching the bit pattern */
         RefCell& get(uint32_t key, uint32_t level)
@@ -752,19 +769,20 @@ public:
 
         RefCell* begin(){return ref_array;}
         RefCell* end(){return ref_array + size();}
-
     };
 
     typedef enum RefType_{RefNode, RefValue, RefList} RefType;
 
     typedef typename PersistentListPool<RefCell*> RefListPool;
 
+    /** Refcells contain reference to node, collision list of values or a value.*/
     class RefCell
     {
     public:
         RefType type_;
 
         RefCell(){}
+        ~RefCell(){dealloc();}
 
         void alloc_list(RefListPool& pool, const KeyValue& a, const KeyValue& b)
         {
@@ -822,12 +840,12 @@ public:
     /** Iterator for cells inside node*/
     struct NodeValueIterator
     {
-        enum IterMode{IterNone,IterCell, IterList};
+        enum IterMode{IterNone, IterCell, IterList};
         
         IterMode iter_mode;
         RefType element_type;
 
-        Node* node_;
+        Node* parent_node;
         RefCell* current;
         RefCell* end;
 
@@ -836,10 +854,10 @@ public:
 
         NodeValueIterator(){}
 
-        NodeValueIterator(Node* nodeIn):node_(nodeIn),iter_mode(IterNone)
+        NodeValueIterator(Node* nodeIn):parent_node(nodeIn),iter_mode(IterNone)
         {
             current = 0;
-            end = node_->ref_array + node_->size();
+            end = parent_node->ref_array + parent_node->size();
         }
 
         bool is_keyvalue(){return element_type == RefValue;}
@@ -900,7 +918,7 @@ public:
         {
             if(!current)
             {
-                current = node_->ref_array;
+                current = parent_node->ref_array;
                 
                 switch(current->type_)
                 {
@@ -951,14 +969,16 @@ public:
 
     typedef Chunk<KeyValue> keyvalue_chunk;
     typedef Chunk<Node>     node_chunk;
-    typedef Chunk<RefCell>  RefCell_chunk;
+    typedef Chunk<RefCell>  ref_chunk;
 
-    typedef ChunkBox<KeyValue> keyvalue_box;
-    typedef ChunkBox<Node>     node_box;
+    typedef ChunkBox<KeyValue> keyvalue_chunk_box;
+    typedef ChunkBox<Node>     node_chunk_box;
+    typedef ChunkBox<RefCell>  ref_chunk_box;
 
     typedef std::unordered_map<Node*, int> refcount_map;
 
 
+    /** The map class.*/
     class Map
     {
         public:
@@ -1121,6 +1141,13 @@ public:
         // TODO
         old;
     }
+
+    /** Garbage collection for map.*/
+    void gc()
+    {
+
+    }
+
 #if 0
     /** Allocate new node*/
     Node* new_node(const T& data)
@@ -1134,10 +1161,11 @@ public:
 #endif
 
 private:
-    keyvalue_box                 keyvalue_manager_;
-    node_box                     node_manager_;
-    PersistentListPool<KeyValue> collided_list_pool_;
-    refcount_map                 ref_count_; // Store references to root nodes
+    keyvalue_chunk_box                 keyvalue_chunks_;
+    node_chunk_box                     node_chunks_;
+    ref_chunk_box                      ref_chunks_;
+    PersistentListPool<KeyValue>       collided_list_pool_;
+    refcount_map                       ref_count_; // Store references to root nodes
 };
 
 #endif
