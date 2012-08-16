@@ -2,6 +2,8 @@ Included software libraries:
 stb_image
 stb_image_write
 
+tinythread++
+
 stb_... fonts
 
 Links with:

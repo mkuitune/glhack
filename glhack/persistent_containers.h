@@ -784,19 +784,19 @@ public:
         RefCell(){}
         ~RefCell(){dealloc();}
 
-        void alloc_list(RefListPool& pool, const KeyValue& a, const KeyValue& b)
+        void bind_list(RefListPool& pool, const KeyValue& a, const KeyValue& b)
         {
             type_ = RefList
             data.list = new RefListPool::List(pool.new_list(a,b));
         }
 
-        void alloc_node(Node* node)
+        void bind_node(Node* node)
         {
             type_ = RefNode;
             data.node = node;
         }
 
-        void alloc_keyvalue(KeyValue* keyvalue)
+        void bind_keyvalue(KeyValue* keyvalue)
         {
             data.keyvalue = keyvalue;
         }
@@ -966,7 +966,6 @@ public:
         }
     };
 
-
     typedef Chunk<KeyValue> keyvalue_chunk;
     typedef Chunk<Node>     node_chunk;
     typedef Chunk<RefCell>  ref_chunk;
@@ -977,129 +976,137 @@ public:
 
     typedef std::unordered_map<Node*, int> refcount_map;
 
+    // Unordered iterator to map nodes
+    //
+    // The purpose is to support stl -like iteration.
+    class node_iterator
+    {
+        // Use the topmost iterator for iterator
+        FixedStack<NodeValueIterator, 7> iter_stack; // Node, and current index to member array. Max tree depth is 7
+        KeyValue* current;
+
+        // For each node:
+        // Iterate over each value in array. If value is a node, go into node.
+        public:
+
+        iterator(Node* node):current(0)
+        {
+            if(node)
+            {
+                push_node(node);
+            }
+        }
+
+        void push_node(Node* node)
+        {
+                iter_stack.push(NodeValueIterator(node));
+
+                iter_stack.top().move_next();
+
+                if(iter_stack.top().is_keyvalue()) 
+                {
+                    current = iter_stack.top().keyvalue();
+                }
+
+                else
+                {
+                    push_node(iter_stack.top().node());
+                }
+        }
+
+        KeyValue& operator*(){return *current;}
+        KeyValue* operator->(){return current;}
+
+        void pop()
+        {
+            if(iter_stack.pop())
+            {
+                advance();
+            }
+            else
+            {
+                current = 0;
+            }
+        }
+
+        void advance()
+        {
+            if(top_iter().move_next())
+            {
+                if(top_iter().is_keyvalue())
+                {
+                    current = top_iter().keyvalue();
+                }
+                else
+                {
+                    push_node(top_iter().node());
+                }
+            }
+            else
+            {
+                pop();
+            }
+        }
+
+        void operator++(){advance();}
+
+        bool operator==(const iterator& i){return current == i.current;}
+        bool operator!=(const iterator& i){return current != i.current;}
+    };
+
 
     /** The map class.*/
     class Map
     {
         public:
+        typedef node_iterator iterator;
 
-            // Unordered iterator to Map
-            //
-            // The purpose is to support stl -like iteration.
-            class iterator
-            {
-                FixedStack<NodeValueIterator, 7> parents_; // Node, and current index to member array. Max tree depth is 7
-                KeyValue* current;
-
-                // TODO constructor and move forward
-                public:
-
-                iterator(Node* node):current(0)
-                {
-                    if(node)
-                    {
-                        push_node(node);
-                    }
-                }
-
-                NodeValueIterator& top_iter(){return *parents_.top();}
-
-                void push_node(Node* node)
-                {
-                        parents_.push(NodeValueIterator(node));
-                        top_iter().move_next();
-                        if(top_iter().is_keyvalue()) 
-                        {
-                            current = top_iter().keyvalue();
-                        }
-                        else
-                        {
-                            push_node(top_iter().node());
-                        }
-                }
-
-                KeyValue& operator*(){return *current;}
-                KeyValue* operator->(){return current;}
-
-                void pop()
-                {
-                    if(parents_.pop())
-                    {
-                        advance();
-                    }
-                    else
-                    {
-                        current = 0;
-                    }
-                }
-
-                void advance()
-                {
-                    if(top_iter().move_next())    
-                    {
-                        if(top_iter().is_keyvalue())
-                            current = top_iter().keyvalue();
-                        else
-                            push_node(top_iter().node());
-                    }
-                    else
-                    {
-                        pop();
-                    }
-                }
-
-                void operator++(){advance();}
-
-                bool operator==(const iterator& i){return current == i.current;}
-                bool operator!=(const iterator& i){return current != i.current;}
-            };
-
-            Map(PersistentMapPool& pool, Node* root):pool_(pool), root_(root)
+        Map(PersistentMapPool& pool, Node* root):pool_(pool), root_(root)
         {
             if(root_) pool_.add_ref(root_);
         }
 
-            Map(const Map& map):pool_(map.pool_), root_(map.root_)
+        Map(const Map& map):pool_(map.pool_), root_(map.root_)
         {
             if(root_) pool_.add_ref(root_);
         }
 
-            Map(Map&& map):pool_(map.pool_), root_(map.root_)
+        Map(Map&& map):pool_(map.pool_), root_(map.root_)
         {
             map.root_ = 0;
         }
 
-            ~Map()
+        ~Map()
+        {
+            if(root_) pool_.remove_ref(root_);
+        }
+
+        Map& operator=(const Map& map)
+        {
+            if(this != &map)
             {
                 if(root_) pool_.remove_ref(root_);
+                pool_ = map.pool_;
+                root_ = map.root_;
+                pool_.add_ref(root_);
             }
+            return *this;
+        }
 
-            Map& operator=(const Map& map)
+        Map& operator=(Map&& map)
+        {
+            if(this != &map)
             {
-                if(this != &map)
-                {
-                    if(root_) pool_.remove_ref(root_);
-                    pool_ = map.pool_;
-                    root_ = map.root_;
-                    pool_.add_ref(root_);
-                }
-                return *this;
+                if(root_) pool_.remove_ref(root_);
+                pool_ = map.pool_;
+                root_ = map.root_;
+                map.root_ = 0;
             }
+            return *this;
+        }
 
-            Map& operator=(Map&& map)
-            {
-                if(this != &map)
-                {
-                    if(root_) pool_.remove_ref(root_);
-                    pool_ = map.pool_;
-                    root_ = map.root_;
-                    map.root_ = 0;
-                }
-                return *this;
-            }
-
-            iterator begin(){return iterator(root_);}
-            iterator end(){return iterator(0);}
+        iterator begin(){return iterator(root_);}
+        iterator end(){return iterator(0);}
 
         private:
             PersistentMapPool& pool_;
@@ -1147,18 +1154,21 @@ public:
     {
 
     }
-
-#if 0
-    /** Allocate new node*/
-    Node* new_node(const T& data)
+    
+    /** Allocate new node */
+    Node* new_node(const KeyValue& v)
     {
-        Node* n = node_box_.reserve_element();
+        Node*     n     = node_chunks_.reserve_element();
+        RefCell*  cells = ref_chunks_.reserve_elements();
+        KeyValue* kv    = keyvalue_chunks_.reserve_element();
 
-        // TODO
+        *kv = v;
 
+        cells->bind_keyvalue(kv);
+        n->ref_array = cells;
         return n;
     }
-#endif
+
 
 private:
     keyvalue_chunk_box                 keyvalue_chunks_;
