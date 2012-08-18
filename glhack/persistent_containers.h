@@ -81,7 +81,7 @@ struct Chunk
         if(is_full()) return 0;
         uint32_t index = lowest_unset_bit(used_elements);
         used_elements = set_bit_on(used_elements, index);
-        T* address = buffer + index * sizeof(T);
+        T* address = ((T*)buffer) + index;
         T* t = new(address)T();
         return t;
     }
@@ -140,7 +140,7 @@ struct Chunk
     
     void set_used(T* ptr)
     {
-        uint32_t index = ptr - buffer;
+        uint32_t index = ptr - ((T*)buffer);
         // Note: if ptr < buffer, then index will wrap (to a very large number >> CHUNK_BUFFER_SIZE)
         // and the following clause will be false.
         if(index < CHUNK_BUFFER_SIZE)
@@ -151,7 +151,7 @@ struct Chunk
     
     void set_marked(T* ptr)
     {
-        uint32_t index = ptr - buffer;
+        uint32_t index = ptr - ((T*)buffer);
         // Note: if ptr < buffer, then index will wrap (to a very large number >> CHUNK_BUFFER_SIZE)
         // and the following clause will be false.
         if(index < CHUNK_BUFFER_SIZE)
@@ -377,7 +377,7 @@ public:
     {
         for(auto chunk = begin(); chunk != end(); ++chunk)
         {
-            uint32_t pre_used_elements = chunk.used_elements;
+            uint32_t pre_used_elements = chunk->used_elements;
             chunk->collect_marked();
 
             if(chunk->used_elements != pre_used_elements && pre_used_elements == CHUNK_BUFFER_SIZE)
@@ -989,7 +989,7 @@ public:
         // Iterate over each value in array. If value is a node, go into node.
         public:
 
-        iterator(Node* node):current(0)
+        node_iterator(Node* node):current(0)
         {
             if(node)
             {
@@ -1001,16 +1001,16 @@ public:
         {
                 iter_stack.push(NodeValueIterator(node));
 
-                iter_stack.top().move_next();
+                iter_stack.top()->move_next();
 
-                if(iter_stack.top().is_keyvalue()) 
+                if(iter_stack.top()->is_keyvalue()) 
                 {
-                    current = iter_stack.top().keyvalue();
+                    current = iter_stack.top()->keyvalue();
                 }
 
                 else
                 {
-                    push_node(iter_stack.top().node());
+                    push_node(iter_stack.top()->node());
                 }
         }
 
@@ -1031,15 +1031,15 @@ public:
 
         void advance()
         {
-            if(top_iter().move_next())
+            if(iter_stack.top()->move_next())
             {
-                if(top_iter().is_keyvalue())
+                if(iter_stack.top()->is_keyvalue())
                 {
-                    current = top_iter().keyvalue();
+                    current = iter_stack.top()->keyvalue();
                 }
                 else
                 {
-                    push_node(top_iter().node());
+                    push_node(iter_stack.top()->node());
                 }
             }
             else
@@ -1050,8 +1050,8 @@ public:
 
         void operator++(){advance();}
 
-        bool operator==(const iterator& i){return current == i.current;}
-        bool operator!=(const iterator& i){return current != i.current;}
+        bool operator==(const node_iterator& i){return current == i.current;}
+        bool operator!=(const node_iterator& i){return current != i.current;}
     };
 
 
