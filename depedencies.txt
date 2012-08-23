@@ -4,6 +4,10 @@ stb_image_write
 
 tinythread++
 
+Open asset import library assimp
+
+
+
 stb_... fonts
 
 Links with:

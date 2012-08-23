@@ -733,26 +733,60 @@ level  0     1     2     3     4     5   6
 
     4 bytes (used_field) + 8 bytes (ref_array pointer) + elem_count(1 to 32) * 8 (ref_array contents) -> 20 to 268 bytes
 
-    The hash trie is used in a persistent manner - each modifications return a new root-node with the path to the changed node
-    re-allocated. The stored elements themselves are not copied, only the references to them.
+    The hash trie is used in a persistent manner - each modifications return a new root-node
+    with the path to the changed node re-allocated. The stored elements themselves are not
+    copied, only the references to them.
+
+    Each non-value type (i.e. that encompass more memory than just sizeof(T), std::string etc,
+    stored in the map must have it's own implementation of the hash32 function.
+
 */
 
 
 template<class K, class V>
-class PersistentMapPool {
+class PersistentMapPool
+{
 public:
 
     /** Key-value pair. */
     struct KeyValue{K first; V second;};
 
     /* Data structure types. */
+    
+    typedef typename PersistentListPool<KeyValue*>       KeyValueListPool;
+    typedef typename PersistentListPool<KeyValue*>::List KeyValueList;
 
     struct RefCell;
 
     struct Node
     {
+        struct Ref
+        {
+            Node* node;
+            Node& operator*(){return *node;}
+            Node& operator->(){return *node;}
+        };
+
+        enum NodeType{EmptyNode, ValueNode, CollisionNode};
+
         uint32_t used;
-        RefCell *ref_array; //> Pointer to an allocated sequence
+        Ref*     child_array; //> Pointer to an allocated child sequence
+       
+        /** For ValueNodes the keyvalue field is referenced. For
+         *  CollisionNodes the collision_list field is referenced. */ 
+        union
+        {
+            KeyValue*     keyvalue;
+            KeyValueList* collision_list;
+        }value;
+
+        NodeType type; 
+
+        Node():used(0), child_array(0)
+        ~Node()
+        {
+            if(type == CollisionNode && value.collision_list) delete value.collision_list;
+        }
 
         /** Return number of elements stored */
         size_t size(){ return count_bits(used);}
@@ -760,83 +794,123 @@ public:
         /** Return index matching the bitfield.*/
         uint32_t index(uint32_t bitfield){return count_bits(used & (bitfield - 1));}
 
-        /** Return reference matching the bit pattern */
-        RefCell& get(uint32_t key, uint32_t level)
+        /** Return reference matching the bit pattern or null if array is not large enough.*/
+        Ref* get(uint32_t key, uint32_t level)
         {
+            Ref* result = 0;
             uint32_t local_index = (key >> (level*5)) & 0x1f;
-            return ref_array + index(local_index);
+            if(local_index < size()) result = child_array + index(local_index);
+            return result;
         }
 
-        RefCell* begin(){return ref_array;}
-        RefCell* end(){return ref_array + size();}
+        Ref* begin(){return child_array;}
+        Ref* end(){return child_array + size();}
     };
 
-    typedef enum RefType_{RefNode, RefValue, RefList} RefType;
+    bool node_has_children(Node* n) {return n->children != 0;}
+    bool node_has_keyvalues(Node* n) {return n->type != Node::EmptyNode;}
 
-    typedef typename PersistentListPool<RefCell*> RefListPool;
-
-    /** Refcells contain reference to node, collision list of values or a value.*/
-    class RefCell
+    /**
+     * Iterator for the values in one node.
+     */
+    struct NodeValueIterator
     {
-    public:
-        RefType type_;
+        Node* node;
+        typename KeyValueList::iterator iter;
+        typename KeyValueList::iterator end;
+        
+        bool      iteration_ongoing;
 
-        RefCell(){}
-        ~RefCell(){dealloc();}
+        KeyValue* keyvalue;
 
-        void bind_list(RefListPool& pool, const KeyValue& a, const KeyValue& b)
+        NodeValueIterator():node(0), keyvalue(0), iteration_ongoing(false){}
+
+        NodeValueIterator(Node* node_in):node(node_in), keyvalue(0), iteration_ongoing(false)
         {
-            type_ = RefList
-            data.list = new RefListPool::List(pool.new_list(a,b));
+            if(node->type == Node::CollisionNode) end = node->value.collision_list->end();
         }
 
-        void bind_node(Node* node)
+        /** Returns true as long as the iterator is ongoing. Once the iteration is complete
+         *  the internal reference to keyvalue is in undefined state. */
+        bool move_next()
         {
-            type_ = RefNode;
-            data.node = node;
-        }
-
-        void bind_keyvalue(KeyValue* keyvalue)
-        {
-            data.keyvalue = keyvalue;
-        }
-
-        void dealloc()
-        {
-            if(type_ == RefList) delete data.list;
-        }
-
-        RefCell& operator=(RefCell& cell)
-        {
-            if(this != &cell)
+            bool result = false;
+            switch(node->type)
             {
-                type_ = cell.type_;
-                switch(type_)
+                case Node::ValueNode:
                 {
-                    case RefNode:
-                        data.node = cell.data.node;
-                        break;
-                    case RefValue:
-                        data.node = cell.data.keyvalue;
-                        break;
-                    case RefList:
-                        data.list = new RefListPool::List(cell.data.list);
-                        break;
-                    default:
-                        break;
+                    if(!keyvalue)
+                    {
+                        // Can visit the only value only once.
+                        keyvalue = node->value.keyvalue;
+                        result = true;
+                    }
+                    break;
                 }
+                case Node::CollisionNode:
+                {
+                    if(iteration_ongoing)
+                    {
+                        iter++;
+                        if(iter != end)
+                        {
+                            keyvalue = *iter;
+                            result = true;
+                        }
+                    }
+                    else
+                    {
+                        iteration_ongoing = true;
+                        // The list has at least two elements. No need to check for nil head.
+                        iter = node->value.collision_list->begin();
+                        keyvalue = *iter;
+                        result = true;
+                    }
+                    break;
+                }
+                case Node::EmptyNode:
+                default:
+                    break;
             }
-            return *this;
+            return result;
         }
 
-        union
-        {
-            typename RefListPool::List* list;
-            KeyValue*                   keyvalue;
-            Node*                       node;
-        }data;
+        KeyValue* current(){return keyvalue;}
     };
 
+    // Itearator for children inside node.
+    struct NodeChildIterator
+    {
+        Node* node;
+        Node::Ref* iter;  
+        Node::Ref* end;  
+        bool iterating;
+
+        NodeChildIterator(Node* node_in):node(node_in), iterating(false)
+        {
+            end = node->end();
+        }
+
+        bool move_next()
+        {
+            bool result = false;
+
+            if(iterating) 
+            {
+                iter++;
+            }
+            else
+            {
+                iter = node->begin();
+            }
+
+            if(iter != end) result = true;
+        }
+            
+        Node* current(){return iter->node;}
+    };
+
+#if 0
     /** Iterator for cells inside node*/
     struct NodeValueIterator
     {
@@ -965,10 +1039,11 @@ public:
             return false;
         }
     };
+#endif
 
-    typedef Chunk<KeyValue> keyvalue_chunk;
-    typedef Chunk<Node>     node_chunk;
-    typedef Chunk<RefCell>  ref_chunk;
+    typedef Chunk<KeyValue>  keyvalue_chunk;
+    typedef Chunk<Node>      node_chunk;
+    typedef Chunk<Node::Ref> ref_chunk;
 
     typedef ChunkBox<KeyValue> keyvalue_chunk_box;
     typedef ChunkBox<Node>     node_chunk_box;
@@ -981,9 +1056,20 @@ public:
     // The purpose is to support stl -like iteration.
     class node_iterator
     {
-        // Use the topmost iterator for iterator
-        FixedStack<NodeValueIterator, 7> iter_stack; // Node, and current index to member array. Max tree depth is 7
+        // Use stack of node child iterators to keep track of state.
+        // Algorithm:
+        //  i)  Go to the leftmost node foundable
+        //  ii) iterate it's values
+        //  ii) go to node sibling, 
+        
+        FixedStack<NodeChildIteator, 8> iter_stack; //Max tree depth is 7 plus root.
+        NodeValueIterator value_iter;
+
         KeyValue* current;
+
+#define CURRENT_NODE iter_stack.top()->current()
+#define CURRENT_KV top_value_iterator.current()
+#define TOP_ITER iter_stack.top()
 
         // For each node:
         // Iterate over each value in array. If value is a node, go into node.
@@ -991,60 +1077,81 @@ public:
 
         node_iterator(Node* node):current(0)
         {
-            if(node)
+            if(node && node_has_children(node))
             {
                 push_node(node);
             }
         }
 
-        void push_node(Node* node)
+        // Latch onto the children of the node - make sure the node has children prior to pushing it
+        void push_node(Node* parent_node)
         {
-                iter_stack.push(NodeValueIterator(node));
+            iter_stack.push(NodeChildIterator(parent_node));
+            TOP_ITER->move_next(); // Must succeed as node has children - now have a valid node
 
-                iter_stack.top()->move_next();
-
-                if(iter_stack.top()->is_keyvalue()) 
-                {
-                    current = iter_stack.top()->keyvalue();
-                }
-
-                else
-                {
-                    push_node(iter_stack.top()->node());
-                }
-        }
-
-        KeyValue& operator*(){return *current;}
-        KeyValue* operator->(){return current;}
-
-        void pop()
-        {
-            if(iter_stack.pop())
+            Node* node = CURRENT_NODE;
+            if(node_has_keyvalues(node))
             {
-                advance();
+                value_iter = NodeValueIterator(node);
+                advance(); // Move value_iter to valid value
             }
             else
             {
-                current = 0;
+                // Push until a node with values is found
+                push_node(node)
             }
         }
 
         void advance()
         {
-            if(iter_stack.top()->move_next())
+            if(value_iter.move_next())
             {
-                if(iter_stack.top()->is_keyvalue())
+                current = CURRENT_KV;
+            }
+            else
+            {
+                Node* node = CURRENT_NODE;
+                // Ran out of values - find next node.
+                if(node_has_children(node))
                 {
-                    current = iter_stack.top()->keyvalue();
+                    push_node(node);
                 }
                 else
                 {
-                    push_node(iter_stack.top()->node());
+                    // Just a leaf node - pop stack
+                    pop();
+                }
+            }
+        }
+
+
+        void pop()
+        {
+            iter_stack.pop();
+
+            if(iter_stack.depth() > 0)
+            {
+                if(TOP_ITER.move_next())
+                {
+                    if(node_hase_keyvalues(CURRENT_NODE))
+                    {
+                        value_iter = NodeValueIterator(CURRENT_NODE);
+                        advance();
+                    }
+                    else
+                    {
+                        push_node(CURRENT_NODE);
+                    }
+                }
+                else
+                {
+                    pop();
                 }
             }
             else
             {
-                pop();
+                // Stack emtpy, nothing left to do
+                current = 0;
             }
         }
 
@@ -1052,6 +1159,13 @@ public:
 
         bool operator==(const node_iterator& i){return current == i.current;}
         bool operator!=(const node_iterator& i){return current != i.current;}
+
+        KeyValue& operator*(){return current;}
+        KeyValue* operator->(){return current;}
+
+#undef CURRENT_NODE
+#undef CURRENT_KV
+#undef TOP
     };
 
 
@@ -1059,54 +1173,54 @@ public:
     class Map
     {
         public:
-        typedef node_iterator iterator;
+            typedef node_iterator iterator;
 
-        Map(PersistentMapPool& pool, Node* root):pool_(pool), root_(root)
+            Map(PersistentMapPool& pool, Node* root):pool_(pool), root_(root)
         {
             if(root_) pool_.add_ref(root_);
         }
 
-        Map(const Map& map):pool_(map.pool_), root_(map.root_)
+            Map(const Map& map):pool_(map.pool_), root_(map.root_)
         {
             if(root_) pool_.add_ref(root_);
         }
 
-        Map(Map&& map):pool_(map.pool_), root_(map.root_)
+            Map(Map&& map):pool_(map.pool_), root_(map.root_)
         {
             map.root_ = 0;
         }
 
-        ~Map()
-        {
-            if(root_) pool_.remove_ref(root_);
-        }
-
-        Map& operator=(const Map& map)
-        {
-            if(this != &map)
+            ~Map()
             {
                 if(root_) pool_.remove_ref(root_);
-                pool_ = map.pool_;
-                root_ = map.root_;
-                pool_.add_ref(root_);
             }
-            return *this;
-        }
 
-        Map& operator=(Map&& map)
-        {
-            if(this != &map)
+            Map& operator=(const Map& map)
             {
-                if(root_) pool_.remove_ref(root_);
-                pool_ = map.pool_;
-                root_ = map.root_;
-                map.root_ = 0;
+                if(this != &map)
+                {
+                    if(root_) pool_.remove_ref(root_);
+                    pool_ = map.pool_;
+                    root_ = map.root_;
+                    pool_.add_ref(root_);
+                }
+                return *this;
             }
-            return *this;
-        }
 
-        iterator begin(){return iterator(root_);}
-        iterator end(){return iterator(0);}
+            Map& operator=(Map&& map)
+            {
+                if(this != &map)
+                {
+                    if(root_) pool_.remove_ref(root_);
+                    pool_ = map.pool_;
+                    root_ = map.root_;
+                    map.root_ = 0;
+                }
+                return *this;
+            }
+
+            iterator begin(){return iterator(root_);}
+            iterator end(){return iterator(0);}
 
         private:
             PersistentMapPool& pool_;
@@ -1138,7 +1252,8 @@ public:
     Map new_map(const KeyValue& v)
     {
         Node* n = new_node(v);
-        Map m(*this, n);
+        uint32_t hash_value = hash32(v);
+        Map m(*this);
         return m;
     }
 
@@ -1152,10 +1267,16 @@ public:
     /** Garbage collection for map.*/
     void gc()
     {
+        // Must cleanup keyvalues, nodes, refs and gc collided_list_pool_
+        // Mark all empty
 
+        // Visit all heads (iterate through map)
+        // For each node: mark node, mark refs, go through all keyvalues and mark them
+        // Then, collect all
+        // Finally gc collided_list_pool_
     }
-    
-    /** Allocate new node */
+
+    /** Allocate new simple node */
     Node* new_node(const KeyValue& v)
     {
         Node*     n     = node_chunks_.reserve_element();

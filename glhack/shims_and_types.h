@@ -183,6 +183,8 @@ public:
         return result;
     }
 
+    size_t depth(){return level_;}
+
 private:
     T stack_[MaxDepth];
     size_t level_;
