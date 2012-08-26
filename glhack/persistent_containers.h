@@ -488,7 +488,7 @@ public:
         }
 
         /** Remove element from list. */
-        List remove(const List& list, const iterator& i)
+        List remove(const iterator& i)
         {
             // Neither head nor node to remove can be null.
             if(i.node != 0 && head_)
@@ -742,14 +742,28 @@ level  0     1     2     3     4     5   6
 
 */
 
+template<class K>
+class AreEqual
+{
+public:
+    static bool compare(const K& k1, const K& k2){return k1 == k2;} 
+};
 
-template<class K, class V>
+template<class K, class V, class Compare = AreEqual<K>>
 class PersistentMapPool
 {
 public:
 
     /** Key-value pair. */
-    struct KeyValue{K first; V second;};
+    struct KeyValue{uint32_t hash; K first; V second;};
+   
+    V* keyvalue_match_get(const KeyValue& kv, const K& key, const uint32_t hash) 
+    {
+        V* result = 0;
+        if(kv->hash == hash && Compare::compare(key, kv.first))
+            result = &kv.second;
+        return result;
+    }
 
     /* Data structure types. */
     
@@ -791,8 +805,30 @@ public:
         /** Return number of elements stored */
         size_t size(){ return count_bits(used);}
 
+        /** Return true if the index signified by the index is used.*/
+        bool index_in_use(uint32_t index){return bit_is_on(used, index);}
+
         /** Return index matching the bitfield.*/
         uint32_t index(uint32_t bitfield){return count_bits(used & (bitfield - 1));}
+
+        /** Return element corresponding to the hash-key.*/
+        Node* get_child_by_fieldindex(uint32_t parsed_index)
+        {
+            if(index_in_use(parsed_index))
+            {
+                uint32_t child_index = index(1 << parsed_index);
+                return child_array[child_index];
+            }
+            else
+            {
+                return 0
+            }
+        }
+
+        Node* get_child_by_hash_and_depth(const uint32_t hash, const uint32_t depth)
+        {
+            return get_child_by_fieldindex((hash >> (depth * 5)) & 0x1f);
+        }
 
         /** Return reference matching the bit pattern or null if array is not large enough.*/
         Ref* get(uint32_t key, uint32_t level)
@@ -909,145 +945,14 @@ public:
             
         Node* current(){return iter->node;}
     };
-
-#if 0
-    /** Iterator for cells inside node*/
-    struct NodeValueIterator
-    {
-        enum IterMode{IterNone, IterCell, IterList};
-        
-        IterMode iter_mode;
-        RefType element_type;
-
-        Node* parent_node;
-        RefCell* current;
-        RefCell* end;
-
-        typename RefListPool::List::iterator list_iterator;
-        typename RefListPool::List::iterator list_iterator_end;
-
-        NodeValueIterator(){}
-
-        NodeValueIterator(Node* nodeIn):parent_node(nodeIn),iter_mode(IterNone)
-        {
-            current = 0;
-            end = parent_node->ref_array + parent_node->size();
-        }
-
-        bool is_keyvalue(){return element_type == RefValue;}
-
-        KeyValue* get_list_keyvalue()
-        {
-            RefCell* c = (RefCell*) list_iterator.data_ptr();
-            KeyValue* k = c->data.keyvalue;
-            return k;
-        }
-        
-        Node* get_list_nodevalue()
-        {
-            RefCell* c = (RefCell*) list_iterator.data_ptr();
-            Node* n = (Node*) c->data.node;
-            return n;
-        }
-
-        Node* node()
-        {
-            Node* n = 0;
-
-            switch(iter_mode)
-            {
-                case IterCell:
-                    n =current->data.node;
-                    break;
-                case IterList:
-                    n = get_list_nodevalue();
-                    break;
-                case IterNone:
-                default:
-                    break;
-            }
-            return n;
-        }
-
-        KeyValue* keyvalue()
-        {
-            KeyValue* kv = 0;
-
-            switch(iter_mode)
-            {
-                case IterCell:
-                    kv =current->data.keyvalue;
-                    break;
-                case IterList:
-                    kv = get_list_keyvalue();
-                    break;
-                case IterNone:
-                default:
-                    break;
-            }
-            return kv;
-        }
-
-        bool move_next()
-        {
-            if(!current)
-            {
-                current = parent_node->ref_array;
-                
-                switch(current->type_)
-                {
-                    case RefNode:
-                        element_type = RefNode;
-                        iter_mode = IterCell;
-                        break;
-                    case RefValue:
-                        element_type = RefValue;
-                        iter_mode = IterCell;
-                        break;
-                    case RefList:
-                        iter_mode = IterList;
-                        list_iterator = current->data.list->begin();
-                        list_iterator_end = current->data.list->end();
-                        break;
-                }
-                return true;
-            }
-
-            if(iter_mode == IterList)
-            {
-                ++list_iterator;
-                if(list_iterator != list_iterator_end) return true;
-                else iter_mode = IterNone;
-            }
-
-            if(++current != end)
-            {
-                if(current->type_ != RefList)
-                {
-                    iter_mode = IterCell;
-                }
-                else
-                {
-                    iter_mode = IterList; 
-                    list_iterator = current->data.list->begin();
-                    list_iterator_end = current->data.list->end();
-                }
-
-                return true;
-            }
-
-            return false;
-        }
-    };
-#endif
-
+    
     typedef Chunk<KeyValue>  keyvalue_chunk;
     typedef Chunk<Node>      node_chunk;
     typedef Chunk<Node::Ref> ref_chunk;
 
-    typedef ChunkBox<KeyValue> keyvalue_chunk_box;
-    typedef ChunkBox<Node>     node_chunk_box;
-    typedef ChunkBox<RefCell>  ref_chunk_box;
+    typedef ChunkBox<KeyValue>  keyvalue_chunk_box;
+    typedef ChunkBox<Node>      node_chunk_box;
+    typedef ChunkBox<Node::Ref> ref_chunk_box;
 
     typedef std::unordered_map<Node*, int> refcount_map;
 
@@ -1124,7 +1029,6 @@ public:
             }
         }
 
-
         void pop()
         {
             iter_stack.pop();
@@ -1150,7 +1054,7 @@ public:
             }
             else
             {
-                // Stack emtpy, nothing left to do
+                // Stack emtpy, nothing left to do - terminate iteration.
                 current = 0;
             }
         }
@@ -1160,7 +1064,7 @@ public:
         bool operator==(const node_iterator& i){return current == i.current;}
         bool operator!=(const node_iterator& i){return current != i.current;}
 
-        KeyValue& operator*(){return current;}
+        KeyValue* operator*(){return current;}
         KeyValue* operator->(){return current;}
 
 #undef CURRENT_NODE
@@ -1168,63 +1072,149 @@ public:
 #undef TOP
     };
 
-
     /** The map class.*/
     class Map
     {
-        public:
-            typedef node_iterator iterator;
+    public:
+        typedef node_iterator iterator;
 
-            Map(PersistentMapPool& pool, Node* root):pool_(pool), root_(root)
+        Map(PersistentMapPool& pool, Node* root):pool_(pool), root_(root)
         {
             if(root_) pool_.add_ref(root_);
         }
 
-            Map(const Map& map):pool_(map.pool_), root_(map.root_)
+        Map(const Map& map):pool_(map.pool_), root_(map.root_)
         {
             if(root_) pool_.add_ref(root_);
         }
 
-            Map(Map&& map):pool_(map.pool_), root_(map.root_)
+        Map(Map&& map):pool_(map.pool_), root_(map.root_)
         {
             map.root_ = 0;
         }
 
-            ~Map()
+        ~Map()
+        {
+            if(root_) pool_.remove_ref(root_);
+        }
+
+        Map& operator=(const Map& map)
+        {
+            if(this != &map)
             {
                 if(root_) pool_.remove_ref(root_);
+                pool_ = map.pool_;
+                root_ = map.root_;
+                pool_.add_ref(root_);
+            }
+            return *this;
+        }
+
+        Map& operator=(Map&& map)
+        {
+            if(this != &map)
+            {
+                if(root_) pool_.remove_ref(root_);
+                pool_ = map.pool_;
+                root_ = map.root_;
+                map.root_ = 0;
+            }
+            return *this;
+        }
+
+        ConstOption<V> try_get_value(const K& key)
+        {
+            uint32_t hash = get_hash32(key);
+            uint32_t level = 0; 
+            V* result = 0;
+            Node* current = root_;
+
+            for(;level < 8; level++) 
+            {
+                Node* n = current->get_child_by_hash_and_depth(hash, level);
+                if(n)
+                {     
+                    if(n->type == Node::ValueNode)
+                    {
+                        result = keyvalue_match_get(n->value.keyvalue, key, hash);
+                    }
+                    else if (n->type == Node::CollisionNode)
+                    {
+                        KeyValueList::iterator i = n->value.collision_list->begin();
+                        KeyValueList::iterator end = n->value.collision_list->end();
+                        for(;i != end && (result == 0); ++i)
+                        {
+                            result = keyvalue_match_get(**i, key, hash);
+                        }
+                    }
+
+                    if(result) break;
+
+                    current = n; // Just move on if match not found.
+                }
+                else
+                {
+                    // Trie path ran out. No value.
+                    break;
+                }
             }
 
-            Map& operator=(const Map& map)
+            return ConstOption(result);
+        }
+
+        Map add(const K& key, const V& value)
+        {
+            return pool_.add(*this, key, value);
+        }
+
+        Map remove(const K& key)
+        {
+            if(try_get_value(key))
             {
-                if(this != &map)
+                // Remove root and branch leading to key. Collect all keyvalues not equal to missing key.
+                std::list<KeyValue*> kept_keys;
+
+                Node* root = root_;
+                Node* new_root = new_node();
+
+                *new_root = *root;
+
+                uint32_t hash = get_hash32(key);
+                Node* next = root_->get_child_by_hash_and_depth(hash, 0);
+                
+                node_iterator iter(next);
+                node_itrator end(0);
+
+                for(;iter != end; iter++)
                 {
-                    if(root_) pool_.remove_ref(root_);
-                    pool_ = map.pool_;
-                    root_ = map.root_;
-                    pool_.add_ref(root_);
+                    KeyValue* current = *iter;
+                    if(! keyvalue_match_get(current, key, hash)) 
+                    {
+                        add(kept_keys, current);
+                    }
                 }
+
+                // Init new map root and child array - just remove the branch from which the node was removed.
+                Map out_map(pool_, new_root);
+                for(auto i = kept_keys.begin(); i != kept_keys.end(); ++i)
+                {
+                    out_map = out_map.add(*i);
+                }
+                return out_map;
+            }
+            else
+            {
+                // Nothing to remove, just return a new instance of the current map.
                 return *this;
             }
+        }
 
-            Map& operator=(Map&& map)
-            {
-                if(this != &map)
-                {
-                    if(root_) pool_.remove_ref(root_);
-                    pool_ = map.pool_;
-                    root_ = map.root_;
-                    map.root_ = 0;
-                }
-                return *this;
-            }
+        iterator begin(){return iterator(root_);}
+        iterator end(){return iterator(0);}
 
-            iterator begin(){return iterator(root_);}
-            iterator end(){return iterator(0);}
-
-        private:
-            PersistentMapPool& pool_;
-            Node* root_;
+    private:
+        PersistentMapPool& pool_;
+        Node* root_;
     };
 
     /** Remove reference to node */
@@ -1249,19 +1239,190 @@ public:
     }
 
     /** Create new map with one element*/
-    Map new_map(const KeyValue& v)
+    Map new_map(const K& key, const V& value)
     {
-        Node* n = new_node(v);
-        uint32_t hash_value = hash32(v);
-        Map m(*this);
+        KeyValue* kv = new_keyvalue(key, value);
+        Node* root = instantiate_tree_path(0, kv);
+
+        Map m(*this, root);
         return m;
     }
 
     /** Create a new map by adding an element to existing map*/
-    Map add(const Map& old, const KeyValue& v)
+    Map add(const Map& old, const K& key, const V& value)
     {
-        // TODO
-        old;
+        KeyValue* kv = new_keyvalue(key, value);
+        Node* new_root = instantiate_tree_path(old.root_, kv);
+        return Map(*this, new_root);
+    }
+
+    /** Create a new map by adding an allocated keyvalue instance to an existing map.*/
+    Map add(const Map& old, KeyValue* keyvalue)
+    {
+        Node* new_root = instantiate_tree_path(old.root_, keyvalue);
+        return Map(*this, new_root);
+    }
+
+    KeyValue* new_keyvalue(const K& k, const V& v)
+    {
+        KeyValue* kv = keyvalue_chunks_.reserve_element();
+        *kv.first  = k;
+        *kv.second = v;
+        *kv.hash   = get_hash32(k);
+        return kv;
+    }
+
+    /** Replace the existing reference array at node with a new array that has the newnode inserted at loc. */
+    void node_insert_replace_refarray(Node* parent, Node* newnode, const uint32_t local_index)
+    {
+        size_t   old_count       = parent->size();
+        size_t   new_count       = old_count + 1;
+        uint32_t local_index_bit = 1 << local_index;
+
+        Ref* child_array = ref_chunks_.reserve_consecutive_elements(new_count);
+        Ref* old_children = parent->child_array;
+
+        // Create new child array for current node and mark new index used.
+        parent->child_array = child_array;
+        parent->used |= local_index_bit;
+
+        uint32_t array_index = parent->index(local_index_bit); 
+
+        child_array[array_index] = newnode;
+
+        if(old_children)
+        {
+            std::copy(old_children, old_children + array_index, child_array);
+            std::copy(old_children + array_index, old_children + old_count, child_array + array_index + 1);
+        }
+    }
+
+    /** Create new nodes on map for the path for the given hash value
+     *  @param hash hash value in.
+     *  @returns RootValue for new tree
+     */
+    Node* instantiate_tree_path(const Node* old_root, const KeyValue* kv)
+    {
+        Node* newroot = kew_node();// This will be the root of the duplicate map.
+
+        if(old_root) *newroot = *old_root; // At first just copy children.
+
+        uint32_t level = 0;
+        uint32_t hash = kv->hash;
+        Node* current = newroot;
+
+        // Go all the way down once we find an empty node. Then assign it as the value.
+        for(;true;level++)
+        {
+            // Calculate the array index for this level of hash and the corresponding bit pattern.
+            uint32_t local_index = (hash >> (level*5)) & 0x1f; // |0-31|
+
+            if(!index_in_use(current->used, local_index))
+            {     
+                // Assign new node positioned at index
+
+                Node* newnode = new_node(); // This node will contain the value.
+                newnode->type =  ValueNode;
+                newnode->value.keyvalue = kv;
+
+                node_insert_replace_refarray(current, newnode, local_index);
+
+                break; 
+            }
+            else
+            {
+                // Index was in use.
+
+                size_t count = current->size();
+
+                Ref* child_array = ref_chunks_.reserve_consecutive_elements(count);
+                Ref* old_children = current->child_array;
+                std::copy(old_children, old_children + count, child_array);
+
+                current->child_array = child_array;
+
+                uint32_t array_index = current->index(local_index_bit); 
+
+                Node* newnode = new_node();
+                *newnode = *child_array[array_index];
+                child_array[array_index] = newnode;
+
+                // No suitable slot found yet.
+                if(level < 6)
+                {
+
+                    // Check if node value matches. If they do, replace current. 
+                    V* v = keyvalue_match_get(newnode->value.keyvalue, kv->first, hash);
+                    if(v)
+                    {
+                        // Replace matching key
+                        newnode->value.keyvalue = kv;
+                        break;
+                    }
+
+                    // If not matching key, just continue onwards.
+                    current = newnode;
+
+                }
+                else
+                {
+                    // Ran out of level. Need a collision list or replace existing value.
+                    // Need collision list.
+                    if(newnode->type == Node::CollisionNode)
+                    {
+                        // Already have a list. First check if value exists, then just replace it.
+                        // Otherwise append to list.
+
+                        KeyValueList* oldlist = newnode->value.collision_list;
+                        KeyValueList::iterator i = oldlist.begin();
+                        KeyValueList::iterator end = oldlist.end();
+
+                        bool replace = false;
+                        for(;i != end; ++i)
+                        {
+                            V* v = keyvalue_match_get(*i, kv->first, hash);
+                            if(v)
+                            {
+                                replace = true;
+                                break;
+                            }
+                        }
+
+                        if(replace)
+                        {
+                            List tmp = oldlist->remove(i);
+                            *(newnode->value.collision_list) = tmp->add(kv);
+                        }
+                        else
+                        {
+                            *(newnode->value.collision_list) = oldlist->add(kv);
+                        }
+                    }
+                    else
+                    {
+                        // Replace single value with a list or replace existing value.
+                        V* v = keyvalue_match_get(newnode->value.keyvalue, kv->first, hash);
+                        if(v)
+                        {
+                            // Replace matching key
+                            newnode->value.keyvalue = kv;
+                            break;
+                        }
+                        else
+                        {
+                            // Need collision list
+                            newnode->type = Node::CollisionNode;
+                            KeyValue* current_kv = newnode->value.keyvalue;
+                            newnode->value.collision_list = new KeyValueList(collided_list_pool.new_list(current_kv, kv));
+                        }
+                    }
+
+                    break;
+                }
+            }
+        }
+
+        return newroot;
     }
 
     /** Garbage collection for map.*/
@@ -1276,27 +1437,33 @@ public:
         // Finally gc collided_list_pool_
     }
 
-    /** Allocate new simple node */
+    /** Allocate new empty node.*/
+    Node* new_node()
+    {
+        Node* n = node_chunks_.reserve_element();
+        n->type = Node::EmptyNode;
+        return n;
+    }
+
+    /** Allocate new node with one value.*/
     Node* new_node(const KeyValue& v)
     {
-        Node*     n     = node_chunks_.reserve_element();
-        RefCell*  cells = ref_chunks_.reserve_elements();
-        KeyValue* kv    = keyvalue_chunks_.reserve_element();
-
+        Node*       n     = node_chunks_.reserve_element();
         *kv = v;
 
-        cells->bind_keyvalue(kv);
-        n->ref_array = cells;
+        n->type = Node::ValueNode;
+        n->value.keyvalue = kv;
+
         return n;
     }
 
 
 private:
-    keyvalue_chunk_box                 keyvalue_chunks_;
-    node_chunk_box                     node_chunks_;
-    ref_chunk_box                      ref_chunks_;
-    PersistentListPool<KeyValue>       collided_list_pool_;
-    refcount_map                       ref_count_; // Store references to root nodes
+    keyvalue_chunk_box keyvalue_chunks_;
+    node_chunk_box     node_chunks_;
+    ref_chunk_box      ref_chunks_;
+    KeyValueListPool   collided_list_pool_;
+    refcount_map       ref_count_; // Store references to root nodes
 };
 
 #endif

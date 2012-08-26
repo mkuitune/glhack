@@ -47,6 +47,20 @@ bool any_of(const T& val, const T& ref0, const T& ref1, const T& ref2){return va
 template<class T>
 bool any_of(const T& val, const T& ref0, const T& ref1, const T& ref2, const T& ref3){return val == ref0 || val == ref1 || val == ref2 || val == ref3;}
 
+//////// Helpfull small types /////////
+
+/** An immutable accessor to a valid or non-valid pointer. */
+template<class T>
+class ConstOption
+{
+public:
+    ConstOption(T* value):ptr(value){}
+    bool is_valid() const {return value != 0;}
+    const T& operator*()const {return *ptr;}
+    const T& operator->()const {return *ptr;}
+private:
+    T* ptr;
+};
 
 /////// String utilities /////////
 
