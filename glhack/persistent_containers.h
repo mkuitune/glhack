@@ -85,6 +85,11 @@ struct Chunk
         T* t = new(address)T();
         return t;
     }
+   
+    T* at(size_t index) 
+    {
+        return ((T*)buffer)[index];
+    }
 
     T* get_new_array(const size_t count)
     {
@@ -386,6 +391,16 @@ public:
                 free_chunks_ = &(*chunk);
             }
         }
+    }
+
+    void set_marked_if_contained(T* ptr)
+    {
+        std::for_each(begin(), end(), [&ptr](chunk_type& c){c.set_marked_if_contains(ptr);});
+    }
+    
+    void set_marked_if_contained_array(T* ptr, size_t size)
+    {
+        std::for_each(begin(), end(), [&ptr](chunk_type& c){c.set_marked_if_contains_array(ptr, size);});
     }
 
     iterator begin(){return chunks_.begin();}
@@ -791,7 +806,9 @@ public:
         union
         {
             KeyValue*     keyvalue;
-            KeyValueList* collision_list;
+            KeyValueList* collision_list; 
+            //Before end of the trie tree hash collisions are just proapagated downwards.
+            //The collided elements are always only keyvalues.
         }value;
 
         NodeType type; 
@@ -1162,11 +1179,20 @@ public:
             return ConstOption(result);
         }
 
+        // TODO: map_add_diff -> map -> value -> diff that implements the element add operator
+        // on a map and also returns a diff between the two versions of the maps.
+
+        /** Add key and value to map.*/
         Map add(const K& key, const V& value)
         {
             return pool_.add(*this, key, value);
         }
 
+        // TODO: map_remove_diff -> map -> value -> diff that implements the element remove operator
+        // on a map and also returns a diff between the two versions of the maps.
+
+
+        /** Remove key entry from map.*/
         Map remove(const K& key)
         {
             if(try_get_value(key))
@@ -1425,6 +1451,41 @@ public:
         return newroot;
     }
 
+    /** Mark all found entries when iterating from this node. Maximum child depth is
+     * seven so stack should not be terribly wasted. */
+
+    void mark_referenced(Node* node)
+    {
+        auto node_chunks_end     = node_chunks_.end();
+        auto keyvalue_chunks_end = keyvalue_chunks_.end();
+        auto ref_chunks_end      = ref_chunks_.end(); 
+    
+        auto recursive_mark = [&](Node* node)
+        {
+
+            node_chunks_.set_marked_if_contained(node); 
+            size_t size = node->size();
+            if(size > 0)
+            {
+                ref_chunks_.set_marked_if_contained_array(node->child_array, size);
+            }
+
+            if(node->type == Node::ValueNode)
+            {
+                keyvalue_chunks_.set_marked_if_contained(node->value.keyvalue);
+            }
+            else if(node->type == Node::CollisionNode)
+            {
+               foreach(node->value.collision_list, [&](KeyValue* kv){keyvalue_chunks_.set_marked_if_contained(kv);});
+            }
+
+            foreach(node, recursive_mark);
+            
+        };
+
+        recursive_mark(node);
+    }
+
     /** Garbage collection for map.*/
     void gc()
     {
@@ -1435,6 +1496,27 @@ public:
         // For each node: mark node, mark refs, go through all keyvalues and mark them
         // Then, collect all
         // Finally gc collided_list_pool_
+
+        // Clean mark fields.
+        keyvalue_chunks_.mark_all_empty();
+        node_chunks_.mark_all_empty();
+        ref_chunks_.mark_all_empty();
+
+        // Then clean up unused references, visit all heads and mark visited nodes as active
+        ref_count_ = copyif(ref_count_, [](const std::pair<Node*, int>& p){return p.second > 0;});
+
+        // Go through each head.
+        for(auto head = ref_count_.begin(); r!= ref_count_.end(); ++r) mark_referenced(r->first);
+
+        // Lastly, collect unused slots.
+        keyvalue_chunks_.collect_chunks();
+        node_chunks_.collect_chunks();
+        ref_chunks_.collect_chunks();
+
+        // After all used slots are collected garbage collect collided list pool (unused heads
+        // have been released in the possible destructors of the list heads).
+        collided_list_pool_.gc();
+
     }
 
     /** Allocate new empty node.*/
