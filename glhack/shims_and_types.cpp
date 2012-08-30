@@ -55,7 +55,7 @@ std::list<TextLine> string_split(const char* str, const char* delim)
 //////////////////////// Hashing /////////////////////////////
 
 
-uint32_t get_hash(cstring string)
+uint32_t get_hash32(cstring& string)
 {
     const char* data = string.c_str();
     int len = string.size();

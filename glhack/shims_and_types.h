@@ -54,12 +54,12 @@ template<class T>
 class ConstOption
 {
 public:
-    ConstOption(T* value):ptr(value){}
-    bool is_valid() const {return value != 0;}
-    const T& operator*()const {return *ptr;}
-    const T& operator->()const {return *ptr;}
+    ConstOption(const T* value):ptr(value){}
+    bool is_valid() const {return ptr != 0;}
+    const T& operator*() const {return *ptr;}
+    const T& operator->() const {return *ptr;}
 private:
-    T* ptr;
+    const T* ptr;
 };
 
 /////// String utilities /////////
@@ -170,7 +170,7 @@ public:
 
     T* top()
     {
-        if(level_ > 0) return stack_ + (level_ - 1);
+        if(level_ > 0) return ((T*)stack_) + (level_ - 1);
         else return 0;
     }
 
@@ -179,11 +179,19 @@ public:
         bool result = false;
         if(level_ < MaxDepth)
         {
-            stack_[level_] = data;
+            ((T*)stack_)[level_] = data;
             level_++;
             result = true;
         }
         return result;
+    }
+
+    T& at(size_t level){return ((T*) stack_)[level];}
+
+    void alloc(const T& t, size_t level)
+    {
+        T* address = ((T*) stack_) + level;
+        new(address)T(t);
     }
 
     bool pop()
@@ -200,7 +208,7 @@ public:
     size_t depth(){return level_;}
 
 private:
-    T stack_[MaxDepth];
+    char* stack_[sizeof(T) * MaxDepth];
     size_t level_;
 };
 
@@ -820,7 +828,7 @@ std::ostream& operator<<(std::ostream& os, const std::map<T, V>& map)
 
 //////////////////////// Hashing /////////////////////////////
 
-uint32_t get_hash32(cstring string);
+uint32_t get_hash32(cstring& string);
 
 template<class T>
 uint32_t get_hash32(const T& elem)

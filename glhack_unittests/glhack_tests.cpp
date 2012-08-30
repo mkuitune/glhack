@@ -135,22 +135,73 @@ GLHTEST(collections, PersistentList_test)
     print_container(list_long);
 }
 
+template<class M> void print_pmap(M& map)
+{
+    glh_test_out() << "Contents of persistent map:" << std::endl;
+    for(auto i = map.begin(); i != map.end(); ++i)
+    {
+        glh_test_out() << i->first  << ":" << i->second << std::endl;
+    }
+}
+
+typedef glh::PersistentMapPool<std::string, int>::Map SI_Map;
+
+void test_overwrite(SI_Map map)
+{
+    auto map1 = map.add("One", 1);
+    print_pmap(map);
+    auto map1_b = map.add("One", 11);
+    print_pmap(map);
+    auto map1_c = map1_b.add("One", 111);
+    print_pmap(map);
+}
+
+
+GLHTEST(collections, PersistentMap_write_gc_test)
+{
+    // Write n elements to map
+    // Write m elements to map2
+    // delete map2, gc
+    // Check map is unchanged.
+}
+
 GLHTEST(collections, PersistentMap_test)
 {
     using namespace glh;
 
+
+    auto visit_scope = [](SI_Map& map, cstring& str, int i){
+        auto map2 = map.add(str, i);
+        print_pmap(map2);
+    };
+
     PersistentMapPool<std::string, int> pool;
-    PersistentMapPool<std::string, int>::Map map = pool.new_map();
+    SI_Map map = pool.new_map();
 
-    auto iter = map.begin();
-    auto end = map.end();
+    glh_test_out() << "  #########" << std::endl;
 
-    glh_test_out() << "Contents of persistent map:" << std::endl;
-    for(;iter != end; ++iter)
-    {
-        glh_test_out() << iter->first  << ":" << iter->second << std::endl;
-    }
+    print_pmap(map);
+    auto map1 = map.add("Foo", 300);
+    print_pmap(map);
+    print_pmap(map1);
 
+    glh_test_out() << "  #########" << std::endl;
+
+    test_overwrite(map);
+    print_pmap(map);
+    print_pmap(map1);
+    
+    glh_test_out() << "  #########" << std::endl;
+
+    auto map2 = map1.add("Removethis", 6996);
+    print_pmap(map1);
+    print_pmap(map2);
+    map2 = map2.remove("Removethis");
+    print_pmap(map1);
+    print_pmap(map2);
+    map2.gc();
+    print_pmap(map1);
+    print_pmap(map2);
 }
 
 /////////// Containers ////////////////

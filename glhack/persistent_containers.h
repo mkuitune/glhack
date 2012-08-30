@@ -47,6 +47,7 @@
 #include<unordered_map>
 #include<functional>
 #include<sstream>
+#include<new>
 
 namespace glh{
 
@@ -82,7 +83,7 @@ struct Chunk
         uint32_t index = lowest_unset_bit(used_elements);
         used_elements = set_bit_on(used_elements, index);
         T* address = ((T*)buffer) + index;
-        T* t = new(address)T();
+        T* t = new(address)T;
         return t;
     }
    
@@ -113,14 +114,14 @@ struct Chunk
         {
             if((used_elements & mask) == 0)
             {
-                result = buffer + array_start_index*sizeof(T);
+                result = ((T*) buffer) + array_start_index;
                 T* tmp;
-                for(size_t i = 0; i  < count; ++i) tmp = new(result + i * sizeof(T))T();
+                for(size_t i = 0; i  < count; ++i) tmp = new(result + i)T;
                 used_elements |= mask;
                 break;
             }
-            mask =<< 1;
-            array_start_index++
+            mask <<= 1;
+            array_start_index++;
         }
 
         return result;
@@ -154,7 +155,7 @@ struct Chunk
         }
     }
     
-    void set_marked(T* ptr)
+    void set_marked(const T* ptr)
     {
         uint32_t index = ptr - ((T*)buffer);
         // Note: if ptr < buffer, then index will wrap (to a very large number >> CHUNK_BUFFER_SIZE)
@@ -176,7 +177,7 @@ struct Chunk
 
     void reset_marks(){mark_field = 0;}
 
-    bool set_marked_if_contains(T* elem)
+    bool set_marked_if_contains(const T* elem)
     {
         bool result = false;
         if(contains(elem))
@@ -187,10 +188,10 @@ struct Chunk
         return result;
     }
     
-    bool set_marked_if_contains_array(T* start, const size_t count)
+    bool set_marked_if_contains_array(const T* start, const size_t count)
     {
         bool result = false;
-        if(contains(start) && ((start - buffer) + count) <= BUFFER_SIZE)
+        if(contains(start) && ((start - ((T*)buffer)) + count) <= CHUNK_BUFFER_SIZE)
         {
             for(size_t i = 0; i < count; ++i) set_marked(start + i);
 
@@ -393,14 +394,14 @@ public:
         }
     }
 
-    void set_marked_if_contained(T* ptr)
+    void set_marked_if_contained(const T* ptr)
     {
         std::for_each(begin(), end(), [&ptr](chunk_type& c){c.set_marked_if_contains(ptr);});
     }
     
-    void set_marked_if_contained_array(T* ptr, size_t size)
+    void set_marked_if_contained_array(const T* ptr, size_t size)
     {
-        std::for_each(begin(), end(), [&ptr](chunk_type& c){c.set_marked_if_contains_array(ptr, size);});
+        std::for_each(begin(), end(), [&ptr, &size](chunk_type& c){c.set_marked_if_contains_array(ptr, size);});
     }
 
     iterator begin(){return chunks_.begin();}
@@ -495,21 +496,21 @@ public:
         }
 
         /** Add element to list */
-        List add(const List& list, const T& data)
+        List add(const T& data) const
         {
             Node* n = pool_.new_node(data);
-            n->next = list->head_; // prepend new element to head
+            n->next = head_; // prepend new element to head
             return List(pool_, n);
         }
 
         /** Remove element from list. */
-        List remove(const iterator& i)
+        List remove(const iterator& i) const
         {
             // Neither head nor node to remove can be null.
             if(i.node != 0 && head_)
             {
                 // If node is first, just return a list starting from next node.
-                if(n == i.node) return List(pool_, n->next);
+                if(head_ == i.node) return List(pool_, head_->next);
 
                 // Otherwise must duplicate nodes prior to node to remove
                 // [a]->[b]->[c]->[d]
@@ -535,10 +536,14 @@ public:
 
                 return List(pool_, new_head);
             }
+            else
+            {
+                return *this;
+            }
         }
 
-        iterator begin(){return iterator(head_);}
-        iterator end(){return iterator(0);}
+        iterator begin() const {return iterator(head_);}
+        iterator end() const {return iterator(0);}
 
         const size_t size() const
         {
@@ -772,18 +777,17 @@ public:
     /** Key-value pair. */
     struct KeyValue{uint32_t hash; K first; V second;};
    
-    V* keyvalue_match_get(const KeyValue& kv, const K& key, const uint32_t hash) 
+    static const V* keyvalue_match_get(const KeyValue& kv, const K& key, const uint32_t hash) 
     {
-        V* result = 0;
-        if(kv->hash == hash && Compare::compare(key, kv.first))
-            result = &kv.second;
-        return result;
+        if(kv.hash == hash && Compare::compare(key, kv.first))
+            return &kv.second;
+        else return 0;
     }
 
     /* Data structure types. */
     
-    typedef typename PersistentListPool<KeyValue*>       KeyValueListPool;
-    typedef typename PersistentListPool<KeyValue*>::List KeyValueList;
+    typedef typename PersistentListPool<const KeyValue*>       KeyValueListPool;
+    typedef typename PersistentListPool<const KeyValue*>::List KeyValueList;
 
     struct RefCell;
 
@@ -805,7 +809,7 @@ public:
          *  CollisionNodes the collision_list field is referenced. */ 
         union
         {
-            KeyValue*     keyvalue;
+            const KeyValue*     keyvalue;
             KeyValueList* collision_list; 
             //Before end of the trie tree hash collisions are just proapagated downwards.
             //The collided elements are always only keyvalues.
@@ -813,7 +817,8 @@ public:
 
         NodeType type; 
 
-        Node():used(0), child_array(0)
+        Node():used(0), child_array(0){}
+
         ~Node()
         {
             if(type == CollisionNode && value.collision_list) delete value.collision_list;
@@ -825,7 +830,7 @@ public:
         /** Return true if the index signified by the index is used.*/
         bool index_in_use(uint32_t index){return bit_is_on(used, index);}
 
-        /** Return index matching the bitfield.*/
+        /** Return index matching the bitfield. The bitfield must reflect an actually used bit.*/
         uint32_t index(uint32_t bitfield){return count_bits(used & (bitfield - 1));}
 
         /** Return element corresponding to the hash-key.*/
@@ -834,11 +839,11 @@ public:
             if(index_in_use(parsed_index))
             {
                 uint32_t child_index = index(1 << parsed_index);
-                return child_array[child_index];
+                return child_array[child_index].node;
             }
             else
             {
-                return 0
+                return 0;
             }
         }
 
@@ -860,8 +865,8 @@ public:
         Ref* end(){return child_array + size();}
     };
 
-    bool node_has_children(Node* n) {return n->children != 0;}
-    bool node_has_keyvalues(Node* n) {return n->type != Node::EmptyNode;}
+    static bool node_has_children(Node* n) {return n->child_array != 0;}
+    static bool node_has_keyvalues(Node* n) {return n->type != Node::EmptyNode;}
 
     /**
      * Iterator for the values in one node.
@@ -874,7 +879,7 @@ public:
         
         bool      iteration_ongoing;
 
-        KeyValue* keyvalue;
+        const KeyValue* keyvalue;
 
         NodeValueIterator():node(0), keyvalue(0), iteration_ongoing(false){}
 
@@ -904,7 +909,7 @@ public:
                 {
                     if(iteration_ongoing)
                     {
-                        iter++;
+                        ++iter;
                         if(iter != end)
                         {
                             keyvalue = *iter;
@@ -928,15 +933,15 @@ public:
             return result;
         }
 
-        KeyValue* current(){return keyvalue;}
+        const KeyValue* current() const {return keyvalue;}
     };
 
     // Itearator for children inside node.
     struct NodeChildIterator
     {
         Node* node;
-        Node::Ref* iter;  
-        Node::Ref* end;  
+        typename Node::Ref* iter;  
+        typename Node::Ref* end;  
         bool iterating;
 
         NodeChildIterator(Node* node_in):node(node_in), iterating(false)
@@ -958,6 +963,8 @@ public:
             }
 
             if(iter != end) result = true;
+
+            return result;
         }
             
         Node* current(){return iter->node;}
@@ -965,11 +972,11 @@ public:
     
     typedef Chunk<KeyValue>  keyvalue_chunk;
     typedef Chunk<Node>      node_chunk;
-    typedef Chunk<Node::Ref> ref_chunk;
+    typedef Chunk<typename Node::Ref> ref_chunk;
 
     typedef ChunkBox<KeyValue>  keyvalue_chunk_box;
     typedef ChunkBox<Node>      node_chunk_box;
-    typedef ChunkBox<Node::Ref> ref_chunk_box;
+    typedef ChunkBox<typename Node::Ref> ref_chunk_box;
 
     typedef std::unordered_map<Node*, int> refcount_map;
 
@@ -984,13 +991,12 @@ public:
         //  ii) iterate it's values
         //  ii) go to node sibling, 
         
-        FixedStack<NodeChildIteator, 8> iter_stack; //Max tree depth is 7 plus root.
+        FixedStack<NodeChildIterator, 8> iter_stack; //Max tree depth is 7 plus root.
         NodeValueIterator value_iter;
 
-        KeyValue* current;
+        const KeyValue* current;
 
 #define CURRENT_NODE iter_stack.top()->current()
-#define CURRENT_KV top_value_iterator.current()
 #define TOP_ITER iter_stack.top()
 
         // For each node:
@@ -1020,7 +1026,7 @@ public:
             else
             {
                 // Push until a node with values is found
-                push_node(node)
+                push_node(node);
             }
         }
 
@@ -1028,7 +1034,7 @@ public:
         {
             if(value_iter.move_next())
             {
-                current = CURRENT_KV;
+                current = value_iter.current();
             }
             else
             {
@@ -1052,9 +1058,9 @@ public:
 
             if(iter_stack.depth() > 0)
             {
-                if(TOP_ITER.move_next())
+                if(TOP_ITER->move_next())
                 {
-                    if(node_hase_keyvalues(CURRENT_NODE))
+                    if(node_has_keyvalues(CURRENT_NODE))
                     {
                         value_iter = NodeValueIterator(CURRENT_NODE);
                         advance();
@@ -1081,12 +1087,11 @@ public:
         bool operator==(const node_iterator& i){return current == i.current;}
         bool operator!=(const node_iterator& i){return current != i.current;}
 
-        KeyValue* operator*(){return current;}
-        KeyValue* operator->(){return current;}
+        const KeyValue* operator*(){return current;}
+        const KeyValue* operator->(){return current;}
 
 #undef CURRENT_NODE
-#undef CURRENT_KV
-#undef TOP
+#undef TOP_ITER
     };
 
     /** The map class.*/
@@ -1143,7 +1148,7 @@ public:
         {
             uint32_t hash = get_hash32(key);
             uint32_t level = 0; 
-            V* result = 0;
+            const V* result = 0;
             Node* current = root_;
 
             for(;level < 8; level++) 
@@ -1153,7 +1158,7 @@ public:
                 {     
                     if(n->type == Node::ValueNode)
                     {
-                        result = keyvalue_match_get(n->value.keyvalue, key, hash);
+                        result = keyvalue_match_get(*n->value.keyvalue, key, hash);
                     }
                     else if (n->type == Node::CollisionNode)
                     {
@@ -1176,8 +1181,10 @@ public:
                 }
             }
 
-            return ConstOption(result);
+            return ConstOption<V>(result);
         }
+
+        // TODO: template<class T> Map.add_seq keyvalue-pair list - add sequence of pairs in one update
 
         // TODO: map_add_diff -> map -> value -> diff that implements the element add operator
         // on a map and also returns a diff between the two versions of the maps.
@@ -1195,36 +1202,59 @@ public:
         /** Remove key entry from map.*/
         Map remove(const K& key)
         {
-            if(try_get_value(key))
+            if(try_get_value(key).is_valid())
             {
                 // Remove root and branch leading to key. Collect all keyvalues not equal to missing key.
-                std::list<KeyValue*> kept_keys;
+                std::list<const KeyValue*> kept_keys;
 
                 Node* root = root_;
-                Node* new_root = new_node();
+                Node* new_root = pool_.new_node();
 
                 *new_root = *root;
 
                 uint32_t hash = get_hash32(key);
                 Node* next = root_->get_child_by_hash_and_depth(hash, 0);
-                
-                node_iterator iter(next);
-                node_itrator end(0);
 
-                for(;iter != end; iter++)
+                // Visit the branch containing the keyvalue and collect all keyvalues except the one to remove.
+                node_iterator iter(next);
+                node_iterator end(0);
+
+                for(;iter != end; ++iter)
                 {
-                    KeyValue* current = *iter;
-                    if(! keyvalue_match_get(current, key, hash)) 
+                    const KeyValue* current = *iter;
+                    if(! keyvalue_match_get(*current, key, hash)) 
                     {
-                        add(kept_keys, current);
+                        kept_keys.push_back(current);
                     }
                 }
 
+                // Remove the branch holding the sought out keyvalue from the new_root.
+                size_t old_size = new_root->size();
+                size_t new_size = old_size - 1;
+
+                if(new_size > 0)
+                {
+                    uint32_t invalid_index = (hash) & 0x1f;
+                    new_root->used = set_bit_off(new_root->used, invalid_index);
+
+                    Node::Ref* new_child_array = pool_.ref_chunks_.reserve_consecutive_elements(new_size);
+                    new_root->child_array = new_child_array;
+                    size_t i = 0;
+                    for(i = 0; i < old_size; ++i)
+                    {
+                        if(root_->child_array[i].node != next) new_child_array[i] = root_->child_array[i];
+                    }
+                }
+                else
+                {
+                    new_root->used = 0;
+                    new_root->child_array = 0;
+                }
                 // Init new map root and child array - just remove the branch from which the node was removed.
                 Map out_map(pool_, new_root);
                 for(auto i = kept_keys.begin(); i != kept_keys.end(); ++i)
                 {
-                    out_map = out_map.add(*i);
+                    out_map = pool_.add(out_map, *i);
                 }
                 return out_map;
             }
@@ -1235,8 +1265,13 @@ public:
             }
         }
 
+        // Run garbage collector on the root pool.
+        void gc(){pool_.gc();}
+
         iterator begin(){return iterator(root_);}
         iterator end(){return iterator(0);}
+        
+        friend PersistentMapPool;
 
     private:
         PersistentMapPool& pool_;
@@ -1283,7 +1318,7 @@ public:
     }
 
     /** Create a new map by adding an allocated keyvalue instance to an existing map.*/
-    Map add(const Map& old, KeyValue* keyvalue)
+    Map add(const Map& old, const KeyValue* keyvalue)
     {
         Node* new_root = instantiate_tree_path(old.root_, keyvalue);
         return Map(*this, new_root);
@@ -1292,9 +1327,9 @@ public:
     KeyValue* new_keyvalue(const K& k, const V& v)
     {
         KeyValue* kv = keyvalue_chunks_.reserve_element();
-        *kv.first  = k;
-        *kv.second = v;
-        *kv.hash   = get_hash32(k);
+        kv->first  = k;
+        kv->second = v;
+        kv->hash   = get_hash32(k);
         return kv;
     }
 
@@ -1305,16 +1340,16 @@ public:
         size_t   new_count       = old_count + 1;
         uint32_t local_index_bit = 1 << local_index;
 
-        Ref* child_array = ref_chunks_.reserve_consecutive_elements(new_count);
-        Ref* old_children = parent->child_array;
+        Node::Ref* child_array = ref_chunks_.reserve_consecutive_elements(new_count);
+        Node::Ref* old_children = parent->child_array;
 
         // Create new child array for current node and mark new index used.
         parent->child_array = child_array;
         parent->used |= local_index_bit;
 
         uint32_t array_index = parent->index(local_index_bit); 
-
-        child_array[array_index] = newnode;
+        // TODO: Check all child_array references that they use explicitly ref.
+        child_array[array_index].node = newnode;
 
         if(old_children)
         {
@@ -1329,7 +1364,7 @@ public:
      */
     Node* instantiate_tree_path(const Node* old_root, const KeyValue* kv)
     {
-        Node* newroot = kew_node();// This will be the root of the duplicate map.
+        Node* newroot = new_node();// This will be the root of the duplicate map.
 
         if(old_root) *newroot = *old_root; // At first just copy children.
 
@@ -1343,12 +1378,12 @@ public:
             // Calculate the array index for this level of hash and the corresponding bit pattern.
             uint32_t local_index = (hash >> (level*5)) & 0x1f; // |0-31|
 
-            if(!index_in_use(current->used, local_index))
+            if(! current->index_in_use(local_index))
             {     
                 // Assign new node positioned at index
 
                 Node* newnode = new_node(); // This node will contain the value.
-                newnode->type =  ValueNode;
+                newnode->type =  Node::ValueNode;
                 newnode->value.keyvalue = kv;
 
                 node_insert_replace_refarray(current, newnode, local_index);
@@ -1361,24 +1396,23 @@ public:
 
                 size_t count = current->size();
 
-                Ref* child_array = ref_chunks_.reserve_consecutive_elements(count);
-                Ref* old_children = current->child_array;
+                Node::Ref* child_array = ref_chunks_.reserve_consecutive_elements(count);
+                Node::Ref* old_children = current->child_array;
                 std::copy(old_children, old_children + count, child_array);
 
                 current->child_array = child_array;
 
-                uint32_t array_index = current->index(local_index_bit); 
+                uint32_t array_index = current->index(local_index); 
 
                 Node* newnode = new_node();
-                *newnode = *child_array[array_index];
-                child_array[array_index] = newnode;
+                *newnode = *child_array[array_index].node;
+                child_array[array_index].node = newnode;
 
                 // No suitable slot found yet.
                 if(level < 6)
                 {
-
                     // Check if node value matches. If they do, replace current. 
-                    V* v = keyvalue_match_get(newnode->value.keyvalue, kv->first, hash);
+                    const V* v = keyvalue_match_get(*newnode->value.keyvalue, kv->first, hash);
                     if(v)
                     {
                         // Replace matching key
@@ -1388,7 +1422,6 @@ public:
 
                     // If not matching key, just continue onwards.
                     current = newnode;
-
                 }
                 else
                 {
@@ -1399,14 +1432,15 @@ public:
                         // Already have a list. First check if value exists, then just replace it.
                         // Otherwise append to list.
 
-                        KeyValueList* oldlist = newnode->value.collision_list;
-                        KeyValueList::iterator i = oldlist.begin();
-                        KeyValueList::iterator end = oldlist.end();
+                        const KeyValueList* oldlist = newnode->value.collision_list;
+                        KeyValueList::iterator i    = oldlist->begin();
+                        KeyValueList::iterator end  = oldlist->end();
 
                         bool replace = false;
                         for(;i != end; ++i)
                         {
-                            V* v = keyvalue_match_get(*i, kv->first, hash);
+                            const KeyValue* ikv = *i;
+                            const V* v = keyvalue_match_get(*ikv, kv->first, hash);
                             if(v)
                             {
                                 replace = true;
@@ -1416,8 +1450,8 @@ public:
 
                         if(replace)
                         {
-                            List tmp = oldlist->remove(i);
-                            *(newnode->value.collision_list) = tmp->add(kv);
+                            KeyValueList tmp = oldlist->remove(i);
+                            *(newnode->value.collision_list) = tmp.add(kv);
                         }
                         else
                         {
@@ -1427,7 +1461,7 @@ public:
                     else
                     {
                         // Replace single value with a list or replace existing value.
-                        V* v = keyvalue_match_get(newnode->value.keyvalue, kv->first, hash);
+                        const V* v = keyvalue_match_get(*newnode->value.keyvalue, kv->first, hash);
                         if(v)
                         {
                             // Replace matching key
@@ -1436,10 +1470,11 @@ public:
                         }
                         else
                         {
-                            // Need collision list
+                            //Need collision list
                             newnode->type = Node::CollisionNode;
-                            KeyValue* current_kv = newnode->value.keyvalue;
-                            newnode->value.collision_list = new KeyValueList(collided_list_pool.new_list(current_kv, kv));
+                            const KeyValue* current_kv = newnode->value.keyvalue;
+                            newnode->value.collision_list = new KeyValueList(collided_list_pool_, 0);
+                            *(newnode->value.collision_list) = collided_list_pool_.new_list(current_kv, kv);
                         }
                     }
 
@@ -1451,38 +1486,39 @@ public:
         return newroot;
     }
 
+    // TODO all absolutely non-member functions to static
+    void recursive_mark(Node* node)
+    {
+        node_chunks_.set_marked_if_contained(node); 
+        size_t size = node->size();
+        if(size > 0)
+        {
+            ref_chunks_.set_marked_if_contained_array(node->child_array, size);
+        }
+
+        if(node->type == Node::ValueNode)
+        {
+            keyvalue_chunks_.set_marked_if_contained(node->value.keyvalue);
+        }
+        else if(node->type == Node::CollisionNode)
+        {
+            auto iter = node->value.collision_list->begin();
+            auto end = node->value.collision_list->end();
+            for(;iter != end; ++iter)
+            {
+                keyvalue_chunks_.set_marked_if_contained(*iter);
+            }
+        }
+
+        for(auto ref = node->begin(); ref != node->end(); ++ref)
+            recursive_mark(ref->node);
+
+    };
+
     /** Mark all found entries when iterating from this node. Maximum child depth is
      * seven so stack should not be terribly wasted. */
-
     void mark_referenced(Node* node)
     {
-        auto node_chunks_end     = node_chunks_.end();
-        auto keyvalue_chunks_end = keyvalue_chunks_.end();
-        auto ref_chunks_end      = ref_chunks_.end(); 
-    
-        auto recursive_mark = [&](Node* node)
-        {
-
-            node_chunks_.set_marked_if_contained(node); 
-            size_t size = node->size();
-            if(size > 0)
-            {
-                ref_chunks_.set_marked_if_contained_array(node->child_array, size);
-            }
-
-            if(node->type == Node::ValueNode)
-            {
-                keyvalue_chunks_.set_marked_if_contained(node->value.keyvalue);
-            }
-            else if(node->type == Node::CollisionNode)
-            {
-               foreach(node->value.collision_list, [&](KeyValue* kv){keyvalue_chunks_.set_marked_if_contained(kv);});
-            }
-
-            foreach(node, recursive_mark);
-            
-        };
-
         recursive_mark(node);
     }
 
@@ -1496,6 +1532,14 @@ public:
         // For each node: mark node, mark refs, go through all keyvalues and mark them
         // Then, collect all
         // Finally gc collided_list_pool_
+        
+        // TODO: Make gc more efficient.
+        // i) collect all live references to an array and sort them.
+        // ii) Sort all chunks in order of their first address
+        // Now the two lists can be passed in linear fashion. 
+        // Takes space (on 64 bit system) 8 * Chunk bytes + 8 * reference bytes.
+        // i.e. for million references ~9MB.
+
 
         // Clean mark fields.
         keyvalue_chunks_.mark_all_empty();
@@ -1506,7 +1550,7 @@ public:
         ref_count_ = copyif(ref_count_, [](const std::pair<Node*, int>& p){return p.second > 0;});
 
         // Go through each head.
-        for(auto head = ref_count_.begin(); r!= ref_count_.end(); ++r) mark_referenced(r->first);
+        for(auto r = ref_count_.begin(); r!= ref_count_.end(); ++r) mark_referenced(r->first);
 
         // Lastly, collect unused slots.
         keyvalue_chunks_.collect_chunks();
