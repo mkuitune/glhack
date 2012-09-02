@@ -80,6 +80,14 @@ TextLine make_text_line(const char* buffer, int begin, int end, int line);
 /** Split string to TextLine instances based on the delimiter. */
 std::list<TextLine> string_split(const char* str, const char* delim);
 
+/** Get a string representation from arbitrary value supporting the << -operator. */
+template<class T>
+cstring to_string(const T& value)
+{
+    std::ostringstream stream;
+    stream << value;
+    return stream.str();
+}
 
 ///////////// Container operations ////////////////
 
@@ -726,6 +734,10 @@ std::list<T> list(const T& p0, const T& p1, const T& p2, const T& p3)
     std::list<T> l; l.push_back(p0); l.push_back(p1); l.push_back(p2); l.push_back(p3); return l;
 }
 
+/** Create pair from input elements. */
+template<class T, class V>
+std::pair<T, V> to_pair(const T& t, const V& v){return std::pair<T, V>(t,v);}
+
 /** Append the second container to the first.*/
 template<class T>
 T append(const T& first_container, const T& second_container)
@@ -743,6 +755,41 @@ Cont join(const Cont& c0, const Cont& c1, const Cont& c2){return append(append(c
 template<class Cont>
 Cont join(const Cont& c0, const Cont& c1, const Cont& c2, const Cont& c3){return append(append(append(c0, c1), c2),c3);}
 
+/** Split container to n containers with element shared between containers.
+ *  if n > element count then count - n empty containers are returned.*/
+template<class C>
+std::vector<C> split_container(const C& container, size_t n)
+{
+    std::vector<C> result;
+    if(n > 1)
+    {
+        for(size_t m = 0; m < n; ++m) add(result, C());
+
+        size_t c_size = container.size();
+        size_t split_index = c_size % n;
+        size_t n_pre_split = c_size / n + 1;
+
+        // Insert ranges to each container.
+        size_t vi = 0;
+        typename C::const_iterator iter = container.begin();
+
+        for(size_t i = 0; i < n; ++i)
+        {
+            size_t n_elems = i < split_index ? n_pre_split : n_pre_split - 1;
+            typename C::const_iterator iter_last = iter;
+            size_t m = 0; while(m++ < n_elems) iter_last++;
+            typename C::iterator insert_start = result[i].begin();
+            std::copy(iter, iter_last, std::inserter(result[i], insert_start));
+            iter = iter_last;
+        }
+    }
+    else
+    {
+        result.push_back(container);
+    }
+    return result;
+}
+
 /** Return a new container with the elements of the container for which the predicate function returns true */
 template<class Collection, class Fun>
 Collection filter(const Collection& collection, const Fun fun)
@@ -757,7 +804,7 @@ Collection filter(const Collection& collection, const Fun fun)
     return out;
 }
 
-
+/** Iterat*/
 
 //////////// Streams //////////////
 

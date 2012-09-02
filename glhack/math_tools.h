@@ -4,6 +4,10 @@
 
 #include <Eigen/Dense>
 
+#include "tinymt32.h"
+#include "tinymt64.h"
+
+#include <math.h>
 #include <stdint.h>
 
 namespace glh{
@@ -51,6 +55,122 @@ inline bool bit_is_on(const uint32_t field, const uint32_t bit)
 {
     return  (field & 1 << bit) != 0;
 }
+
+///////////// Random number generators ///////////
+
+#define GLH_RAND_SEED 7894321
+
+/** PRN generator. */
+template<class T>
+struct Random{
+    Random();
+    Random(T seed);
+    T rand();
+};
+
+template<>
+struct Random<int32_t>
+{
+    tinymt32_t state;
+    void init(int seed)
+    {
+        tinymt32_init(&state, seed);
+    }
+
+    Random(int seed){init(seed);}
+    Random(){init(GLH_RAND_SEED);}
+
+    int32_t rand()
+    {
+        uint32_t result = tinymt32_generate_uint32(&state);
+        return *((int32_t*) &result);
+    }
+};
+
+template<>
+struct Random<float>
+{
+    tinymt32_t state;
+    void init(int seed)
+    {
+        tinymt32_init(&state, seed);
+    }
+
+    Random(int seed){init(seed);}
+    Random(){init(GLH_RAND_SEED);}
+
+    float rand(){return tinymt32_generate_float(&state);}
+};
+
+/** Random range generates numbers in inclusive range(start, end)*/
+template<class T>
+struct RandomRange
+{
+    RandomRange(T start, T end);
+    T rand();
+};
+
+template<>
+struct RandomRange<int32_t>
+{
+    Random<float> random;
+    int32_t start; //> Inclusive range start.
+    int32_t end; //> Inclusive range end.
+    float offset;
+
+    void init()
+    {
+        offset = (float) (end - start);
+    }
+
+    RandomRange(int32_t start_, int32_t end_):start(start_), end(end_){init();}
+    RandomRange(int32_t start_, int32_t end_, int seed):random(seed),start(start_), end(end_){init();}
+
+    int32_t rand()
+    {
+        const float f = random.rand();
+        return start + (int32_t) (floor(offset * f + 0.5f));
+    }
+};
+
+template<>
+struct RandomRange<float>
+{
+    Random<float> random;
+    float start; //> Inclusive range start.
+    float end; //> Inclusive range end.
+    float offset;
+
+    void init(){offset = end - start;}
+
+    RandomRange(float start_, float end_):start(start_), end(end_){init();}
+    RandomRange(float start_, float end_, int seed):random(seed),start(start_), end(end_){init();}
+
+    float rand()
+    {
+        return start + offset * tinymt32_generate_float(&random.state);
+    }
+};
+
+////////////////// Combinatorial stuff /////////////////////
+
+/** From list of elements {a} return all the pairs generated from the sequence {a_i * a_j} */
+template<class V>
+std::list<std::pair<typename V::value_type, typename V::value_type>> all_pairs(V& seq)
+{
+    typedef std::pair<typename V::value_type, typename V::value_type> pair_elem;
+    std::list<pair_elem> result;
+    for(auto i = seq.begin(); i != seq.end(); ++i)
+    {
+        for(auto j = seq.begin(); j != seq.end(); ++j)
+        {
+            result.push_back(pair_elem(*i,*j));
+        }
+    }
+
+    return result;
+}
+
 } // namespace glh
 
 /////////////// Hash functions //////////////

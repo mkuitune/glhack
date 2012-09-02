@@ -1298,6 +1298,23 @@ public:
         Map m(*this, 0);
         return m;
     }
+    
+    /** Create new empty from existing map. */
+    template<class M>
+    Map new_map(const M& map_in)
+    {
+        Node* root = 0;
+
+        for(auto i = map_in.begin(); i != map_in.end(); ++i)
+        {
+            KeyValue* kv = new_keyvalue(i->first, i->second);
+            root = instantiate_tree_path(root, kv);
+        }
+
+        Map m(*this, root);
+
+        return m;
+    }
 
     /** Create new map with one element*/
     Map new_map(const K& key, const V& value)

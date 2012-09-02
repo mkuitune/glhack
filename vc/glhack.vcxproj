@@ -19,6 +19,8 @@
     <ClCompile Include="..\glhack\math_tools.cpp" />
     <ClCompile Include="..\glhack\persistent_containers.cpp" />
     <ClCompile Include="..\glhack\shims_and_types.cpp" />
+    <ClCompile Include="..\glhack\tinymt32.c" />
+    <ClCompile Include="..\glhack\tinymt64.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\glhack\allocators.h" />
@@ -30,6 +32,8 @@
     <ClInclude Include="..\glhack\math_tools.h" />
     <ClInclude Include="..\glhack\persistent_containers.h" />
     <ClInclude Include="..\glhack\shims_and_types.h" />
+    <ClInclude Include="..\glhack\tinymt32.h" />
+    <ClInclude Include="..\glhack\tinymt64.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{44F323EF-6A0E-4F1C-989F-ED5CEE4FC70F}</ProjectGuid>

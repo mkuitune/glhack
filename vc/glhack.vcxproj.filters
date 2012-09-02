@@ -9,6 +9,8 @@
     <ClCompile Include="..\glhack\persistent_containers.cpp" />
     <ClCompile Include="..\glhack\math_tools.cpp" />
     <ClCompile Include="..\glhack\managed_structures.cpp" />
+    <ClCompile Include="..\glhack\tinymt32.c" />
+    <ClCompile Include="..\glhack\tinymt64.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\glhack\glbase.h" />
@@ -20,5 +22,7 @@
     <ClInclude Include="..\glhack\glh_typedefs.h" />
     <ClInclude Include="..\glhack\managed_structures.h" />
     <ClInclude Include="..\glhack\persistent_containers.h" />
+    <ClInclude Include="..\glhack\tinymt32.h" />
+    <ClInclude Include="..\glhack\tinymt64.h" />
   </ItemGroup>
 </Project>

@@ -11,6 +11,7 @@
 
 /// Minimal unit test framework
 
+// Output stream mapping.
 std::ostream* g_outstream = &std::cout;
 
 std::ostream& glh_test_out(){return *g_outstream;}
@@ -80,6 +81,8 @@ void print_container(T container)
     glh_test_out() << range_to_string(begin, end) << std::endl;
 }
 
+// TODO: Test framework and tests to separate files.
+
 /////////// Tests here //////////////
 
 GLHTEST(basic, test_test)
@@ -144,9 +147,18 @@ template<class M> void print_pmap(M& map)
     }
 }
 
-typedef glh::PersistentMapPool<std::string, int>::Map SI_Map;
 
-void test_overwrite(SI_Map map)
+typedef glh::PersistentMapPool<std::string, int> SIMapPool;
+typedef glh::PersistentMapPool<std::string, int>::Map SIMap;
+typedef std::map<std::string, int> StlSIMap;
+
+/* Map tests:
+Use cases: Insert, Access, Remove, Gc, Print (IARGP).
+
+
+*/
+
+void test_overwrite(SIMap map)
 {
     auto map1 = map.add("One", 1);
     print_pmap(map);
@@ -156,13 +168,239 @@ void test_overwrite(SI_Map map)
     print_pmap(map);
 }
 
-
-GLHTEST(collections, PersistentMap_write_gc_test)
+void write_random_elements(const int n, glh::Random<int> rand, glh::cstring& prefix, StlSIMap& map)
 {
-    // Write n elements to map
-    // Write m elements to map2
-    // delete map2, gc
-    // Check map is unchanged.
+    int i = 0;
+    while(i++ < n)
+    {
+        int r = rand.rand();
+        glh::cstring str = prefix + glh::to_string(r);
+        map[str] = r;
+    }
+}
+
+
+// Map test: write, and gc test TODO
+
+// Map test: write, remove and gc test TODO
+
+// Map test: write, create and destroy recursively n maps, check root values, gc, check root values TODO 
+
+
+// Map tests: create and gc tests:
+//
+// WE: fill map by writing element  by element
+// WM: fill map by instantiating it from an stl-map.
+// Instantiation elements: e1 e2
+//                                    Test matrix:
+//                                    1   2  3  4      5,6,7,8
+// create_gc_test 1: write map        WE WE WM WM  e1   -||-  e1
+//                2: write map2       WE WM WM WE  e2   -||-  e1
+//                3: verify map     
+//                3: delete map2, gc
+//                4: verify map
+
+SIMap map_insert_elements(const StlSIMap& map, SIMapPool& pool, bool gc_at_each)
+{
+    SIMap out_map = pool.new_map();
+    if(gc_at_each)
+    {
+        for(auto i = map.begin(); i != map.end(); ++i)
+        {
+            out_map = out_map.add(i->first, i->second);
+            out_map.gc();
+        }
+    }
+    else
+    {
+        for(auto i = map.begin(); i != map.end(); ++i)
+        {
+            out_map = out_map.add(i->first, i->second);
+        }
+    }
+    return out_map;
+}
+
+typedef SIMap (*create_map_inserter)(const StlSIMap&, SIMapPool&, bool gc_at_each);
+
+SIMap map_direct_instantiation(const StlSIMap& map, SIMapPool& pool,bool gc_at_each)
+{
+    SIMap out_map = pool.new_map(map);
+    if(gc_at_each) pool.gc();
+    return out_map;
+}
+
+SIMap map_remove_elements(const StlSIMap& map, SIMap pmap)
+{
+    for(auto i = map.begin(); i != map.end(); ++i)
+    {
+        pmap = pmap.remove(i->first);
+    }
+    return pmap;
+}
+
+/** Return true if all elements in reference are found in map.*/
+bool verify_map_elements(const StlSIMap& reference, SIMap& map)
+{
+    bool found = true;
+
+    // Verify elements both ways - from map to reference and from reference to map.
+
+    // From reference to map - check are elements exist.
+    for(auto i = reference.begin(); i != reference.end(); ++i)
+    {
+        auto v = map.try_get_value(i->first);
+        if(! v.is_valid())
+        {
+            GLH_TEST_LOG("Persistent map did not contain all elements.");
+            return false;
+        }
+    }
+
+    //  from map to reference - check there are no extra elements.
+    for(auto i = map.begin(); i != map.end(); ++i)
+    {
+        if(reference.count(i->first) < 1)
+        {
+            GLH_TEST_LOG("Persistent map contained unexpected elements.");
+            return false;
+        }
+    }
+
+    return found;
+}
+
+void map_create_and_gc_test_body(const StlSIMap& first_elements,
+                                 const StlSIMap& second_elements,
+                                 create_map_inserter first_insert,
+                                 create_map_inserter second_insert, 
+                                 bool first_gc,
+                                 bool gc_at_each,
+                                 bool remove_before_delete,
+                                 bool& result)
+{
+    using namespace glh;
+
+    result = false;
+
+    SIMapPool pool;
+
+    SIMap first_map = first_insert(first_elements, pool, gc_at_each);
+
+    ASSERT_TRUE(verify_map_elements(first_elements, first_map), "First map invalid.");
+
+    if(first_gc)
+    { 
+        pool.gc();
+        ASSERT_TRUE(verify_map_elements(first_elements, first_map), "First map invalid.");
+    }
+
+    SIMap* second_map = new SIMap(second_insert(second_elements, pool, gc_at_each));
+
+    ASSERT_TRUE(verify_map_elements(second_elements, *second_map), "Second map invalid.");
+    ASSERT_TRUE(verify_map_elements(first_elements, first_map), "First map invalid.");
+
+    pool.gc();
+
+    ASSERT_TRUE(verify_map_elements(second_elements, *second_map), "Second map invalid.");
+    ASSERT_TRUE(verify_map_elements(first_elements, first_map), "First map invalid.");
+
+    delete(second_map);
+
+    ASSERT_TRUE(verify_map_elements(first_elements, first_map), "First map invalid.");
+
+    pool.gc();
+
+    ASSERT_TRUE(verify_map_elements(first_elements, first_map), "First map invalid.");
+
+    // Remove half of elements from first map, insert them to another map and back again and
+    // verify the results.
+    if(first_elements.size() > 1)
+    {
+        auto maps = split_container(first_elements, 2);
+        const int removed = 1;
+        const int kept = 0;
+
+        for(auto i = maps[removed].begin(); i != maps[removed].end(); ++i)
+        {
+            first_map = first_map.remove(i->first);
+        }
+
+        if(gc_at_each) first_map.gc();
+
+        ASSERT_TRUE(verify_map_elements( maps[kept], first_map), "Persistent map erase half verify failed.");
+    }
+    result = true;
+}
+
+bool persistent_map_create_and_gc_body(const StlSIMap& first_elements, const StlSIMap& second_elements,
+                                       bool gc_first,bool gc_at_each, bool remove_before_delete)
+{
+    using namespace glh;
+
+    bool result = false;
+
+    map_create_and_gc_test_body(first_elements, second_elements, map_insert_elements, map_insert_elements,
+                                gc_first, gc_at_each, remove_before_delete, result);
+    if(!result) return false;
+    map_create_and_gc_test_body(first_elements, second_elements, map_insert_elements, map_direct_instantiation,
+                                gc_first, gc_at_each,remove_before_delete,result);
+    if(!result) return false;
+    map_create_and_gc_test_body(first_elements, second_elements, map_direct_instantiation, map_insert_elements, 
+                                gc_first, gc_at_each,remove_before_delete,result);
+    if(!result) return false;
+    map_create_and_gc_test_body(first_elements, second_elements, map_direct_instantiation, map_direct_instantiation,
+                                gc_first, gc_at_each,remove_before_delete,result);
+    if(!result) return false;
+    map_create_and_gc_test_body(first_elements, first_elements, map_insert_elements, map_insert_elements, 
+                                gc_first, gc_at_each,remove_before_delete, result);
+    if(!result) return false;
+    map_create_and_gc_test_body(first_elements, first_elements, map_insert_elements, map_direct_instantiation,
+                                gc_first, gc_at_each,remove_before_delete, result);
+    if(!result) return false;
+    map_create_and_gc_test_body(first_elements, first_elements, map_direct_instantiation, map_insert_elements,
+                                gc_first, gc_at_each,remove_before_delete, result);
+    if(!result) return false;
+    map_create_and_gc_test_body(first_elements, first_elements, map_direct_instantiation, map_direct_instantiation,
+                                gc_first, gc_at_each,remove_before_delete, result);
+    return result;
+}
+
+GLHTEST(collections, PersistentMap_combinations)
+{
+    using namespace glh;
+    std::list<int> sizes;
+    add(sizes, 1)(2)(3)(4)(5)(6)(7)(11)(13)(17)(19)(23)(29)(31)(32)(33)(67)(135)(271)(543);
+    auto size_pairs = all_pairs(sizes);
+
+    Random<int> rand;
+
+    // First run all tests with different maps.
+    for(auto p = size_pairs.begin(); p != size_pairs.end(); ++p)
+    {
+        StlSIMap first_elements;
+        StlSIMap second_elements;
+
+        write_random_elements(p->first, rand, std::string(""), first_elements);
+        write_random_elements(p->second, rand, std::string(""), second_elements);
+
+        // Go through each six combinations of the three bools insertable
+        for(uint32_t bools = 0; bools < 6; ++bools)
+        {
+            bool gc_first             = bit_is_on(bools, 0);
+            bool gc_at_each           = bit_is_on(bools, 1);
+            bool remove_before_delete = bit_is_on(bools, 2);
+
+            bool result = persistent_map_create_and_gc_body(first_elements, second_elements, gc_first, gc_at_each, 
+                                              remove_before_delete);
+            ASSERT_TRUE(result, "Persistent_map_create_and_gc_body failed");
+
+            // Run only with values from one map
+            result = persistent_map_create_and_gc_body(first_elements, first_elements, gc_first, gc_at_each, 
+                                              remove_before_delete);
+            ASSERT_TRUE(result, "Persistent_map_create_and_gc_body failed");
+        }
+    }
 }
 
 GLHTEST(collections, PersistentMap_test)
@@ -170,13 +408,13 @@ GLHTEST(collections, PersistentMap_test)
     using namespace glh;
 
 
-    auto visit_scope = [](SI_Map& map, cstring& str, int i){
+    auto visit_scope = [](SIMap& map, cstring& str, int i){
         auto map2 = map.add(str, i);
         print_pmap(map2);
     };
 
     PersistentMapPool<std::string, int> pool;
-    SI_Map map = pool.new_map();
+    SIMap map = pool.new_map();
 
     glh_test_out() << "  #########" << std::endl;
 
