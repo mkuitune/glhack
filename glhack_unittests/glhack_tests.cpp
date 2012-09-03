@@ -16,9 +16,18 @@ std::ostream* g_outstream = &std::cout;
 
 std::ostream& glh_test_out(){return *g_outstream;}
 
+// Use global boolean to signal result of each test. No need for return values, shorter test functions.
+bool g_exec_result;
+
+void glh_test_err()
+{
+    glh_test_out() << "Error.";
+    g_exec_result = false;
+}
+
 #define GLH_TEST_LOG(msg_param)do{ glh_test_out() << std::endl << "  " << msg_param << std::endl;}while(0)
-#define ASSERT_TRUE(stmnt_param, msg_param)do{if(!(stmnt_param)){glh_test_out() << std::endl << "  " << msg_param << std::endl; g_exec_result = false;return;}}while(0)
-#define ASSERT_FALSE(stmnt_param, msg_param)do{if(stmnt_param){glh_test_out() << std::endl << "  " << msg_param << std::endl; g_exec_result = false;return;}}while(0)
+#define ASSERT_TRUE(stmnt_param, msg_param)do{if(!(stmnt_param)){glh_test_err(); glh_test_out() << std::endl << "  " << msg_param << std::endl;return;}}while(0)
+#define ASSERT_FALSE(stmnt_param, msg_param)do{if(stmnt_param){glh_test_err(); glh_test_out() << std::endl << "  " << msg_param << std::endl;return;}}while(0)
 
 
 typedef std::function<void(void)> GLhTestFun;
@@ -55,9 +64,6 @@ class glhtestclass_##test_name {           \
 };                                         \
 GlhTestAdd test_name##__add(TestCallback(glhtestclass_##test_name::run, #group_name, #test_name)); \
 void glhtestclass_##test_name::run()
-
-// Use global boolean to signal result of each test. No need for return values, shorter test functions.
-bool g_exec_result;
 
 
 /////////// Test utilities ///////////
@@ -366,7 +372,7 @@ bool persistent_map_create_and_gc_body(const StlSIMap& first_elements, const Stl
     return result;
 }
 
-GLHTEST(collections, PersistentMap_combinations)
+GLHTEST(collections_pmap, PersistentMap_combinations)
 {
     using namespace glh;
     std::list<int> sizes;
@@ -403,7 +409,7 @@ GLHTEST(collections, PersistentMap_combinations)
     }
 }
 
-GLHTEST(collections, PersistentMap_test)
+GLHTEST(collections_pmap, PersistentMap_test)
 {
     using namespace glh;
 
@@ -586,13 +592,23 @@ bool run_tests(const std::list<std::string>& group_names)
 {
     using namespace glh;
     bool result = true;
-    
-    foreach(group_names, [&](const std::string& str) {run_group(*g_tests.find(str));});
+    for(auto gname = group_names.begin(); gname != group_names.end(); ++gname)
+    {
+        auto test = g_tests.find(*gname);
+        if(test == g_tests.end())
+        {
+            glh_test_out() << "Warning: Could not find group:" << *gname << std::endl;
+        }
+        {
+            run_group(*test);
+        }
+    }
+
 
     return result;
 }
 
-std::list<std::string> active_groups = glh::list(std::string("PersistentMap_test")); 
+std::list<std::string> active_groups = glh::list(std::string("collections_pmap")); 
 
 /** Run the tests. */
 bool glh_run_tests()

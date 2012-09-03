@@ -9,6 +9,7 @@
 
 #include <math.h>
 #include <stdint.h>
+#include <list>
 
 namespace glh{
 

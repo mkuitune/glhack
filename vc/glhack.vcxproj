@@ -19,8 +19,14 @@
     <ClCompile Include="..\glhack\math_tools.cpp" />
     <ClCompile Include="..\glhack\persistent_containers.cpp" />
     <ClCompile Include="..\glhack\shims_and_types.cpp" />
-    <ClCompile Include="..\glhack\tinymt32.c" />
-    <ClCompile Include="..\glhack\tinymt64.c" />
+    <ClCompile Include="..\glhack\tinymt32.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsCpp</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsCpp</CompileAs>
+    </ClCompile>
+    <ClCompile Include="..\glhack\tinymt64.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsCpp</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsCpp</CompileAs>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\glhack\allocators.h" />
