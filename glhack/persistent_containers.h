@@ -175,8 +175,6 @@ struct Chunk
                ptr < (((T*) buffer) + CHUNK_BUFFER_SIZE);
     }
 
-    void reset_marks(){mark_field = 0;}
-
     bool set_marked_if_contains(const T* elem)
     {
         bool result = false;
@@ -262,7 +260,8 @@ public:
     chunk_type* new_chunk()
     {
         chunks_.push_back(chunk_type());
-        return &chunks_.back();
+        chunk_type* chunk = &chunks_.back();
+        return chunk;
     }
 
     T* reserve_element()
@@ -347,7 +346,7 @@ public:
                 }
 
                 // At this point we must know the operation cannot fail.
-                result = chunk->get_new_array(element_count);
+                result = created_chunk->get_new_array(element_count);
             }
         }
 
@@ -369,12 +368,10 @@ public:
 
     void mark_all_empty()
     {
-        foreach(chunks_, [](chunk_type& c){c.used_elements = 0;});
-    }
-
-    void reset_marks()
-    {
-        foreach(chunks_, [](chunk_type& c){c.reset_marks();});
+        for(auto c = chunks_.begin(); c != chunks_.end(); ++c)
+        {
+            c->mark_field = 0;
+        }
     }
 
     /** After the chunks have been marked, collect the unused memory in all of them. If 
@@ -401,6 +398,7 @@ public:
     
     void set_marked_if_contained_array(const T* ptr, size_t size)
     {
+        // TODO replace for_each with a loop that break immediately whem a match is found.
         std::for_each(begin(), end(), [&ptr, &size](chunk_type& c){c.set_marked_if_contains_array(ptr, size);});
     }
 
@@ -943,16 +941,19 @@ public:
         typename Node::Ref* iter;  
         typename Node::Ref* end;  
         bool iterating;
+        bool node_has_children;
 
-        NodeChildIterator(Node* node_in):node(node_in), iterating(false)
+        NodeChildIterator(Node* node_in):node(node_in), iterating(false), node_has_children(false)
         {
             end = node->end();
+            if(node_in->size() > 0) node_has_children = true;
         }
 
         bool move_next()
         {
-            bool result = false;
+            if(!node_has_children) return false;
 
+            bool result = false;
             if(iterating) 
             {
                 iter++;
@@ -960,13 +961,14 @@ public:
             else
             {
                 iter = node->begin();
+                iterating = true;
             }
 
             if(iter != end) result = true;
 
             return result;
         }
-            
+
         Node* current(){return iter->node;}
     };
     
@@ -997,7 +999,6 @@ public:
         const KeyValue* current;
 
 #define CURRENT_NODE iter_stack.top()->current()
-#define TOP_ITER iter_stack.top()
 
         // For each node:
         // Iterate over each value in array. If value is a node, go into node.
@@ -1015,9 +1016,10 @@ public:
         void push_node(Node* parent_node)
         {
             iter_stack.push(NodeChildIterator(parent_node));
-            TOP_ITER->move_next(); // Must succeed as node has children - now have a valid node
+            NodeChildIterator* ni = iter_stack.top();
+            ni->move_next(); // Must succeed as node has children - now have a valid node
 
-            Node* node = CURRENT_NODE;
+            Node* node = ni->current();
             if(node_has_keyvalues(node))
             {
                 value_iter = NodeValueIterator(node);
@@ -1025,7 +1027,7 @@ public:
             }
             else
             {
-                // Push until a node with values is found
+                // Push until a node with values is found.
                 push_node(node);
             }
         }
@@ -1038,7 +1040,8 @@ public:
             }
             else
             {
-                Node* node = CURRENT_NODE;
+                NodeChildIterator* ni = iter_stack.top();
+                Node* node =ni->current();
                 // Ran out of values - find next node.
                 if(node_has_children(node))
                 {
@@ -1046,8 +1049,18 @@ public:
                 }
                 else
                 {
-                    // Just a leaf node - pop stack
-                    pop();
+                    // Move to next sibling node or if none left pop.
+                    if(ni->move_next())
+                    {
+                        Node* next_node = ni->current();
+                        value_iter = NodeValueIterator(next_node);
+                        advance(); // Move value_iter to valid value
+                    }
+                    else
+                    {
+                        // No siblings left - pop stack
+                        pop();
+                    }
                 }
             }
         }
@@ -1058,16 +1071,18 @@ public:
 
             if(iter_stack.depth() > 0)
             {
-                if(TOP_ITER->move_next())
+                NodeChildIterator* ni = iter_stack.top();
+                if(ni->move_next())
                 {
-                    if(node_has_keyvalues(CURRENT_NODE))
+                    Node* node = ni->current();
+                    if(node_has_keyvalues(node))
                     {
-                        value_iter = NodeValueIterator(CURRENT_NODE);
+                        value_iter = NodeValueIterator(node);
                         advance();
                     }
                     else
                     {
-                        push_node(CURRENT_NODE);
+                        push_node(node);
                     }
                 }
                 else
@@ -1089,9 +1104,6 @@ public:
 
         const KeyValue* operator*(){return current;}
         const KeyValue* operator->(){return current;}
-
-#undef CURRENT_NODE
-#undef TOP_ITER
     };
 
     /** The map class.*/
@@ -1419,7 +1431,7 @@ public:
 
                 current->child_array = child_array;
 
-                uint32_t array_index = current->index(local_index); 
+                uint32_t array_index = current->index(1 << local_index); 
 
                 Node* newnode = new_node();
                 *newnode = *child_array[array_index].node;

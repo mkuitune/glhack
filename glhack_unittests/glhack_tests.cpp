@@ -276,6 +276,8 @@ bool verify_map_elements(const StlSIMap& reference, SIMap& map)
     return found;
 }
 
+int g_mcagtb_counter = 0;
+
 void map_create_and_gc_test_body(const StlSIMap& first_elements,
                                  const StlSIMap& second_elements,
                                  create_map_inserter first_insert,
@@ -286,7 +288,7 @@ void map_create_and_gc_test_body(const StlSIMap& first_elements,
                                  bool& result)
 {
     using namespace glh;
-
+ 
     result = false;
 
     SIMapPool pool;
@@ -336,6 +338,8 @@ void map_create_and_gc_test_body(const StlSIMap& first_elements,
 
         ASSERT_TRUE(verify_map_elements( maps[kept], first_map), "Persistent map erase half verify failed.");
     }
+
+    g_mcagtb_counter++; // Use counter to track specific runtimes for debugger attachment.
     result = true;
 }
 
@@ -372,43 +376,114 @@ bool persistent_map_create_and_gc_body(const StlSIMap& first_elements, const Stl
     return result;
 }
 
+GLHTEST(collections_pmap, PersistentMap_twosource_collect)
+{
+    using namespace glh;
+    bool gc_first             =false;
+    bool gc_at_each           = true;
+    bool remove_before_delete = false;
+    bool result = false;
+
+    StlSIMap first_elements;
+    StlSIMap second_elements;
+
+    Random<int> rand;
+
+    int first_count = 1;
+    int second_count = 2;
+
+    write_random_elements(first_count, rand, std::string(""), first_elements);
+    write_random_elements(second_count, rand, std::string(""), second_elements);
+
+    map_create_and_gc_test_body(first_elements, second_elements, map_insert_elements, map_insert_elements,
+                                gc_first, gc_at_each, remove_before_delete, result);
+
+    ASSERT_TRUE(result, "Persistent map twosource collect failed.");
+}
+
+GLHTEST(collections_pmap, PersistentMap_write_and_find_elements)
+{
+    using namespace glh;
+
+    StlSIMap elements_a;
+    add(elements_a, "-1027699544", -1027699544);
+    StlSIMap elements_b;
+    add(elements_b, "-1027699544", -1027699544)("-1904646281", -1904646281);
+    StlSIMap elements_c;
+    add(elements_c, "-1027699544", -1027699544)("-1904646281", -1904646281)("-957781851", -957781851);
+    StlSIMap elements_d;
+    add(elements_d, "-1027699544", -1027699544)("-1904646281", -1904646281)("-957781851", -957781851)("511395623", 511395623);
+
+    SIMapPool pool;
+    bool gc_at_each = false;
+
+    SIMap map = map_insert_elements(elements_a, pool, gc_at_each);
+    ASSERT_TRUE(verify_map_elements(elements_a, map), "Map failed to store all elements.");
+
+    map = map_insert_elements(elements_b, pool, gc_at_each);
+    ASSERT_TRUE(verify_map_elements(elements_b, map), "Map failed to store all elements.");
+
+    map = map_insert_elements(elements_c, pool, gc_at_each);
+    ASSERT_TRUE(verify_map_elements(elements_c, map), "Map failed to store all elements.");
+
+    map = map_insert_elements(elements_d, pool, gc_at_each);
+    ASSERT_TRUE(verify_map_elements(elements_d, map), "Map failed to store all elements.");
+
+}
+
+#if 1
 GLHTEST(collections_pmap, PersistentMap_combinations)
 {
     using namespace glh;
     std::list<int> sizes;
-    add(sizes, 1)(2)(3)(4)(5)(6)(7)(11)(13)(17)(19)(23)(29)(31)(32)(33)(67)(135)(271)(543);
+    //add(sizes, 1)(2)(3)(4)(5)(6)(7)(11)(13)(17)(19)(23)(29)(31)(32)(33)(67)(135)(271)(543);
+    add(sizes, 1)(2)(3)(4)(5)(6)(7)(11)(13)(17)(19)(23)(29)(31)(32)(33)(67)(135);
+    // TODO: Make gc faster. The current n^2 is really, really bad.
     auto size_pairs = all_pairs(sizes);
+    typedef Random<int> Rand;
+    std::vector<Rand> rands;
+    add(rands,Rand(1))(Rand(7))(Rand(17))(Rand());
 
-    Random<int> rand;
-
+    size_t pair_index = 1;
     // First run all tests with different maps.
-    for(auto p = size_pairs.begin(); p != size_pairs.end(); ++p)
+    glh_test_out() << std::endl;
+    for(auto p = size_pairs.begin(); p != size_pairs.end(); ++p, pair_index++)
     {
-        StlSIMap first_elements;
-        StlSIMap second_elements;
+        glh_test_out() << "Run pair " << pair_index << " of " << size_pairs.size() << std::endl;
+        int first_size = p->first;
+        int second_size = p->second;
 
-        write_random_elements(p->first, rand, std::string(""), first_elements);
-        write_random_elements(p->second, rand, std::string(""), second_elements);
-
-        // Go through each six combinations of the three bools insertable
-        for(uint32_t bools = 0; bools < 6; ++bools)
+        // Test with different pseudorandom sequences.
+        for(size_t ri = 0; ri != rands.size(); ++ri)
         {
-            bool gc_first             = bit_is_on(bools, 0);
-            bool gc_at_each           = bit_is_on(bools, 1);
-            bool remove_before_delete = bit_is_on(bools, 2);
+            StlSIMap first_elements;
+            StlSIMap second_elements;
 
-            bool result = persistent_map_create_and_gc_body(first_elements, second_elements, gc_first, gc_at_each, 
-                                              remove_before_delete);
-            ASSERT_TRUE(result, "Persistent_map_create_and_gc_body failed");
+            write_random_elements(first_size,  rands[ri], std::string(""), first_elements);
+            write_random_elements(second_size, rands[ri], std::string(""), second_elements);
 
-            // Run only with values from one map
-            result = persistent_map_create_and_gc_body(first_elements, first_elements, gc_first, gc_at_each, 
-                                              remove_before_delete);
-            ASSERT_TRUE(result, "Persistent_map_create_and_gc_body failed");
+            // Go through each six combinations of the three bools insertable
+            for(uint32_t bools = 0; bools < 6; ++bools)
+            {
+                bool gc_first             = bit_is_on(bools, 0);
+                bool gc_at_each           = bit_is_on(bools, 1);
+                bool remove_before_delete = bit_is_on(bools, 2);
+
+                bool result = persistent_map_create_and_gc_body(first_elements, second_elements, gc_first, gc_at_each, 
+                                                  remove_before_delete);
+                ASSERT_TRUE(result, "Persistent_map_create_and_gc_body failed");
+
+                // Run only with values from one map
+                result = persistent_map_create_and_gc_body(first_elements, first_elements, gc_first, gc_at_each, 
+                                                  remove_before_delete);
+                ASSERT_TRUE(result, "Persistent_map_create_and_gc_body failed");
+            }
         }
     }
 }
+#endif
 
+#if 0
 GLHTEST(collections_pmap, PersistentMap_test)
 {
     using namespace glh;
@@ -447,6 +522,7 @@ GLHTEST(collections_pmap, PersistentMap_test)
     print_pmap(map1);
     print_pmap(map2);
 }
+#endif
 
 /////////// Containers ////////////////
 
