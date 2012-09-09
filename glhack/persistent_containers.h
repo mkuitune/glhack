@@ -1227,6 +1227,17 @@ public:
                 uint32_t hash = get_hash32(key);
                 Node* next = root_->get_child_by_hash_and_depth(hash, 0);
 
+                // Have to collect the keyvalue from node separately.
+                NodeValueIterator node_val_iter(next);
+                while(node_val_iter.move_next())
+                {
+                    const KeyValue* current = node_val_iter.current();
+                    if(! keyvalue_match_get(*current, key, hash)) 
+                    {
+                        kept_keys.push_back(current);
+                    }
+                }
+
                 // Visit the branch containing the keyvalue and collect all keyvalues except the one to remove.
                 node_iterator iter(next);
                 node_iterator end(0);
@@ -1252,9 +1263,10 @@ public:
                     Node::Ref* new_child_array = pool_.ref_chunks_.reserve_consecutive_elements(new_size);
                     new_root->child_array = new_child_array;
                     size_t i = 0;
+                    size_t child_index = 0;
                     for(i = 0; i < old_size; ++i)
                     {
-                        if(root_->child_array[i].node != next) new_child_array[i] = root_->child_array[i];
+                        if(root_->child_array[i].node != next) new_child_array[child_index++] = root_->child_array[i];
                     }
                 }
                 else
@@ -1289,6 +1301,14 @@ public:
         PersistentMapPool& pool_;
         Node* root_;
     };
+
+    ~PersistentMapPool()
+    {
+        // Must call destructor on all used cells.
+        // TODO: Should this be the responsibility of individual containers?
+        ref_count_.clear();
+        gc();
+    }
 
     /** Remove reference to node */
     void remove_ref(Node* n)

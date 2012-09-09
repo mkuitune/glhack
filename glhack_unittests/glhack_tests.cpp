@@ -449,7 +449,7 @@ GLHTEST(collections_pmap, PersistentMap_combinations)
     glh_test_out() << std::endl;
     for(auto p = size_pairs.begin(); p != size_pairs.end(); ++p, pair_index++)
     {
-        glh_test_out() << "Run pair " << pair_index << " of " << size_pairs.size() << std::endl;
+        glh_test_out() << "Run pair " << pair_index << " of " << size_pairs.size() << "(" << p->first << ", "<< p->second << ")" << std::endl;
         int first_size = p->first;
         int second_size = p->second;
 
@@ -468,6 +468,9 @@ GLHTEST(collections_pmap, PersistentMap_combinations)
                 bool gc_first             = bit_is_on(bools, 0);
                 bool gc_at_each           = bit_is_on(bools, 1);
                 bool remove_before_delete = bit_is_on(bools, 2);
+
+                // TODO: Remove.
+                gc_at_each = false;
 
                 bool result = persistent_map_create_and_gc_body(first_elements, second_elements, gc_first, gc_at_each, 
                                                   remove_before_delete);
