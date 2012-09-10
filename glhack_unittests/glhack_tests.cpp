@@ -436,8 +436,8 @@ GLHTEST(collections_pmap, PersistentMap_combinations)
 {
     using namespace glh;
     std::list<int> sizes;
-    //add(sizes, 1)(2)(3)(4)(5)(6)(7)(11)(13)(17)(19)(23)(29)(31)(32)(33)(67)(135)(271)(543);
-    add(sizes, 1)(2)(3)(4)(5)(6)(7)(11)(13)(17)(19)(23)(29)(31)(32)(33)(67)(135);
+    add(sizes, 1)(2)(3)(4)(5)(6)(7)(11)(13)(17)(19)(23)(29)(31)(32)(33)(67)(135)(271)(543);
+    //add(sizes, 1)(2)(3)(4)(5)(6)(7)(11)(13)(17)(19)(23)(29)(31)(32)(33)(67)(135);
     // TODO: Make gc faster. The current n^2 is really, really bad.
     auto size_pairs = all_pairs(sizes);
     typedef Random<int> Rand;
@@ -468,9 +468,6 @@ GLHTEST(collections_pmap, PersistentMap_combinations)
                 bool gc_first             = bit_is_on(bools, 0);
                 bool gc_at_each           = bit_is_on(bools, 1);
                 bool remove_before_delete = bit_is_on(bools, 2);
-
-                // TODO: Remove.
-                gc_at_each = false;
 
                 bool result = persistent_map_create_and_gc_body(first_elements, second_elements, gc_first, gc_at_each, 
                                                   remove_before_delete);

@@ -271,18 +271,19 @@ public:
         if(free_chunks_)
         {
             elem = free_chunks_->get_new();
-
+            chunk_type* chunk = free_chunks_;
             // Check if free chunks is still free or do we need new chunks
-            if(free_chunks_->is_full())
+            if(chunk->is_full())
             {
-                if(free_chunks_->next)
+                if(chunk->next)
                 {
-                    free_chunks_ = free_chunks_->next;
+                    free_chunks_ = chunk->next;
                 }
                 else
                 {
                     free_chunks_ = new_chunk();
                 }
+                chunk->next = 0;
             }
         }
 
@@ -298,6 +299,7 @@ public:
         if(element_count <= CHUNK_BUFFER_SIZE)
         {
             chunk_type* chunk = free_chunks_;
+            chunk_type* first_chunk =  chunk;
             chunk_type* prev_chunk = 0;
             while(chunk)
             {
@@ -322,6 +324,7 @@ public:
                         {
                             prev_chunk->next = chunk->next;
                         }
+                        chunk->next = 0;
                    }
 
                    break;
@@ -330,6 +333,7 @@ public:
                {
                    prev_chunk = chunk;
                    chunk = chunk->next;
+                   if(chunk == first_chunk) break; //TODO add breakpoint, debug
                }
             }
 
@@ -569,6 +573,9 @@ public:
     {
         // Deleting ListPool before the end of the lifetime of all heads will result
         // in undefined behaviour.
+        // Call destructor on unused elements
+        ref_count_.clear();
+        gc(); 
     }
 
     /** Create new empty list. */
