@@ -5,9 +5,9 @@
  * garbage collection interface that's required to call explicitly. 
  *
  * Then plan is to implementent:
- *  - persistent list PersistentList
+ *  - persistent list PList
  *      - a simple linked list with distinct heads nodes for reference counting
- *  - persistent map PersistentMap
+ *  - persistent map PMap
  *      - a simple persistent map with node copying
  *  - persistent vector PersistentVector
  *      - an implementation similar to Clojure's persistent vector
@@ -127,34 +127,6 @@ struct Chunk
         return result;
     }
 
-    void free_element(T* ptr)
-    {
-        uint32_t index = ptr - buffer;
-        // Note: if ptr < buffer, then index will wrap (to a very large number >> CHUNK_BUFFER_SIZE)
-        // and the following clause will be false.
-        if(index < CHUNK_BUFFER_SIZE)
-        {
-            used_elements = set_bit_off(used_elements, index);
-        }
-    }
-
-    /** Free 'count' number of positions starting at ptr.*/
-    void free_array(T* ptr, const size_t count)
-    {
-        for(size_t i = 0; i < count; ++i) free_element(ptr + i);
-    }
-    
-    void set_used(T* ptr)
-    {
-        uint32_t index = ptr - ((T*)buffer);
-        // Note: if ptr < buffer, then index will wrap (to a very large number >> CHUNK_BUFFER_SIZE)
-        // and the following clause will be false.
-        if(index < CHUNK_BUFFER_SIZE)
-        {
-            used_elements = set_bit_on(used_elements, index);
-        }
-    }
-    
     void set_marked(const T* ptr)
     {
         uint32_t index = ptr - ((T*)buffer);
@@ -215,32 +187,6 @@ struct Chunk
             }
         }
     }
-
-#if 0
-    /** Use this for marking used elements. @returns true if element is contained in chunk.*/
-    bool set_used_if_contains(T* elem)
-    {
-        bool result = false;
-        if(contains(elem))
-        {
-            set_used(elem);
-            result = true;
-        }
-        return result;
-    }
-
-    bool set_used_if_contains_array(T* start, const size_t count)
-    {
-        bool result = false;
-        if(contains(start) && ((start - buffer) + count) <= BUFFER_SIZE)
-        {
-            for(size_t i = 0; i < count; ++i) set_used(start + i);
-
-            result = true;
-        }
-        return result;
-    }
-#endif
 };
 
 
@@ -301,6 +247,7 @@ public:
             chunk_type* chunk = free_chunks_;
             chunk_type* first_chunk =  chunk;
             chunk_type* prev_chunk = 0;
+
             while(chunk)
             {
                 if(result = chunk->get_new_array(element_count)) 
@@ -316,14 +263,11 @@ public:
                         {
                             free_chunks_ = chunk->next;
                         }
-                        else if(prev_chunk && !chunk->next)
-                        {
-                            prev_chunk->next = 0;
-                        }
-                        else // prev_chunk && chunk->next
+                        else // prev_chunk && chunk->next := valid|0
                         {
                             prev_chunk->next = chunk->next;
                         }
+
                         chunk->next = 0;
                    }
 
@@ -333,7 +277,11 @@ public:
                {
                    prev_chunk = chunk;
                    chunk = chunk->next;
-                   if(chunk == first_chunk) break; //TODO add breakpoint, debug
+                   if(chunk == first_chunk)
+                   {
+                       assert(!"ChunkBox: Free chunk list is circular.");
+                       break; //TODO add breakpoint, debug
+                   }
                }
             }
 
@@ -349,7 +297,7 @@ public:
                     free_chunks_ = created_chunk;
                 }
 
-                // At this point we must know the operation cannot fail.
+                // At this point we know the operation cannot fail.
                 result = created_chunk->get_new_array(element_count);
             }
         }
@@ -382,12 +330,12 @@ public:
      * chunk has been full and has some memory freed move it to the free_chunks_ list.*/
     void collect_chunks()
     {
+        free_chunks_ = 0;
         for(auto chunk = begin(); chunk != end(); ++chunk)
         {
-            uint32_t pre_used_elements = chunk->used_elements;
             chunk->collect_marked();
 
-            if(chunk->used_elements != pre_used_elements && pre_used_elements == CHUNK_BUFFER_SIZE)
+            if(!chunk->is_full())
             {
                 chunk->next = free_chunks_;
                 free_chunks_ = &(*chunk);
@@ -423,7 +371,7 @@ private:
 /** Pool manager and collector for persistent lists. 
  *  Not a particularly efficient implementation. */
 template<class T>
-class PersistentListPool
+class PListPool
 {
 public:
 
@@ -454,7 +402,7 @@ public:
 
     public:
 
-        List(PersistentListPool& pool, Node* head):pool_(pool), head_(head){if(head_) pool_.add_ref(head_);}
+        List(PListPool& pool, Node* head):pool_(pool), head_(head){if(head_) pool_.add_ref(head_);}
         ~List(){if(head_) pool_.remove_ref(head_);}
        
         List(const List& old_list):pool_(old_list.pool_), head_(old_list.head_)
@@ -556,7 +504,7 @@ public:
         }
 
     private:
-        PersistentListPool& pool_;
+        PListPool& pool_;
         Node*               head_; 
     };
 
@@ -565,11 +513,11 @@ public:
 
     typedef std::unordered_map<Node*, int> ref_count_map;
     
-    PersistentListPool()
+    PListPool()
     {
     }
 
-    ~PersistentListPool()
+    ~PListPool()
     {
         // Deleting ListPool before the end of the lifetime of all heads will result
         // in undefined behaviour.
@@ -768,14 +716,17 @@ level  0     1     2     3     4     5   6
 */
 
 template<class K>
-class AreEqual
-{
-public:
+class AreEqual { public:
     static bool compare(const K& k1, const K& k2){return k1 == k2;} 
 };
 
-template<class K, class V, class Compare = AreEqual<K>>
-class PersistentMapPool
+template<class H>
+class MapHash { public:
+    static uint32_t hash(const H& h){return get_hash32(h);}
+};
+
+template<class K, class V, class Compare = AreEqual<K>, class HashFun = MapHash<K>>
+class PMapPool
 {
 public:
 
@@ -791,8 +742,8 @@ public:
 
     /* Data structure types. */
     
-    typedef typename PersistentListPool<const KeyValue*>       KeyValueListPool;
-    typedef typename PersistentListPool<const KeyValue*>::List KeyValueList;
+    typedef typename PListPool<const KeyValue*>       KeyValueListPool;
+    typedef typename PListPool<const KeyValue*>::List KeyValueList;
 
     struct RefCell;
 
@@ -832,6 +783,23 @@ public:
         /** Return number of elements stored */
         size_t size(){ return count_bits(used);}
 
+        /** Return pointer to hash value if type is not EmptyNode */
+        const uint32_t* hash_value()
+        {
+            const uint32_t* result = 0;
+            if(type == CollisionNode)
+            {
+                auto kvi = value.collision_list->begin();
+                result = &(kvi->hash);
+
+            }
+            else if(type == ValueNode)
+            {
+                result = &(value.keyvalue->hash);
+            }
+            return result;
+        }
+
         /** Return true if the index signified by the index is used.*/
         bool index_in_use(uint32_t index){return bit_is_on(used, index);}
 
@@ -862,7 +830,8 @@ public:
         {
             Ref* result = 0;
             uint32_t local_index = (key >> (level*5)) & 0x1f;
-            if(local_index < size()) result = child_array + index(local_index);
+            uint32_t child_index = index(1 << local_index);
+            if(child_index < size()) result = child_array + child_index;
             return result;
         }
 
@@ -1119,7 +1088,7 @@ public:
     public:
         typedef node_iterator iterator;
 
-        Map(PersistentMapPool& pool, Node* root):pool_(pool), root_(root)
+        Map(PMapPool& pool, Node* root):pool_(pool), root_(root)
         {
             if(root_) pool_.add_ref(root_);
         }
@@ -1165,7 +1134,7 @@ public:
 
         ConstOption<V> try_get_value(const K& key)
         {
-            uint32_t hash = get_hash32(key);
+            uint32_t hash = HashFun::hash(key);
             uint32_t level = 0; 
             const V* result = 0;
             Node* current = root_;
@@ -1217,25 +1186,25 @@ public:
         // TODO: map_remove_diff -> map -> value -> diff that implements the element remove operator
         // on a map and also returns a diff between the two versions of the maps.
 
-
         /** Remove key entry from map.*/
         Map remove(const K& key)
         {
             if(try_get_value(key).is_valid())
             {
-                // Remove root and branch leading to key. Collect all keyvalues not equal to missing key.
+                // Remove root and branch containing the removed value. Collect all keyvalues not equal to missing key.
                 std::list<const KeyValue*> kept_keys;
 
                 Node* root = root_;
                 Node* new_root = pool_.new_node();
 
+                // Copy values first from old root to new as is.
                 *new_root = *root;
 
-                uint32_t hash = get_hash32(key);
-                Node* next = root_->get_child_by_hash_and_depth(hash, 0);
+                uint32_t hash = HashFun::hash(key);
+                Node* removed_branch = root_->get_child_by_hash_and_depth(hash, 0);
 
                 // Have to collect the keyvalue from node separately.
-                NodeValueIterator node_val_iter(next);
+                NodeValueIterator node_val_iter(removed_branch);
                 while(node_val_iter.move_next())
                 {
                     const KeyValue* current = node_val_iter.current();
@@ -1246,7 +1215,7 @@ public:
                 }
 
                 // Visit the branch containing the keyvalue and collect all keyvalues except the one to remove.
-                node_iterator iter(next);
+                node_iterator iter(removed_branch);
                 node_iterator end(0);
 
                 for(;iter != end; ++iter)
@@ -1273,7 +1242,7 @@ public:
                     size_t child_index = 0;
                     for(i = 0; i < old_size; ++i)
                     {
-                        if(root_->child_array[i].node != next) new_child_array[child_index++] = root_->child_array[i];
+                        if(root_->child_array[i].node != removed_branch) new_child_array[child_index++] = root_->child_array[i];
                     }
                 }
                 else
@@ -1281,12 +1250,16 @@ public:
                     new_root->used = 0;
                     new_root->child_array = 0;
                 }
-                // Init new map root and child array - just remove the branch from which the node was removed.
+
+                // Init new map root and child array - add the kept keyvalues from the removed branch.
+
                 Map out_map(pool_, new_root);
+
                 for(auto i = kept_keys.begin(); i != kept_keys.end(); ++i)
                 {
                     out_map = pool_.add(out_map, *i);
                 }
+
                 return out_map;
             }
             else
@@ -1302,14 +1275,14 @@ public:
         iterator begin(){return iterator(root_);}
         iterator end(){return iterator(0);}
         
-        friend PersistentMapPool;
+        friend PMapPool;
 
     private:
-        PersistentMapPool& pool_;
+        PMapPool& pool_;
         Node* root_;
     };
 
-    ~PersistentMapPool()
+    ~PMapPool()
     {
         // Must call destructor on all used cells.
         // TODO: Should this be the responsibility of individual containers?
@@ -1338,7 +1311,7 @@ public:
         return m;
     }
     
-    /** Create new empty from existing map. */
+    /** Create a copy from existing map. TODO: Remove this?*/
     template<class M>
     Map new_map(const M& map_in)
     {
@@ -1385,16 +1358,17 @@ public:
         KeyValue* kv = keyvalue_chunks_.reserve_element();
         kv->first  = k;
         kv->second = v;
-        kv->hash   = get_hash32(k);
+        kv->hash   = HashFun::hash(k);
         return kv;
     }
 
     /** Replace the existing reference array at node with a new array that has the newnode inserted at loc. */
-    void node_insert_replace_refarray(Node* parent, Node* newnode, const uint32_t local_index)
+    void node_insert_replace_refarray(Node* parent, Node* newnode, const uint32_t local_index, const uint32_t child_level)
     {
         size_t   old_count       = parent->size();
         size_t   new_count       = old_count + 1;
         uint32_t local_index_bit = 1 << local_index;
+        const uint32_t* newnode_hash = newnode->hash_value();
 
         Node::Ref* child_array = ref_chunks_.reserve_consecutive_elements(new_count);
         Node::Ref* old_children = parent->child_array;
@@ -1407,10 +1381,16 @@ public:
         // TODO: Check all child_array references that they use explicitly ref.
         child_array[array_index].node = newnode;
 
-        if(old_children)
+        auto child_ref = child_array + array_index;
+
+        // Copy all other children to new places in new child array
+        for(auto oi = old_children; oi != old_children + old_count; ++oi)
         {
-            std::copy(old_children, old_children + array_index, child_array);
-            std::copy(old_children + array_index, old_children + old_count, child_array + array_index + 1);
+            const uint32_t* child_hash = oi->node->hash_value();
+            assert(child_hash);
+            auto ref = parent->get(*child_hash, child_level);
+            assert(ref != child_ref);
+            ref->node = oi->node;
         }
     }
 
@@ -1442,7 +1422,7 @@ public:
                 newnode->type =  Node::ValueNode;
                 newnode->value.keyvalue = kv;
 
-                node_insert_replace_refarray(current, newnode, local_index);
+                node_insert_replace_refarray(current, newnode, local_index, level);
 
                 break; 
             }
@@ -1653,7 +1633,7 @@ private:
 #if 0
 /** Generic collection printer */
 template<class T>
-std::ostream& operator<<(std::ostream& os, PersistentListPool<T>::List& list)
+std::ostream& operator<<(std::ostream& os, PListPool<T>::List& list)
 {
     each_elem_to_os(os, list.begin(), list.end());
     return os;

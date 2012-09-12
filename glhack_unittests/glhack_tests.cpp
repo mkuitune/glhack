@@ -117,11 +117,11 @@ GLHTEST(math_ops, bit_ops_test)
 
 /////////// Collections ////////////
 
-GLHTEST(collections, PersistentList_test)
+GLHTEST(collections, PList_test)
 {
     using namespace glh;
 
-    PersistentListPool<int> pool;
+    PListPool<int> pool;
     auto list_empty = pool.new_list();
     auto list_a = pool.new_list(list(1, 2, 3, 4));
     auto list_b = pool.new_list(list(5, 6, 7, 8));
@@ -154,8 +154,8 @@ template<class M> void print_pmap(M& map)
 }
 
 
-typedef glh::PersistentMapPool<std::string, int> SIMapPool;
-typedef glh::PersistentMapPool<std::string, int>::Map SIMap;
+typedef glh::PMapPool<std::string, int> SIMapPool;
+typedef glh::PMapPool<std::string, int>::Map SIMap;
 typedef std::map<std::string, int> StlSIMap;
 
 /* Map tests:
@@ -376,7 +376,7 @@ bool persistent_map_create_and_gc_body(const StlSIMap& first_elements, const Stl
     return result;
 }
 
-GLHTEST(collections_pmap, PersistentMap_twosource_collect)
+GLHTEST(collections_pmap, PMap_twosource_collect)
 {
     using namespace glh;
     bool gc_first             =false;
@@ -401,7 +401,7 @@ GLHTEST(collections_pmap, PersistentMap_twosource_collect)
     ASSERT_TRUE(result, "Persistent map twosource collect failed.");
 }
 
-GLHTEST(collections_pmap, PersistentMap_write_and_find_elements)
+GLHTEST(collections_pmap, PMap_write_and_find_elements)
 {
     using namespace glh;
 
@@ -432,7 +432,7 @@ GLHTEST(collections_pmap, PersistentMap_write_and_find_elements)
 }
 
 #if 1
-GLHTEST(collections_pmap, PersistentMap_combinations)
+GLHTEST(collections_pmap, PMap_combinations)
 {
     using namespace glh;
     std::list<int> sizes;
@@ -484,7 +484,7 @@ GLHTEST(collections_pmap, PersistentMap_combinations)
 #endif
 
 #if 0
-GLHTEST(collections_pmap, PersistentMap_test)
+GLHTEST(collections_pmap, PMap_test)
 {
     using namespace glh;
 
@@ -494,7 +494,7 @@ GLHTEST(collections_pmap, PersistentMap_test)
         print_pmap(map2);
     };
 
-    PersistentMapPool<std::string, int> pool;
+    PMapPool<std::string, int> pool;
     SIMap map = pool.new_map();
 
     glh_test_out() << "  #########" << std::endl;
