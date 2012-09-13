@@ -87,6 +87,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\glhack_unittests\glhack_tests.cpp" />
+    <ClCompile Include="..\glhack_unittests\masp_tests.cpp" />
     <ClCompile Include="..\glhack_unittests\unittester.cpp" />
   </ItemGroup>
   <ItemGroup>

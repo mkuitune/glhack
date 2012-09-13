@@ -7,7 +7,7 @@
 #include "unittester.h"
 
 
-ADD_GROUP(collections_pmap);
+//ADD_GROUP(collections_pmap);
 
 /////////// Tests here //////////////
 
