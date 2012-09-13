@@ -87,6 +87,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\glhack_unittests\glhack_tests.cpp" />
+    <ClCompile Include="..\glhack_unittests\unittester.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\glhack_unittests\unittester.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

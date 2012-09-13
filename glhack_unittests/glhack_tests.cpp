@@ -3,104 +3,24 @@
 
 #include "glhack.h"
 #include "persistent_containers.h"
-
-#include<list>
-#include<map>
-#include<functional>
-#include<iostream> 
-
-/// Minimal unit test framework
-
-// Output stream mapping.
-std::ostream* g_outstream = &std::cout;
-
-std::ostream& glh_test_out(){return *g_outstream;}
-
-// Use global boolean to signal result of each test. No need for return values, shorter test functions.
-bool g_exec_result;
-
-void glh_test_err()
-{
-    glh_test_out() << "Error.";
-    g_exec_result = false;
-}
-
-#define GLH_TEST_LOG(msg_param)do{ glh_test_out() << std::endl << "  " << msg_param << std::endl;}while(0)
-#define ASSERT_TRUE(stmnt_param, msg_param)do{if(!(stmnt_param)){glh_test_err(); glh_test_out() << std::endl << "  " << msg_param << std::endl;return;}}while(0)
-#define ASSERT_FALSE(stmnt_param, msg_param)do{if(stmnt_param){glh_test_err(); glh_test_out() << std::endl << "  " << msg_param << std::endl;return;}}while(0)
+#include<string>
+#include "unittester.h"
 
 
-typedef std::function<void(void)> GLhTestFun;
-
-
-struct TestCallback{
-    GLhTestFun callback; 
-    std::string group;
-    std::string name;
-    TestCallback(GLhTestFun f, const char* grp, const char* str):
-        callback(f), group(grp), name(str){}
-    TestCallback():callback(0), name(""){}
-};
-
-typedef std::map<std::string, TestCallback> TestGroup;
-typedef std::map<std::string, TestGroup> TestSet;
-
-TestSet g_tests;
-
-class GlhTestAdd
-{
-public:
-    GlhTestAdd(const TestCallback& callback)
-    {
-        if(g_tests.count(callback.group) == 0) g_tests[callback.group] = TestGroup();
-
-        g_tests[callback.group][callback.name] = callback;
-    }
-};
-
-#define GLHTEST(group_name, test_name)     \
-class glhtestclass_##test_name {           \
-    public: static void run();             \
-};                                         \
-GlhTestAdd test_name##__add(TestCallback(glhtestclass_##test_name::run, #group_name, #test_name)); \
-void glhtestclass_##test_name::run()
-
-
-/////////// Test utilities ///////////
-
-template<class T>
-std::list<T> range_to_list(T start, T delta, T end)
-{
-    T value;
-    std::list<T> result;
-
-    for(value = start; value < end; value += delta) result.push_back(value);
-
-    return result;
-}
-
-template<class T>
-void print_container(T container)
-{
-    auto begin = container.begin();
-    auto end = container.end();
-    glh_test_out() << range_to_string(begin, end) << std::endl;
-}
-
-// TODO: Test framework and tests to separate files.
+ADD_GROUP(collections_pmap);
 
 /////////// Tests here //////////////
 
-GLHTEST(basic, test_test)
+UTEST(basic, test_test)
 {
-    glh_test_out() << "Test test" << std::endl;
+    ut_test_out() << "Test test" << std::endl;
     ASSERT_TRUE(true, "Statement was not true!");
     ASSERT_FALSE(false, "Statement was not false!");
 }
 
 /////////// Math ops /////////////
 
-GLHTEST(math_ops, bit_ops_test)
+UTEST(math_ops, bit_ops_test)
 {
     using namespace glh;
 
@@ -117,7 +37,7 @@ GLHTEST(math_ops, bit_ops_test)
 
 /////////// Collections ////////////
 
-GLHTEST(collections, PList_test)
+UTEST(collections, PList_test)
 {
     using namespace glh;
 
@@ -146,10 +66,10 @@ GLHTEST(collections, PList_test)
 
 template<class M> void print_pmap(M& map)
 {
-    glh_test_out() << "Contents of persistent map:" << std::endl;
+    ut_test_out() << "Contents of persistent map:" << std::endl;
     for(auto i = map.begin(); i != map.end(); ++i)
     {
-        glh_test_out() << i->first  << ":" << i->second << std::endl;
+        ut_test_out() << i->first  << ":" << i->second << std::endl;
     }
 }
 
@@ -376,7 +296,7 @@ bool persistent_map_create_and_gc_body(const StlSIMap& first_elements, const Stl
     return result;
 }
 
-GLHTEST(collections_pmap, PMap_twosource_collect)
+UTEST(collections_pmap, PMap_twosource_collect)
 {
     using namespace glh;
     bool gc_first             =false;
@@ -401,7 +321,7 @@ GLHTEST(collections_pmap, PMap_twosource_collect)
     ASSERT_TRUE(result, "Persistent map twosource collect failed.");
 }
 
-GLHTEST(collections_pmap, PMap_write_and_find_elements)
+UTEST(collections_pmap, PMap_write_and_find_elements)
 {
     using namespace glh;
 
@@ -432,7 +352,7 @@ GLHTEST(collections_pmap, PMap_write_and_find_elements)
 }
 
 #if 1
-GLHTEST(collections_pmap, PMap_combinations)
+UTEST(collections_pmap, PMap_combinations)
 {
     using namespace glh;
     std::list<int> sizes;
@@ -446,10 +366,10 @@ GLHTEST(collections_pmap, PMap_combinations)
 
     size_t pair_index = 1;
     // First run all tests with different maps.
-    glh_test_out() << std::endl;
+    ut_test_out() << std::endl;
     for(auto p = size_pairs.begin(); p != size_pairs.end(); ++p, pair_index++)
     {
-        glh_test_out() << "Run pair " << pair_index << " of " << size_pairs.size() << "(" << p->first << ", "<< p->second << ")" << std::endl;
+        ut_test_out() << "Run pair " << pair_index << " of " << size_pairs.size() << "(" << p->first << ", "<< p->second << ")" << std::endl;
         int first_size = p->first;
         int second_size = p->second;
 
@@ -484,7 +404,7 @@ GLHTEST(collections_pmap, PMap_combinations)
 #endif
 
 #if 0
-GLHTEST(collections_pmap, PMap_test)
+UTEST(collections_pmap, PMap_test)
 {
     using namespace glh;
 
@@ -497,20 +417,20 @@ GLHTEST(collections_pmap, PMap_test)
     PMapPool<std::string, int> pool;
     SIMap map = pool.new_map();
 
-    glh_test_out() << "  #########" << std::endl;
+    ut_test_out() << "  #########" << std::endl;
 
     print_pmap(map);
     auto map1 = map.add("Foo", 300);
     print_pmap(map);
     print_pmap(map1);
 
-    glh_test_out() << "  #########" << std::endl;
+    ut_test_out() << "  #########" << std::endl;
 
     test_overwrite(map);
     print_pmap(map);
     print_pmap(map1);
     
-    glh_test_out() << "  #########" << std::endl;
+    ut_test_out() << "  #########" << std::endl;
 
     auto map2 = map1.add("Removethis", 6996);
     print_pmap(map1);
@@ -526,13 +446,13 @@ GLHTEST(collections_pmap, PMap_test)
 
 /////////// Containers ////////////////
 
-GLHTEST(containers, pool_test)
+UTEST(containers, pool_test)
 {
     using namespace glh;
     Pool<int> intpool;
 }
 
-GLHTEST(containers, pooled_list_test)
+UTEST(containers, pooled_list_test)
 {
     using namespace glh;
     PooledList<int>::ListPool pool;
@@ -542,11 +462,11 @@ GLHTEST(containers, pooled_list_test)
     add(list1, 1);
     add(list2, 2);
 
-    glh_test_out() << list1 << std::endl;
-    glh_test_out() << list2 << std::endl;
+    ut_test_out() << list1 << std::endl;
+    ut_test_out() << list2 << std::endl;
 }
 
-GLHTEST(containers, arrayset_test)
+UTEST(containers, arrayset_test)
 {
     using namespace glh;
     ArraySet<int> set;
@@ -569,7 +489,7 @@ namespace {
     }
 }
 
-GLHTEST(containers, bimap_test)
+UTEST(containers, bimap_test)
 {
     using namespace glh;
     BiMap<std::string, int> map;
@@ -579,11 +499,11 @@ GLHTEST(containers, bimap_test)
 
     insert_all_pairs(map, pairs, pairs + pair_count - 1);
 
-    glh_test_out() << map.map() << std::endl;
-    glh_test_out() << map.inverse_map() << std::endl;
+    ut_test_out() << map.map() << std::endl;
+    ut_test_out() << map.inverse_map() << std::endl;
 }
 
-GLHTEST(containers, aligned_array_test)
+UTEST(containers, aligned_array_test)
 {
     using namespace glh;
     size_t size = 500;
@@ -607,7 +527,7 @@ GLHTEST(containers, aligned_array_test)
 
 ////////// Shader utilities etc. ///////////
 
-GLHTEST(shader_utilities, shader_parse_test)
+UTEST(shader_utilities, shader_parse_test)
 {
     using namespace glh;
     bool result = true;
@@ -624,80 +544,11 @@ GLHTEST(shader_utilities, shader_parse_test)
 
     auto vars = parse_shader_vars(shader_f);
     
-    glh_test_out() << std::endl;
-    for(auto i = vars.begin(); i != vars.end();i++) glh_test_out() << "  " << *i << std::endl;
-
+    ut_test_out() << std::endl;
+    for(auto i = vars.begin(); i != vars.end();i++) ut_test_out() << "  " << *i << std::endl;
 }
 
 
-//////////////// Test Runners. ////////////////////
-
-void run_test(const TestCallback& test)
-{
-    glh_test_out() << "Run " << test.name << " ";
-    g_exec_result = true;
-    test.callback();
-    if(g_exec_result)
-    {
-        glh_test_out() << "\n    passed." << std::endl;
-    }
-    else
-    {
-        glh_test_out() << test.name << "\n    FAILED!" << std::endl; 
-    }
-}
-
-void run_group(TestSet::value_type& group)
-{
-    using namespace glh;
-    glh_test_out() << "Group:'" << group.first << "'" << std::endl;
-    foreach_value(group.second, run_test);
-}
-
-bool run_all_tests()
-{
-    using namespace glh;
-    bool result = true;
-    
-    foreach(g_tests, run_group);
-
-    return result;
-}
-
-bool run_tests(const std::list<std::string>& group_names)
-{
-    using namespace glh;
-    bool result = true;
-    for(auto gname = group_names.begin(); gname != group_names.end(); ++gname)
-    {
-        auto test = g_tests.find(*gname);
-        if(test == g_tests.end())
-        {
-            glh_test_out() << "Warning: Could not find group:" << *gname << std::endl;
-        }
-        {
-            run_group(*test);
-        }
-    }
 
 
-    return result;
-}
 
-std::list<std::string> active_groups = glh::list(std::string("collections_pmap")); 
-
-/** Run the tests. */
-bool glh_run_tests()
-{
-    bool result = true;
-
-    if(active_groups.size() > 0) run_tests(active_groups);
-    else run_all_tests();
-
-    return result;
-}
-
-int main(int argc, char* argv[])
-{
-    glh_run_tests();
-}

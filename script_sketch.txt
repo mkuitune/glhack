@@ -1,0 +1,161 @@
+Eval - Apply rules
+
+Program is evaluated linearly.
+The value of latest expression is pushed on stack.
+
+3
+$> 3  # 3 pushed to stack
+
+a = 3
+# push 3 to sta
+
+f = fun(x y)(x + y)
+
+obj = map(
+	sum = fun(x y)(x + y)
+	div = fun(x y)( x / y)
+	sub = fun(x y)(x - y)
+)
+
+obj(sum)(4 5)
+obj.sum(4 5)
+
+
+
+3 + 1
+$> 4
+a
+$>
+
+
+a = 3
+# is a sugared form of
+kv(a 3)
+
+
+map(a 3 b 4)
+#is a sugared form of
+map(kv(a 3) kv(b 4))
+
+
+a = 3
+$> ()
+b = 4
+
+c = a + b
+# Eval current a + b, store as number
+c = eqn(a + b)
+# Eqn objects are evaluated each time their
+# value is sought out.
+c
+# prints 7
+a = 8
+c
+# prints 12
+
+(b c) = (1 2)
+a = 1
+# Is equal to
+def(a 1) 
+
+a = (1 : 3  2: 4)
+b =(1 2 3 4)
+# is equal to
+b = (1: 2: 3:)
+
+
+b=array(1 2 3 4)
+#is equal to
+b=(0:1 1:2 2:3)
+
+c = fun(x y z){
+}
+
+d = c(a[1] 2 3);
+
+make_animal = fun(name height width)
+{
+	map(name:name height:height 
+width:width)
+}
+
+if(cond){block}
+
+if( a is 3){a = a + 3}
+match(param map(cond, block)
+match(a 
+  
+    1 : {print("a is one")}
+	String : {print("a is string")}
+	Object : 
+  )
+)
+
+
+# Interface: map signature
+# verifies map has fields and they
+# match the signature if given 
+
+Mesh = signature(
+	vertices : 'map
+	faces : 'map
+	edges: 'map
+)
+
+
+
+match(m,
+  (
+	Mesh : {handle_mesh(m);}
+	_ : 	{abort("Not a mesh" + str(m))}
+  )
+)
+
+
+
+
+graph = 
+(0 : (1 2 3)
+
+
+r = regex("foo|bar")
+match = r("football")
+if(match[1])
+{
+	print
+}
+
+
+// ML -like
+let a = 9
+
+// Automatic truncation
+let a(x:int) = x * x   
+
+let _,b = 1,2
+
+let m = dict(a 1 b 2 c3)
+
+let n = m <- (a 9)
+
+
+let l = (
+
+let f(x) = match x with |String str -> print str
+                        | Int i     -> 
+
+// Created referred object type
+let a = new String "Hello
+let s = a.size()
+
+let A = 
+| int32   of Foo
+| float32 of Bar
+
+let b = Foo 45
+
+let anon_a = env
+    let a
+    let b
+    let print (
+end
