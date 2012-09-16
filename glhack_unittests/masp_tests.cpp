@@ -18,6 +18,8 @@ UTEST(masp, simple)
 
     Masp m;
 
-    const char* str = "a = 1;";
+    Masp::Atom a = m.compile_string("1");
+
+    GLH_TEST_LOG(string_of_atom(a));
 
 }
