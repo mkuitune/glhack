@@ -213,8 +213,112 @@ void Masp::Atom::alloc_str(const char* str, const char* str_end)
     strncat(((char*)value.string), str, size - 1);
 }
 
+
 ///// Utility functions /////
 
+/** Return pointer either to the next newline ('\n') or to the end of the given range.
+*/
+const char* to_newline(const char* begin, const char* end)
+{
+    const char* c = begin;
+    while(c != end && *c != '\n'){c++;}
+    return c;
+}
+
+/** Return pointer to end of string. Returns the pointer to the last
+ *  quote in strings delimited with " -characters.
+ *
+ *  @param begin Pointer to first element after the initial " in the string.
+ *  @param end   Pointer to the null termination character for the string.
+ *  @return      Pointer to the delimiting " in a string or to the end of the given range.
+ */
+static const char* last_quote_of_string(const char* begin, const char* end)
+{
+    const char* last = end;
+    const char* c = begin;
+    size_t i = 0;
+
+    while(c != end)
+    {
+        if(*c == '\\')
+        {
+            c++;
+            if(c == end) return c;
+        }
+        else if(*c == '"') 
+        {
+            return c;
+        }
+
+        c++;
+    }
+
+    return c;
+}
+
+/** Match the pattern to the beginning of the given range.
+ * @param pattern        Pattern to match
+ * @param pattern_length Length of pattern (equalent to to strlen).
+ * @param begin          Beginning of the range to scan.
+ * @param end            End of the range to scan.
+ * @return               True if the pattern matched the beginning of the range, otherwise false.
+*/
+static bool match_string(const char* pattern, const size_t pattern_length, const char* begin, const char* end)
+{
+    bool result = false;
+    size_t length = end - begin;
+    if(length >= pattern_length)
+    {
+        size_t i = 0;
+        const char* c = begin;
+        result = true;
+        while(i++ < pattern_length && result){result = *pattern++ == *c++;}
+    }
+    return result;
+}
+
+/** Verify that give scope delimiters balance out.*/
+static bool check_scope(const char* begin, const char* end, const char* comment, char scope_start, char scope_end)
+{
+    bool result = true;
+    const char* c = begin;
+    int scope = 0;
+    size_t comment_length = strlen(comment);
+    while(c != end)
+    {
+        if(match_string(comment, comment_length, c, end))
+        {
+            c = to_newline(c, end);
+        }
+        if(*c == '"')
+        {
+            c = last_quote_of_string(c, end);
+        }
+        else if(*c == scope_start)
+        {
+            scope = scope + 1;
+        }
+        else if(*c == scope_end)
+        {
+            scope = scope - 1;
+        }
+
+        if(scope < 0)
+        {
+            break;
+        }
+
+        c++;
+    }
+
+    if(scope != 0) result = false;
+
+    return result;
+}
+
+typedef glh::AnnotatedResult<Masp::Atom> parser_result;
+
+/** Parse string to atom. Use one instance of AtomParser per string/atom pair. */
 class AtomParser
 {
 public:
@@ -222,12 +326,6 @@ public:
     AtomParser()
     {
         reading_string = false;
-
-        LPAREN  ="(";
-        RPAREN  =")";
-        COMMENT =";;";
-        QUOTE   ="'";
-        NEWLINE = "\n";
     }
 
     // List stack.
@@ -235,7 +333,7 @@ public:
     typedef std::list<Masp::Atom> atom_list;
     std::stack<atom_list* > stack;
 
-    atom_list* push(atom_list* list)
+    atom_list* push_list(atom_list* list)
     {
         atom_list* result = 0;
         if(list)
@@ -251,7 +349,7 @@ public:
     }
 
     /** Pop list stack, return popped list if not empty.*/
-    atom_list* pop()
+    atom_list* pop_list()
     {
         atom_list* result = 0;
         if(!stack.empty())
@@ -279,76 +377,95 @@ public:
 
     typedef const char* charptr;
 
-    charptr LPAREN;
-    charptr RPAREN;
-    charptr COMMENT;
-    charptr QUOTE;
-    charptr NEWLINE;
+    charptr c_;
+    charptr end_;
 
-
-    void parse_string(charptr c, charptr end, charptr* last)
+    bool is(char ch){return *c_ == ch;}
+    bool at_end(){return c_ == end_;}
+    void init(const char* start, const char* end){c_ = start; end_ = end;}
+    const char* next(){return c_ + 1;}
+    void move_forward(){c_ = c_ + 1;}
+    void set(const char * ch){c_ = ch;}
+    void to_newline()
     {
-        size_t i = 0;
-        while(c != end)
-        {
-            if(*c == '\\')
-            {
-                c++;
-                if(c==end) return;
-            }
-            else if(*c == '"') 
-            {
-                *last = c;
-                return;
-            }
-
-            c++;
-        }
+        while(c_ != end_ && *c_ != '\n'){c_++;}
     }
 
-    Masp::Atom parse(const char* str, std::string& err)
+    const char* parse_string()
+    {
+        return last_quote_of_string(c_,end_);
+    }
+
+    bool parse_number()
+    {
+        return true;
+    }
+
+    bool parse_symbol()
+    {
+        return true;
+    }
+
+    parser_result parse(const char* str)
     {
         Masp::Atom root = make_atom_list();
-        atom_list* list = push(root.value.list);
+        atom_list* list = push_list(root.value.list);
 
         size_t size = strlen(str);
-        size_t i = 0;
-        charptr end = str + size;
+        init(str, str + size);
 
+        bool scope_valid = check_scope(c_, end_, ";", '(', ')');
 
-
-        while(i < size)
+        if(!scope_valid)
         {
-            charptr c = str + i;
-
-            // Parse string
-            if(*c == '"') 
-            {
-                const char* last = 0;
-                parse_string(c + 1, end, &last);
-                if(last)
-                {
-                    i = last - str;
-                    list->push_back(make_atom_string(c + 1, last));
-                }
-                else break;
-                 
-            }
-
-            i++;
+            return parser_result("Could not parse, error in list scope - misplaced '(' or ')' ");
         }
 
-        return root;
+        while(! at_end())
+        {
+            if(is('"')) //> string
+            {
+                const charptr last = parse_string();
+                list->push_back(make_atom_string(next(), last));
+                set(last);
+            }
+            else if(is(';'))  //> newline
+            {
+                to_newline();
+            }
+            else if(is('(')) // Enter list
+            {
+                list->push_back(make_atom_list());
+                atom_list* new_list = list->back().value.list;
+                list = push_list(new_list);
+            }
+            else if(is(')')) // Exit list
+            {
+                list = pop_list();
+            }
+            else if(parse_number())
+            {
+                // push back number on list make_atom_number
+            }
+            else if(parse_symbol())
+            {
+                // push back symbol on list make_atom_symbol
+            }
+
+            if(at_end()) break;
+            move_forward();
+        }
+
+        return parser_result(root);
     }
 
 };
 
-Masp::Atom string_to_atom(const char* str, std::string& err)
+parser_result string_to_atom(const char* str)
 {
     AtomParser parser;
-    err = "";
-    Masp::Atom a = parser.parse(str, err);
-    return a;
+
+    return parser.parse(str);
 }
 
 static void atom_to_string_helper(std::ostream& os, const Masp::Atom& a)
