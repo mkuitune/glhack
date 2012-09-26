@@ -31,6 +31,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\glhack\allocators.h" />
+    <ClInclude Include="..\glhack\annotated_result.h" />
     <ClInclude Include="..\glhack\geometry.h" />
     <ClInclude Include="..\glhack\glbase.h" />
     <ClInclude Include="..\glhack\glhack.h" />

@@ -316,7 +316,7 @@ static bool check_scope(const char* begin, const char* end, const char* comment,
     return result;
 }
 
-typedef glh::AnnotatedResult<Masp::Atom> parser_result;
+
 
 /** Parse string to atom. Use one instance of AtomParser per string/atom pair. */
 class AtomParser
@@ -406,7 +406,7 @@ public:
         return true;
     }
 
-    parser_result parse(const char* str)
+    Masp::parser_result parse(const char* str)
     {
         Masp::Atom root = make_atom_list();
         atom_list* list = push_list(root.value.list);
@@ -418,7 +418,7 @@ public:
 
         if(!scope_valid)
         {
-            return parser_result("Could not parse, error in list scope - misplaced '(' or ')' ");
+            return Masp::parser_result("Could not parse, error in list scope - misplaced '(' or ')' ");
         }
 
         while(! at_end())
@@ -456,12 +456,12 @@ public:
             move_forward();
         }
 
-        return parser_result(root);
+        return Masp::parser_result(root);
     }
 
 };
 
-parser_result string_to_atom(const char* str)
+Masp::parser_result string_to_atom(const char* str)
 {
     AtomParser parser;
 

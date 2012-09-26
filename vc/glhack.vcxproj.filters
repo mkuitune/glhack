@@ -26,5 +26,6 @@
     <ClInclude Include="..\glhack\tinymt32.h" />
     <ClInclude Include="..\glhack\tinymt64.h" />
     <ClInclude Include="..\glhack\masp.h" />
+    <ClInclude Include="..\glhack\annotated_result.h" />
   </ItemGroup>
 </Project>

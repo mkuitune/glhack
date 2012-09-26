@@ -2,7 +2,8 @@
 #define MASP_H
 
 
-#include<string>
+#include "annotated_result.h"
+
 #include<list>
 
 /** Script environment. */
@@ -95,11 +96,14 @@ public:
     class Env;
     Env* env_;
 
+typedef glh::AnnotatedResult<Atom> parser_result;
+
 };
 
 
-/** Parse string to data structure. If err is not empty then parsing failed.*/
-Masp::Atom string_to_atom(const char* str, std::string& err);
+
+/** Parse string to atom data structure.*/
+Masp::parser_result string_to_atom(const char* str);
 const std::string atom_to_string(const Masp::Atom& atom);
 
 #endif
