@@ -5,6 +5,7 @@
 #include<cstring>
 #include<algorithm>
 #include<cstdlib>
+#include<cctype>
 #include<sstream>
 
 ////// Masp::Atom ///////
@@ -391,6 +392,8 @@ public:
         while(c_ != end_ && *c_ != '\n'){c_++;}
     }
 
+    bool is_space(){return isspace(*c_) != 0;}
+
     const char* parse_string()
     {
         return last_quote_of_string(c_,end_);
@@ -442,6 +445,10 @@ public:
             else if(is(')')) // Exit list
             {
                 list = pop_list();
+            }
+            else if(is_space())
+            {
+                // After this we know that the input is either number or symbol
             }
             else if(parse_number())
             {

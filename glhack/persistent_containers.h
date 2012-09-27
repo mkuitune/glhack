@@ -57,7 +57,7 @@ namespace glh{
 template<class T>
 struct Chunk
 {
-    unsigned char buffer[CHUNK_BUFFER_SIZE * sizeof(T)];
+    typename std::aligned_storage <sizeof(T), std::alignment_of<T>::value>::type buffer[CHUNK_BUFFER_SIZE];
 
     /** Used for storing the allocation state of buffer, with array position matching bit position
      *  1<<i : buffer[i]

@@ -1,4 +1,5 @@
 #include<string>
+#include<type_traits>
 
 namespace glh
 {
@@ -20,7 +21,7 @@ public:
         valid_ = r.valid_;
         if(r.valid_)
         {
-            new(as_value())T(*(r.as_value()));
+            new(value_)T(*(r.as_value()));
         }
         else
         {
@@ -48,16 +49,16 @@ public:
         }
     }
 
-    T* as_value(){return ((T*) value_);}
+    T* as_value(){return reinterpret_cast<T*>(value_);}
     const std::string& message(){return message_;}
     bool valid(){return valid_;}
 
 private:
     AnnotatedResult& operator=(const AnnotatedResult& a);
 
-    bool valid_;
-    char value_[sizeof(T)];
+    typename std::aligned_storage <sizeof(T), std::alignment_of<T>::value>::type value_[1];
     std::string message_;
+    bool valid_;
 };
 
 }
