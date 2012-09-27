@@ -216,7 +216,7 @@ public:
     size_t depth(){return level_;}
 
 private:
-    char* stack_[sizeof(T) * MaxDepth];
+    typename std::aligned_storage <sizeof(T), std::alignment_of<T>::value>::type stack_[MaxDepth];
     size_t level_;
 };
 

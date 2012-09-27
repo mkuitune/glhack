@@ -44,6 +44,7 @@
 #include "math_tools.h"
 #include "shims_and_types.h"
 
+#include<type_traits>
 #include<unordered_map>
 #include<functional>
 #include<sstream>
