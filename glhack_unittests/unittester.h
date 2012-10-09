@@ -8,23 +8,24 @@
 //
 // Introduction
 // ------------
-// A Tiny Unittester Framework is a lightweight unit test suite for hobby projects and other exploratory purposes.
+// A Tiny Unittester Framework is a lightweight unit test suite.
 //
-// The 'framework' is composed of only two files - unittester.h and unittester.cpp. The latter of which
-// contains the main function. You build your unittestsuite by including unittester.h in all files that implement
-// tests and then building them with unittester.cpp into an executable (of course, linking any libs you might want
-// to use on the way).
+// It contains two files - unittester.h and unittester.cpp. The latter implements the
+// test entry point main -function.
+//
+// Include unittester.h in every file which implements tests and
+// compile them with unittester.cpp into an executable.
 //
 //
 // Usage
 // -----
-// You use the macro
+// The macro
 //
 // UTEST(<test_group>, <test_name>)
 //
-// to declare a test after which you write the test body wrapped in brackets.
+// declares a test after which the test body follows.
 //
-// Use the macros
+// The macros
 //
 // ASSERT_TRUE(<statement_in_c++>, <message string>)
 //
@@ -32,7 +33,7 @@
 //
 // ASSERT_FALSE(<statement_in_c++>, <message string>)
 //
-// to catch erroneus states, seize the execution of a particular test and signal the test suite of failure in a particular test.
+// catch erroneus states, seize the execution of a particular test and signal the test suite of failure in a particular test.
 //
 // Error in one test does not terminate the execution of the entire test suite.
 //
@@ -92,6 +93,7 @@
 #include<string>
 #include<memory>
 
+
 /** Ouput stream for test logging. Usage: ut_test_out() << "Hello, you feisty tester's little helper!" */
 std::ostream& ut_test_out();
 
@@ -148,12 +150,15 @@ void print_container(T container)
 typedef std::function<void(void)> UtTestFun;
 
 struct TestCallback{
+
+    static void dummy(void){}
+
     UtTestFun callback; 
     std::string group;
     std::string name;
     TestCallback(UtTestFun f, const char* grp, const char* str):
         callback(f), group(grp), name(str){}
-    TestCallback():callback(0), name(""){}
+   TestCallback():callback(TestCallback::dummy), name(""){}
 };
 
 typedef std::map<std::string, TestCallback> TestGroup;
@@ -165,6 +170,5 @@ class UtTestAdd
 public:
     UtTestAdd(const TestCallback& callback);
 };
-
 
 #endif

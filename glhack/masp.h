@@ -6,12 +6,16 @@
 
 #include<list>
 
+namespace masp{
+
 /** Script environment. */
 class Masp
 {
 public:
 
-    enum Type{NUMBER, LIST, MAP, STRING, FUNCTION, OBJECT, SYMBOL};
+#define MASP_VERSION 0.01
+
+    enum Type{NUMBER, LIST, MAP, STRING, CLOSURE, VECTOR, OBJECT, SYMBOL};
 
     struct ListRef{void* list;};
     struct MapRef{void* map;};
@@ -57,9 +61,9 @@ public:
         Type type;
         union
         {
-            Number           number;
-            const char*      string;
-            std::list<Atom>* list;
+            Number             number;
+            const char*        string;
+            std::list<Atom>*   list;
         } value;
 
         Atom();
@@ -88,22 +92,31 @@ public:
         } value;
     };
 
-
     Masp();
     ~Masp();
 
+    //TODO: Eval : place value of atom to applied list
+    //TODO: Apply: fun -> list -> value
+
     // Environment
     class Env;
+
     Env* env_;
 
-typedef glh::AnnotatedResult<Atom> parser_result;
+
 
 };
 
-
+typedef glh::AnnotatedResult<Masp::Atom> parser_result;
 
 /** Parse string to atom data structure.*/
-Masp::parser_result string_to_atom(const char* str);
+parser_result string_to_atom(Masp& m, const char* str);
+/** Return string representation of atom. */
 const std::string atom_to_string(const Masp::Atom& atom);
+
+/** Evaluate the datastructure held within the atom in the context of the Masp env. Return result as atom.*/
+Masp::Atom eval(Masp& m, const Masp::Atom& atom);
+
+}//Namespace masp
 
 #endif

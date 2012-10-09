@@ -49,6 +49,8 @@ public:
         }
     }
 
+    T& operator*(){return *(reinterpret_cast<T*>(value_));}
+    T& operator->(){return *(reinterpret_cast<T*>(value_));}
     T* as_value(){return reinterpret_cast<T*>(value_);}
     const std::string& message(){return message_;}
     bool valid(){return valid_;}

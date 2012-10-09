@@ -11,15 +11,31 @@
 
 ADD_GROUP(masp);
 
+int i;
 
 UTEST(masp, simple)
 {
     using namespace glh;
+    using namespace masp;
 
     Masp m;
 
-    Masp::Atom a = m.compile_string("1");
+    auto parsestr = [&m](const char* str)
+    {
+            parser_result a = string_to_atom(m, str);
 
-    GLH_TEST_LOG(string_of_atom(a));
+        if(a.valid())
+        {
+            GLH_TEST_LOG(atom_to_string(*a));
+        }
+    };
 
+    parsestr("1");
+    parsestr("0xf");
+    parsestr("0b101");
+
+    parsestr("\"foo\"");
+    parsestr("(\"foo\")");
+    parsestr("'(\"foo\" \"bar\")");
+    parsestr("(+ 1 2)");
 }

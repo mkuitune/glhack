@@ -755,7 +755,7 @@ Cont join(const Cont& c0, const Cont& c1, const Cont& c2){return append(append(c
 template<class Cont>
 Cont join(const Cont& c0, const Cont& c1, const Cont& c2, const Cont& c3){return append(append(append(c0, c1), c2),c3);}
 
-/** Split container to n containers with element shared between containers.
+/** Split elements evenly within a container to n containers.
  *  if n > element count then count - n empty containers are returned.*/
 template<class C>
 std::vector<C> split_container(const C& container, size_t n)

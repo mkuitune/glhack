@@ -6,9 +6,20 @@
 #include<algorithm>
 #include<cstdlib>
 #include<cctype>
+#include<regex>
 #include<sstream>
 
+namespace masp{
+
 ////// Masp::Atom ///////
+
+Masp::Atom make_atom_number(const Masp::Number& num)
+{
+    Masp::Atom a;
+    a.value.number.set(num);
+    a.type = Masp::NUMBER;
+    return a;
+}
 
 Masp::Atom make_atom_number(int i)
 {
@@ -211,11 +222,52 @@ void Masp::Atom::alloc_str(const char* str, const char* str_end)
 {
     size_t size = str_end - str + 1;
     value.string = (const char*) malloc(size * sizeof(char));
+    ((char*)value.string)[0] = '\0';
     strncat(((char*)value.string), str, size - 1);
+
+    ((char*)value.string)[size -1] = '\0';
 }
 
 
 ///// Utility functions /////
+
+static inline bool is_digit(char c){return isdigit(c) != 0;}
+static inline bool is_space(char c){return isspace(c) != 0;}
+
+std::regex g_regfloat("^([-+]?[0-9]+(\\.[0-9]*)?|\\.[0-9]+)([eE][-+]?[0-9]+)?$");
+std::regex g_regint("^(?:([-+]?[1-9][0-9]*)|(0[xX][0-9A-Fa-f]+)|0[bB]([01]+))$");
+
+typedef enum ParseResult_t{PARSE_NIL, PARSE_INT, PARSE_FLOAT} ParseResult;
+
+ParseResult parsenum(const char* num, const char* numend, int& intvalue, double& doublevalue)
+{
+    std::cmatch res; 
+    ParseResult result = PARSE_NIL;
+
+    if(std::regex_search(num, numend, res, g_regint))
+    {
+        std::string is = res[0].str();
+
+        if(is[0] == '0')
+        {
+            if(is[1] == 'x' ||is[1] == 'X') intvalue = strtol(is.c_str(), 0, 16);
+            else if(is[1] == 'b' || is[1] == 'B') intvalue = strtol(res[3].str().c_str(), 0, 2); 
+        }
+        else
+        {
+            intvalue = atoi(is.c_str());
+        }
+        result = PARSE_INT;
+    }
+    else if(std::regex_search(num, numend, res, g_regfloat))
+    {
+        std::string sf = res[0].str();
+        doublevalue = atof(sf.c_str());
+        result = PARSE_FLOAT;
+    }
+    return result;
+
+}
 
 /** Return pointer either to the next newline ('\n') or to the end of the given range.
 */
@@ -278,7 +330,7 @@ static bool match_string(const char* pattern, const size_t pattern_length, const
     return result;
 }
 
-/** Verify that give scope delimiters balance out.*/
+/** Verify that given scope delimiters balance out.*/
 static bool check_scope(const char* begin, const char* end, const char* comment, char scope_start, char scope_end)
 {
     bool result = true;
@@ -316,7 +368,6 @@ static bool check_scope(const char* begin, const char* end, const char* comment,
 
     return result;
 }
-
 
 
 /** Parse string to atom. Use one instance of AtomParser per string/atom pair. */
@@ -382,34 +433,70 @@ public:
     charptr end_;
 
     bool is(char ch){return *c_ == ch;}
+
     bool at_end(){return c_ == end_;}
+
     void init(const char* start, const char* end){c_ = start; end_ = end;}
+
     const char* next(){return c_ + 1;}
+
     void move_forward(){c_ = c_ + 1;}
+
     void set(const char * ch){c_ = ch;}
+
     void to_newline()
     {
         while(c_ != end_ && *c_ != '\n'){c_++;}
     }
 
-    bool is_space(){return isspace(*c_) != 0;}
-
     const char* parse_string()
     {
-        return last_quote_of_string(c_,end_);
+        return last_quote_of_string(next(),end_);
     }
 
-    bool parse_number()
+    bool parse_number(Masp::Number& out)
     {
-        return true;
+        bool result = false;
+
+        const char* c = c_;
+        bool is_prefix = (*c == '+' || *c == '-');
+        bool next_is_num = is_digit(c[1]);
+
+        const char* begin = c_;
+        const char* end;
+
+        if(is_digit(*c) || (is_prefix && next_is_num))
+        {
+            int intvalue;
+            double floatvalue;
+
+            end = c_ + 1;
+            while(!is_space(*end) && *end != ')' && *end != '(' && *end != ';' && *end) end++;
+
+            ParseResult r = parsenum(begin, end, intvalue, floatvalue);
+            result = r != PARSE_NIL;
+
+            if(r == PARSE_INT) out.set(intvalue);
+            else if(r == PARSE_FLOAT) out.set(floatvalue);
+        }
+
+        if(result) c_ = end - 1;
+
+        return result;
     }
 
-    bool parse_symbol()
+    bool parse_symbol(const char** begin, const char** end)
     {
-        return true;
+        bool result = false;
+        *begin = c_;
+        const char* last = c_ + 1;
+        while(!is_space(*last) && *last != ')' && *last != '(' && *last != ';' && *last) last++;
+        *end = last;
+        result = true;
+        return result;
     }
 
-    Masp::parser_result parse(const char* str)
+    parser_result parse(Masp& m, const char* str)
     {
         Masp::Atom root = make_atom_list();
         atom_list* list = push_list(root.value.list);
@@ -421,9 +508,12 @@ public:
 
         if(!scope_valid)
         {
-            return Masp::parser_result("Could not parse, error in list scope - misplaced '(' or ')' ");
+            return parser_result("Could not parse, error in list scope - misplaced '(' or ')' ");
         }
 
+        Masp::Number tmp_number;
+        const char* tmp_string_begin;
+        const char* tmp_string_end;
         while(! at_end())
         {
             if(is('"')) //> string
@@ -432,7 +522,7 @@ public:
                 list->push_back(make_atom_string(next(), last));
                 set(last);
             }
-            else if(is(';'))  //> newline
+            else if(is(';'))  //> Quote, go to newline
             {
                 to_newline();
             }
@@ -446,33 +536,39 @@ public:
             {
                 list = pop_list();
             }
-            else if(is_space())
+            else if(is_space(*c_))
             {
                 // After this we know that the input is either number or symbol
             }
-            else if(parse_number())
+            else if(parse_number(tmp_number))
             {
-                // push back number on list make_atom_number
+                list->push_back(make_atom_number(tmp_number));
             }
-            else if(parse_symbol())
+            else if(parse_symbol(&tmp_string_begin, &tmp_string_end))
             {
-                // push back symbol on list make_atom_symbol
+                list->push_back(make_atom_symbol(tmp_string_begin, tmp_string_end));
+                set(tmp_string_end - 1);
+            }
+            else
+            {
+                assert(!"Masp parse error."); // 
             }
 
             if(at_end()) break;
+
             move_forward();
         }
 
-        return Masp::parser_result(root);
+        return parser_result(root);
     }
 
 };
 
-Masp::parser_result string_to_atom(const char* str)
+parser_result string_to_atom(Masp& m, const char* str)
 {
     AtomParser parser;
 
-    return parser.parse(str);
+    return parser.parse(m, str);
 }
 
 static void atom_to_string_helper(std::ostream& os, const Masp::Atom& a)
@@ -521,6 +617,8 @@ const std::string atom_to_string(const Masp::Atom& atom)
     return stream.str();
 }
 
+///// Evaluation utilities /////
+
 ///// Masp::Env //////
 class Masp::Env
 {
@@ -551,3 +649,4 @@ Masp::~Masp()
     delete env_;
 }
 
+} // Namespace masp ends
