@@ -1,4 +1,5 @@
 #include<iostream>
+#include<cstring>
 #include "masp.h"
 
 void print_help()
@@ -14,29 +15,31 @@ int main(int argc, char* argv[])
 
     std::cout << "Masp repl\n" << std::endl;
 
-    std::string line;
     bool live = true;
+    const int line_size = 1024;
+    char line[line_size];
     while(live)
     {
         std::cout << ">";
-        std::cin >> line;
+        std::cin.getline(line, line_size);
     
-        if(line.compare("quit") == 0)
+        if(strcmp(line,"quit") == 0)
         {
             live = false;
         }
-        else if(line.compare("help") == 0)
+        else if(strcmp(line, "help") == 0)
         {
             print_help();
         }
         else
         {
-            parser_result result = string_to_atom(M, line.c_str());
+            parser_result result = string_to_atom(M, line);
             if(result.valid())
             {
                 // Masp::Atom eval_result = eval(M, *result);
+                std::string outline = atom_to_string(*result);
                 // std::string outline = atom_to_string(eval_result);
-                // std::cout << outline << std::endl;
+                std::cout << outline << std::endl;
             }
             else
             {
