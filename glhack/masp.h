@@ -15,12 +15,13 @@ public:
 
 #define MASP_VERSION 0.01
 
-    enum Type{NUMBER, LIST, MAP, STRING, CLOSURE, VECTOR, OBJECT, SYMBOL};
+    enum Type{NUMBER, STRING, SYMBOL, CLOSURE, VECTOR, LIST, MAP, OBJECT};
 
     struct ListRef{void* list;};
     struct MapRef{void* map;};
-    struct FunRef{void* fun;};
+    struct ClosureRef{void* fun;};
     struct ObjRef{void* obj;};
+    struct VecRef{void* vec;};
 
     struct Number{
         enum Type{INT, DOUBLE};
@@ -53,11 +54,35 @@ public:
         }
     };
 
+    class Value
+    {
+    public:
+        Type type;
+        union
+        {
+            Number      number;
+            const char* string; //> Data for string | symbol
+            ListRef     list;
+            MapRef      map;
+            ClosureRef  fun;
+            ObjRef      obj;
+        } value;
+
+        Value();
+        ~Value();
+        Value(const Value& v);
+        Value(Value&& v);
+        Value& operator=(const Value& v);
+        Value& operator=(Value&& v);
+        void alloc_str(const char* str);
+        void alloc_str(const char* str, const char* end);
+
+    };
 
     class Atom
     {
     public:
-        /** Legal types: NUMBER, STRING, SYMBOL, LIST.*/
+        /* Note: Legal types out of parser: NUMBER, STRING, SYMBOL, LIST.*/
         Type type;
         union
         {
@@ -76,25 +101,12 @@ public:
         void alloc_str(const char* str, const char* end);
     };
 
-    class Value
-    {
-    public:
-        Type type;
-        union
-        {
-            Number      number;
-            const char* string;
-            const char* symbol;
-            ListRef     list;
-            MapRef      map;
-            FunRef      fun;
-            ObjRef      obj;
-        } value;
-    };
-
     Masp();
     ~Masp();
 
+
+    // TODO: replace std::List with plist
+    // TODO: replace Atom with Value
     //TODO: Eval : place value of atom to applied list
     //TODO: Apply: fun -> list -> value
 
