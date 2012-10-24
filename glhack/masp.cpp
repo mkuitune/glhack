@@ -11,109 +11,406 @@
 
 namespace masp{
 
-////// Masp::Atom ///////
+////// Masp::Value ///////
 
-Masp::Atom make_atom_number(const Masp::Number& num)
+typedef std::list<Value> List;
+struct Map{int i;};
+struct Closure{int i;};
+struct Object{int i;};
+struct Vector{int i;};
+
+
+List* reveal(const ListRef& ref){return reinterpret_cast<List*>(ref.data);}
+Map* reveal(const MapRef& ref){return reinterpret_cast<Map*>(ref.data);}
+Closure* reveal(const ClosureRef& ref){return reinterpret_cast<Closure*>(ref.data);}
+Object* reveal(const ObjectRef& ref){return reinterpret_cast<Object*>(ref.data);}
+Vector* reveal(const VectorRef& ref){return reinterpret_cast<Vector*>(ref.data);}
+
+ListRef hide(List* ref){ListRef r = {ref};return r;}
+MapRef hide(Map* ref){MapRef r = {ref};return r;}
+ClosureRef hide(Closure* ref){ClosureRef r = {ref};return r;}
+ObjectRef hide(Object* ref){ObjectRef r = {ref};return r;}
+VectorRef hide(Vector* ref){VectorRef r = {ref};return r;}
+
+Value make_value_number(const Number& num)
 {
-    Masp::Atom a;
+    Value a;
     a.value.number.set(num);
-    a.type = Masp::NUMBER;
+    a.type = NUMBER;
     return a;
 }
 
-Masp::Atom make_atom_number(int i)
+Value make_value_number(int i)
 {
-    Masp::Atom a;
+    Value a;
     a.value.number.set(i);
-    a.type = Masp::NUMBER;
+    a.type = NUMBER;
     return a;
 }
 
-Masp::Atom make_atom_number(double d)
+Value make_value_number(double d)
 {
-    Masp::Atom a;
+    Value a;
     a.value.number.set(d);
-    a.type = Masp::NUMBER;
+    a.type = NUMBER;
     return a;
 }
 
-Masp::Atom make_atom_string(const char* str)
+Value make_value_string(const char* str)
 {
-    Masp::Atom a;
-    a.type = Masp::STRING;
+    Value a;
+    a.type = STRING;
     a.alloc_str(str);
     return a;
 }
 
-Masp::Atom make_atom_string(const char* str, const char* str_end)
+Value make_value_string(const char* str, const char* str_end)
 {
-    Masp::Atom a;
-    a.type = Masp::STRING;
+    Value a;
+    a.type = STRING;
     a.alloc_str(str, str_end);
     return a;
 }
 
 
-Masp::Atom make_atom_symbol(const char* str)
+Value make_value_symbol(const char* str)
 {
-    Masp::Atom a;
-    a.type = Masp::SYMBOL;
+    Value a;
+    a.type = SYMBOL;
     a.alloc_str(str);
     return a;
 }
 
-Masp::Atom make_atom_symbol(const char* str, const char* str_end)
+Value make_value_symbol(const char* str, const char* str_end)
 {
-    Masp::Atom a;
-    a.type = Masp::SYMBOL;
+    Value a;
+    a.type = SYMBOL;
     a.alloc_str(str, str_end);
     return a;
 }
 
-Masp::Atom make_atom_list()
+Value make_value_list()
 {
-    Masp::Atom a;
-    a.type = Masp::LIST;
-    a.value.list = new std::list<Masp::Atom>();
+    Value a;
+    a.type = LIST;
+    a.value.list = hide(new std::list<Value>());
     return a;
 }
 
-Masp::Atom::Atom()
+Value make_value_map()
+{
+    Value a;
+    a.type = MAP;
+    a.value.map = hide(new Map);
+    return a;
+}
+
+Value make_value_closure()
+{
+    Value a;
+    a.type = CLOSURE;
+    a.value.closure = hide(new Closure);
+    return a;
+}
+
+Value make_value_object()
+{
+    Value a;
+    a.type = OBJECT;
+    a.value.object = hide(new Object);
+    return a;
+}
+
+Value make_value_vector()
+{
+    Value a;
+    a.type = VECTOR;
+    a.value.vector = hide(new Vector);
+    return a;
+}
+
+Value::Value()
 {
 }
 
-Masp::Atom::~Atom()
+
+void Value::dealloc()
 {
-    if((type == Masp::STRING || type == Masp::SYMBOL) && value.string)
+    if((type == STRING || type == SYMBOL) && value.string)
     {
         free(((void*)value.string));
     }
-    else if(type == Masp::LIST && value.list)
+    else if(type == LIST && value.list.data){ delete reveal(value.list);}
+    else if(type == MAP && value.map.data){ delete reveal(value.map);}
+    else if(type == CLOSURE && value.closure.data){ delete reveal(value.closure);}
+    else if(type == OBJECT && value.object.data){ delete reveal(value.object);}
+    else if(type == VECTOR && value.vector.data){ delete reveal(value.vector);}
+}
+
+Value::~Value()
+{
+    dealloc();
+}
+
+template<class T, class V>
+V copy_t(const V& v)
+{
+    T* t = 0;
+    if(v.data) t = new T(*reveal(v));
+    return hide(t);
+}
+
+Value::Value(const Value& v)
+{
+    copy(v);
+}
+
+void Value::copy(const Value& v)
+{
+    type = v.type;
+    switch(type)
+    {
+        case NUMBER:
+        {
+            value.number.set(v.value.number);
+            break;
+        }
+        case SYMBOL:
+        case STRING:
+        {
+            alloc_str(v.value.string);
+            break;
+        }
+        case LIST:
+        {
+            value.list = copy_t<List, ListRef>(v.value.list);
+            break;
+        }
+        case MAP:
+        {
+            value.map = copy_t<Map, MapRef>(v.value.map);
+            break;
+        }
+        case CLOSURE:
+        {
+            value.closure = copy_t<Closure, ClosureRef>(v.value.closure);
+            break;
+        }
+        case OBJECT:
+        {
+            value.object = copy_t<Object, ObjectRef>(v.value.object);
+            break;
+        }
+        case VECTOR:
+        {
+            value.vector = copy_t<Vector, VectorRef>(v.value.vector);
+            break;
+        }
+        default:
+            assert(!"Illegal Value type");
+    }
+}
+
+void Value::movefrom(Value& v)
+{
+    type = v.type;
+    
+    switch(type)
+    {
+        case NUMBER:
+        {
+            value.number.set(v.value.number);
+            break;
+        }
+        case SYMBOL:
+        case STRING:
+        {
+            value.string = v.value.string;
+            v.value.string = 0;
+            break;
+        }
+        case LIST:
+        {
+            value.list = v.value.list;
+            v.value.list.data = 0;
+            break;
+        }
+        case MAP:
+        {
+            value.map = v.value.map;
+            v.value.map.data = 0;
+            break;
+        }
+        case CLOSURE:
+        {
+            value.closure = v.value.closure;
+            v.value.closure.data = 0;
+            break;
+        }
+        case OBJECT:
+        {
+            value.object = v.value.object;
+            v.value.object.data= 0;
+            break;
+        }
+        case VECTOR:
+        {
+            value.vector = v.value.vector;
+            v.value.object.data= 0;
+            break;
+        }
+        default:
+            assert(!"Illegal Value type");
+    }
+}
+
+Value::Value(Value&& v)
+{
+    movefrom(v);
+}
+
+Value& Value::operator=(const Value& a)
+{
+    if(&a != this)
+    {
+        copy(a);
+    }
+    
+    return *this;
+}
+
+Value& Value::operator=(Value&& v)
+{
+    if(&v == this)
+    {
+        movefrom(v);
+    }
+
+    return *this; 
+}
+
+void Value::alloc_str(const char* str)
+{
+    size_t size = strlen(str) + 1;
+    value.string = (const char*) malloc(size * sizeof(char));
+    strcpy(((char*)value.string), str);
+}
+
+void Value::alloc_str(const char* str, const char* str_end)
+{
+    size_t size = str_end - str + 1;
+    value.string = (const char*) malloc(size * sizeof(char));
+    ((char*)value.string)[0] = '\0';
+    strncat(((char*)value.string), str, size - 1);
+
+    ((char*)value.string)[size -1] = '\0';
+}
+
+
+
+////// Atom ///////
+
+Atom make_atom_number(const Number& num)
+{
+    Atom a;
+    a.value.number.set(num);
+    a.type = NUMBER;
+    return a;
+}
+
+Atom make_atom_number(int i)
+{
+    Atom a;
+    a.value.number.set(i);
+    a.type = NUMBER;
+    return a;
+}
+
+Atom make_atom_number(double d)
+{
+    Atom a;
+    a.value.number.set(d);
+    a.type = NUMBER;
+    return a;
+}
+
+Atom make_atom_string(const char* str)
+{
+    Atom a;
+    a.type = STRING;
+    a.alloc_str(str);
+    return a;
+}
+
+Atom make_atom_string(const char* str, const char* str_end)
+{
+    Atom a;
+    a.type = STRING;
+    a.alloc_str(str, str_end);
+    return a;
+}
+
+
+Atom make_atom_symbol(const char* str)
+{
+    Atom a;
+    a.type = SYMBOL;
+    a.alloc_str(str);
+    return a;
+}
+
+Atom make_atom_symbol(const char* str, const char* str_end)
+{
+    Atom a;
+    a.type = SYMBOL;
+    a.alloc_str(str, str_end);
+    return a;
+}
+
+Atom make_atom_list()
+{
+    Atom a;
+    a.type = LIST;
+    a.value.list = new std::list<Atom>();
+    return a;
+}
+
+Atom::Atom()
+{
+}
+
+Atom::~Atom()
+{
+    if((type == STRING || type == SYMBOL) && value.string)
+    {
+        free(((void*)value.string));
+    }
+    else if(type == LIST && value.list)
     {
         delete value.list;
     }
 }
 
-Masp::Atom::Atom(const Atom& atom)
+Atom::Atom(const Atom& atom)
 {
     type = atom.type;
     switch(atom.type)
     {
-        case Masp::NUMBER:
+        case NUMBER:
         {
             value.number.set(atom.value.number);
             break;
         }
-        case Masp::SYMBOL:
-        case Masp::STRING:
+        case SYMBOL:
+        case STRING:
         {
             alloc_str(atom.value.string);
             break;
         }
-        case Masp::LIST:
+        case LIST:
         {
 
-            value.list = new std::list<Masp::Atom>(atom.value.list->begin(), atom.value.list->end());
+            value.list = new std::list<Atom>(atom.value.list->begin(), atom.value.list->end());
             break;
         }
         default:
@@ -121,24 +418,24 @@ Masp::Atom::Atom(const Atom& atom)
     }
 }
 
-Masp::Atom::Atom(Atom&& atom)
+Atom::Atom(Atom&& atom)
 {
     type = atom.type;
     switch(atom.type)
     {
-        case Masp::NUMBER:
+        case NUMBER:
         {
             value.number.set(atom.value.number);
             break;
         }
-        case Masp::SYMBOL:
-        case Masp::STRING:
+        case SYMBOL:
+        case STRING:
         {
             value.string = atom.value.string;
             atom.value.string = 0;
             break;
         }
-        case Masp::LIST:
+        case LIST:
         {
             value.list = atom.value.list;
             atom.value.list = 0;
@@ -149,7 +446,7 @@ Masp::Atom::Atom(Atom&& atom)
     }
 }
 
-Masp::Atom& Masp::Atom::operator=(const Atom& a)
+Atom& Atom::operator=(const Atom& a)
 {
     if(&a == this) return *this;
     else
@@ -157,20 +454,20 @@ Masp::Atom& Masp::Atom::operator=(const Atom& a)
         type = a.type;
         switch(type)
         {
-            case Masp::NUMBER:
+            case NUMBER:
             {
                 value.number.set(a.value.number);
                 break;
             }
-            case Masp::SYMBOL:
-            case Masp::STRING:
+            case SYMBOL:
+            case STRING:
             {
                 alloc_str(a.value.string);
                 break;
             }
-            case Masp::LIST:
+            case LIST:
             {
-                value.list = new std::list<Masp::Atom>(a.value.list->begin(), a.value.list->end());
+                value.list = new std::list<Atom>(a.value.list->begin(), a.value.list->end());
                 break;
             }
             default:
@@ -180,26 +477,26 @@ Masp::Atom& Masp::Atom::operator=(const Atom& a)
     return *this;
 }
 
-Masp::Atom& Masp::Atom::operator=(Atom&& atom)
+Atom& Atom::operator=(Atom&& atom)
 {
     if(&atom == this) return *this;
 
     type = atom.type;
     switch(atom.type)
     {
-        case Masp::NUMBER:
+        case NUMBER:
         {
             value.number.set(atom.value.number);
             break;
         }
-        case Masp::SYMBOL:
-        case Masp::STRING:
+        case SYMBOL:
+        case STRING:
         {
             value.string = atom.value.string;
             atom.value.string = 0;
             break;
         }
-        case Masp::LIST:
+        case LIST:
         {
             value.list = atom.value.list;
             atom.value.list = 0;
@@ -211,14 +508,14 @@ Masp::Atom& Masp::Atom::operator=(Atom&& atom)
     return *this;
 }
 
-void Masp::Atom::alloc_str(const char* str)
+void Atom::alloc_str(const char* str)
 {
     size_t size = strlen(str) + 1;
     value.string = (const char*) malloc(size * sizeof(char));
     strcpy(((char*)value.string), str);
 }
 
-void Masp::Atom::alloc_str(const char* str, const char* str_end)
+void Atom::alloc_str(const char* str, const char* str_end)
 {
     size_t size = str_end - str + 1;
     value.string = (const char*) malloc(size * sizeof(char));
@@ -382,7 +679,7 @@ public:
 
     // List stack.
 
-    typedef std::list<Masp::Atom> atom_list;
+    typedef std::list<Atom> atom_list;
     std::stack<atom_list* > stack;
 
     atom_list* push_list(atom_list* list)
@@ -454,7 +751,7 @@ public:
         return last_quote_of_string(next(),end_);
     }
 
-    bool parse_number(Masp::Number& out)
+    bool parse_number(Number& out)
     {
         bool result = false;
 
@@ -498,7 +795,7 @@ public:
 
     parser_result parse(Masp& m, const char* str)
     {
-        Masp::Atom root = make_atom_list();
+        Atom root = make_atom_list();
         atom_list* list = push_list(root.value.list);
 
         size_t size = strlen(str);
@@ -511,7 +808,7 @@ public:
             return parser_result("Could not parse, error in list scope - misplaced '(' or ')' ");
         }
 
-        Masp::Number tmp_number;
+        Number tmp_number;
         const char* tmp_string_begin;
         const char* tmp_string_end;
         while(! at_end())
@@ -571,13 +868,13 @@ parser_result string_to_atom(Masp& m, const char* str)
     return parser.parse(m, str);
 }
 
-static void atom_to_string_helper(std::ostream& os, const Masp::Atom& a)
+static void atom_to_string_helper(std::ostream& os, const Atom& a)
 {
     switch(a.type)
     {
-        case Masp::NUMBER:
+        case NUMBER:
         {
-            if(a.value.number.type == Masp::Number::INT)
+            if(a.value.number.type == Number::INT)
             {
                 os << a.value.number.to_int() << " ";
             }
@@ -587,17 +884,17 @@ static void atom_to_string_helper(std::ostream& os, const Masp::Atom& a)
             }
             break;
         }
-        case Masp::SYMBOL:
+        case SYMBOL:
         {
             os << a.value.string << " ";
             break;
         }
-        case Masp::STRING:
+        case STRING:
         {
             os << "\"" << a.value.string << "\" ";
             break;
         }
-        case Masp::LIST:
+        case LIST:
         {
             os << "(";
             for(auto i = a.value.list->begin(); i != a.value.list->end(); ++i)
@@ -610,7 +907,7 @@ static void atom_to_string_helper(std::ostream& os, const Masp::Atom& a)
     }
 }
 
-const std::string atom_to_string(const Masp::Atom& atom)
+const std::string atom_to_string(const Atom& atom)
 {
     std::ostringstream stream;
     atom_to_string_helper(stream, atom);
@@ -624,8 +921,8 @@ class Masp::Env
 {
 public:
 
-    typedef glh::PMapPool<std::string, Masp::Value>      value_pool;
-    typedef glh::PMapPool<std::string, Masp::Value>::Map value_map;
+    typedef glh::PMapPool<std::string, Value>      value_pool;
+    typedef glh::PMapPool<std::string, Value>::Map value_map;
 
     Masp::Env():env_pool_()
     {
