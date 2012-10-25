@@ -17,7 +17,7 @@ struct ObjectRef{void* data;};
 struct VectorRef{void* data;};
 
 struct Number{
-    enum Type{INT, DOUBLE};
+    enum Type{INT, FLOAT};
     union
     {
         int    intvalue;
@@ -26,7 +26,7 @@ struct Number{
     Type type;
 
     Number& set(const int i){type = INT; value.intvalue = i; return *this;}
-    Number& set(const double d){type = DOUBLE; value.floatvalue = d; return *this;}
+    Number& set(const double d){type = FLOAT; value.floatvalue = d; return *this;}
     Number& set(const Number& n){
         type = n.type;
         if(type == INT) value.intvalue = n.value.intvalue;
@@ -78,27 +78,6 @@ private:
 
 };
 
-class Atom
-{
-public:
-    /* Note: Legal types out of parser: NUMBER, STRING, SYMBOL, LIST.*/
-    Type type;
-    union
-    {
-        Number             number;
-        const char*        string;
-        std::list<Atom>*   list;
-    } value;
-
-    Atom();
-    ~Atom();
-    Atom(const Atom& atom);
-    Atom(Atom&& atom);
-    Atom& operator=(const Atom& a);
-    Atom& operator=(Atom&& a);
-    void alloc_str(const char* str);
-    void alloc_str(const char* str, const char* end);
-};
 
 
 /** Script environment. */
@@ -128,15 +107,19 @@ public:
 
 };
 
-typedef glh::AnnotatedResult<Atom> parser_result;
+typedef glh::AnnotatedResult<Value> parser_result;
 
-/** Parse string to atom data structure.*/
-parser_result string_to_atom(Masp& m, const char* str);
-/** Return string representation of atom. */
-const std::string atom_to_string(const Value& atom);
+/** Parse string to value data structure.*/
+parser_result string_to_value(Masp& m, const char* str);
+/** Return string representation of value. */
+const std::string value_to_string(const Value& v);
+/** Return string representation of value annotated with type. */
+const std::string value_to_typed_string(const Value& v);
+/** Return type of value as string.*/
+const char* value_type_to_string(const Value& v);
 
 /** Evaluate the datastructure held within the atom in the context of the Masp env. Return result as atom.*/
-Atom eval(Masp& m, const Atom& atom);
+Atom eval(Masp& m, const Value& v);
 
 }//Namespace masp
 

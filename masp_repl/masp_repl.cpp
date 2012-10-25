@@ -10,6 +10,9 @@ void print_help()
 int main(int argc, char* argv[])
 {
     using namespace masp;
+    using std::cout;
+    using std::cin;
+    using std::endl;
 
     Masp M;
 
@@ -20,8 +23,8 @@ int main(int argc, char* argv[])
     char line[line_size];
     while(live)
     {
-        std::cout << ">";
-        std::cin.getline(line, line_size);
+        cout << ">";
+        cin.getline(line, line_size);
     
         if(strcmp(line,"quit") == 0)
         {
@@ -33,17 +36,17 @@ int main(int argc, char* argv[])
         }
         else
         {
-            parser_result result = string_to_atom(M, line);
+            parser_result result = string_to_value(M, line);
             if(result.valid())
             {
                 // Masp::Atom eval_result = eval(M, *result);
-                std::string outline = atom_to_string(*result);
+                std::string outline = value_to_typed_string(*result);
                 // std::string outline = atom_to_string(eval_result);
-                std::cout << outline << std::endl;
+                cout << outline << endl;
             }
             else
             {
-                std::cout << "Parse error:" << result.message() << std::endl;
+                cout << "Parse error:" << result.message() << endl;
             }
         }
     }

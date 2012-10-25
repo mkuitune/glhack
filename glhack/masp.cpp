@@ -308,228 +308,22 @@ void Value::alloc_str(const char* str, const char* str_end)
 
 
 
-////// Atom ///////
-
-Atom make_atom_number(const Number& num)
-{
-    Atom a;
-    a.value.number.set(num);
-    a.type = NUMBER;
-    return a;
-}
-
-Atom make_atom_number(int i)
-{
-    Atom a;
-    a.value.number.set(i);
-    a.type = NUMBER;
-    return a;
-}
-
-Atom make_atom_number(double d)
-{
-    Atom a;
-    a.value.number.set(d);
-    a.type = NUMBER;
-    return a;
-}
-
-Atom make_atom_string(const char* str)
-{
-    Atom a;
-    a.type = STRING;
-    a.alloc_str(str);
-    return a;
-}
-
-Atom make_atom_string(const char* str, const char* str_end)
-{
-    Atom a;
-    a.type = STRING;
-    a.alloc_str(str, str_end);
-    return a;
-}
-
-
-Atom make_atom_symbol(const char* str)
-{
-    Atom a;
-    a.type = SYMBOL;
-    a.alloc_str(str);
-    return a;
-}
-
-Atom make_atom_symbol(const char* str, const char* str_end)
-{
-    Atom a;
-    a.type = SYMBOL;
-    a.alloc_str(str, str_end);
-    return a;
-}
-
-Atom make_atom_list()
-{
-    Atom a;
-    a.type = LIST;
-    a.value.list = new std::list<Atom>();
-    return a;
-}
-
-Atom::Atom()
-{
-}
-
-Atom::~Atom()
-{
-    if((type == STRING || type == SYMBOL) && value.string)
-    {
-        free(((void*)value.string));
-    }
-    else if(type == LIST && value.list)
-    {
-        delete value.list;
-    }
-}
-
-Atom::Atom(const Atom& atom)
-{
-    type = atom.type;
-    switch(atom.type)
-    {
-        case NUMBER:
-        {
-            value.number.set(atom.value.number);
-            break;
-        }
-        case SYMBOL:
-        case STRING:
-        {
-            alloc_str(atom.value.string);
-            break;
-        }
-        case LIST:
-        {
-
-            value.list = new std::list<Atom>(atom.value.list->begin(), atom.value.list->end());
-            break;
-        }
-        default:
-            assert(!"Illegal Atom type");
-    }
-}
-
-Atom::Atom(Atom&& atom)
-{
-    type = atom.type;
-    switch(atom.type)
-    {
-        case NUMBER:
-        {
-            value.number.set(atom.value.number);
-            break;
-        }
-        case SYMBOL:
-        case STRING:
-        {
-            value.string = atom.value.string;
-            atom.value.string = 0;
-            break;
-        }
-        case LIST:
-        {
-            value.list = atom.value.list;
-            atom.value.list = 0;
-            break;
-        }
-        default:
-            assert(!"Illegal Atom type");
-    }
-}
-
-Atom& Atom::operator=(const Atom& a)
-{
-    if(&a == this) return *this;
-    else
-    {
-        type = a.type;
-        switch(type)
-        {
-            case NUMBER:
-            {
-                value.number.set(a.value.number);
-                break;
-            }
-            case SYMBOL:
-            case STRING:
-            {
-                alloc_str(a.value.string);
-                break;
-            }
-            case LIST:
-            {
-                value.list = new std::list<Atom>(a.value.list->begin(), a.value.list->end());
-                break;
-            }
-            default:
-                assert(!"Illegal Atom type");
-        }
-    }
-    return *this;
-}
-
-Atom& Atom::operator=(Atom&& atom)
-{
-    if(&atom == this) return *this;
-
-    type = atom.type;
-    switch(atom.type)
-    {
-        case NUMBER:
-        {
-            value.number.set(atom.value.number);
-            break;
-        }
-        case SYMBOL:
-        case STRING:
-        {
-            value.string = atom.value.string;
-            atom.value.string = 0;
-            break;
-        }
-        case LIST:
-        {
-            value.list = atom.value.list;
-            atom.value.list = 0;
-            break;
-        }
-        default:
-            assert(!"Illegal Atom type");
-    }
-    return *this;
-}
-
-void Atom::alloc_str(const char* str)
-{
-    size_t size = strlen(str) + 1;
-    value.string = (const char*) malloc(size * sizeof(char));
-    strcpy(((char*)value.string), str);
-}
-
-void Atom::alloc_str(const char* str, const char* str_end)
-{
-    size_t size = str_end - str + 1;
-    value.string = (const char*) malloc(size * sizeof(char));
-    ((char*)value.string)[0] = '\0';
-    strncat(((char*)value.string), str, size - 1);
-
-    ((char*)value.string)[size -1] = '\0';
-}
-
-
 ///// Utility functions /////
 
 static inline bool is_digit(char c){return isdigit(c) != 0;}
 static inline bool is_space(char c){return isspace(c) != 0;}
+
+const char* g_delimiters = "(){}[];";
+
+enum DelimEnum{
+    LEFT_PAREN    = 0,
+    RIGHT_PAREN   = 1,
+    LEFT_BRACE    = 2,
+    RIGHT_BRACE   = 3,
+    LEFT_BRACKET  = 4,
+    RIGHT_BRACKET = 5,
+    SEMICOLON     = 6
+};
 
 std::regex g_regfloat("^([-+]?[0-9]+(\\.[0-9]*)?|\\.[0-9]+)([eE][-+]?[0-9]+)?$");
 std::regex g_regint("^(?:([-+]?[1-9][0-9]*)|(0[xX][0-9A-Fa-f]+)|0[bB]([01]+))$");
@@ -627,6 +421,26 @@ static bool match_string(const char* pattern, const size_t pattern_length, const
     return result;
 }
 
+/** Look for the character in the given null terminated string. If value found return index of character in string. */
+static int pos_in_string(const char c, const char* str)
+{
+    const char* ptr = str;
+    while(c != *ptr && *(++ptr)){}
+    if(*ptr) return ptr - str;
+    else return - 1;
+}
+
+static bool is_in_string(const char c, const char* str)
+{
+    return pos_in_string(c, str) >= 0;
+}
+
+static bool is_delimiter(const char c)
+{
+    return is_in_string(c, g_delimiters);
+}
+
+
 /** Verify that given scope delimiters balance out.*/
 static bool check_scope(const char* begin, const char* end, const char* comment, char scope_start, char scope_end)
 {
@@ -668,23 +482,23 @@ static bool check_scope(const char* begin, const char* end, const char* comment,
 
 
 /** Parse string to atom. Use one instance of AtomParser per string/atom pair. */
-class AtomParser
+class ValueParser
 {
 public:
 
-    AtomParser()
+    ValueParser()
     {
         reading_string = false;
     }
 
     // List stack.
 
-    typedef std::list<Atom> atom_list;
-    std::stack<atom_list* > stack;
+    typedef std::list<Value> value_list;
+    std::stack<value_list* > stack;
 
-    atom_list* push_list(atom_list* list)
+    value_list* push_list(value_list* list)
     {
-        atom_list* result = 0;
+        value_list* result = 0;
         if(list)
         {
             stack.push(list);
@@ -698,9 +512,9 @@ public:
     }
 
     /** Pop list stack, return popped list if not empty.*/
-    atom_list* pop_list()
+    value_list* pop_list()
     {
-        atom_list* result = 0;
+        value_list* result = 0;
         if(!stack.empty())
         {
             result = stack.top();
@@ -739,7 +553,7 @@ public:
 
     void move_forward(){c_ = c_ + 1;}
 
-    void set(const char * ch){c_ = ch;}
+    void set(const char* chp){c_ = chp;}
 
     void to_newline()
     {
@@ -757,7 +571,7 @@ public:
 
         const char* c = c_;
         bool is_prefix = (*c == '+' || *c == '-');
-        bool next_is_num = is_digit(c[1]);
+        bool next_is_num = (c_ != end_ && (c_ + 1) != end_) && is_digit(c[1]);
 
         const char* begin = c_;
         const char* end;
@@ -768,7 +582,7 @@ public:
             double floatvalue;
 
             end = c_ + 1;
-            while(!is_space(*end) && *end != ')' && *end != '(' && *end != ';' && *end) end++;
+            while(!is_space(*end) && (! is_delimiter(*end)) && *end) end++;
 
             ParseResult r = parsenum(begin, end, intvalue, floatvalue);
             result = r != PARSE_NIL;
@@ -787,7 +601,7 @@ public:
         bool result = false;
         *begin = c_;
         const char* last = c_ + 1;
-        while(!is_space(*last) && *last != ')' && *last != '(' && *last != ';' && *last) last++;
+        while(!is_space(*last) && (! is_delimiter(*last)) && *last) last++;
         *end = last;
         result = true;
         return result;
@@ -795,18 +609,24 @@ public:
 
     parser_result parse(Masp& m, const char* str)
     {
-        Atom root = make_atom_list();
-        atom_list* list = push_list(root.value.list);
+        Value root = make_value_list();
+        value_list* list = push_list(reveal(root.value.list));
 
         size_t size = strlen(str);
         init(str, str + size);
 
         bool scope_valid = check_scope(c_, end_, ";", '(', ')');
-
         if(!scope_valid)
-        {
             return parser_result("Could not parse, error in list scope - misplaced '(' or ')' ");
-        }
+        
+        scope_valid = check_scope(c_, end_, ";", '[', ']');
+        if(!scope_valid)
+            return parser_result("Could not parse, error in list scope - misplaced '[' or ']' ");
+        
+        scope_valid = check_scope(c_, end_, ";", '{', '}');
+        if(!scope_valid)
+            return parser_result("Could not parse, error in list scope - misplaced '{' or '}' ");
+
 
         Number tmp_number;
         const char* tmp_string_begin;
@@ -816,7 +636,7 @@ public:
             if(is('"')) //> string
             {
                 const charptr last = parse_string();
-                list->push_back(make_atom_string(next(), last));
+                list->push_back(make_value_string(next(), last));
                 set(last);
             }
             else if(is(';'))  //> Quote, go to newline
@@ -825,8 +645,8 @@ public:
             }
             else if(is('(')) // Enter list
             {
-                list->push_back(make_atom_list());
-                atom_list* new_list = list->back().value.list;
+                list->push_back(make_value_list());
+                value_list* new_list = reveal(list->back().value.list);
                 list = push_list(new_list);
             }
             else if(is(')')) // Exit list
@@ -839,11 +659,11 @@ public:
             }
             else if(parse_number(tmp_number))
             {
-                list->push_back(make_atom_number(tmp_number));
+                list->push_back(make_value_number(tmp_number));
             }
             else if(parse_symbol(&tmp_string_begin, &tmp_string_end))
             {
-                list->push_back(make_atom_symbol(tmp_string_begin, tmp_string_end));
+                list->push_back(make_value_symbol(tmp_string_begin, tmp_string_end));
                 set(tmp_string_end - 1);
             }
             else
@@ -861,57 +681,96 @@ public:
 
 };
 
-parser_result string_to_atom(Masp& m, const char* str)
+parser_result string_to_value(Masp& m, const char* str)
 {
-    AtomParser parser;
+    ValueParser parser;
 
     return parser.parse(m, str);
 }
 
-static void atom_to_string_helper(std::ostream& os, const Atom& a)
+typedef const char* (*PrefixHelper)(const Value& v);
+
+static void value_to_string_helper(std::ostream& os, const Value& v, PrefixHelper prfx)
 {
-    switch(a.type)
+    auto out = [&]()->std::ostream& {
+        if(prfx) os << prfx(v) << " ";
+        return os;
+    };
+
+    switch(v.type)
     {
         case NUMBER:
         {
-            if(a.value.number.type == Number::INT)
+            if(v.value.number.type == Number::INT)
             {
-                os << a.value.number.to_int() << " ";
+                out() << v.value.number.to_int() << " ";
             }
             else
             {
-                os << a.value.number.to_float() << " ";
+                out() << v.value.number.to_float() << " ";
             }
             break;
         }
         case SYMBOL:
         {
-            os << a.value.string << " ";
+            out() << v.value.string << " ";
             break;
         }
         case STRING:
         {
-            os << "\"" << a.value.string << "\" ";
+            out() << "\"" << v.value.string << "\" ";
             break;
         }
         case LIST:
         {
-            os << "(";
-            for(auto i = a.value.list->begin(); i != a.value.list->end(); ++i)
+            out() << "(";
+            for(auto i = reveal(v.value.list)->begin(); i != reveal(v.value.list)->end(); ++i)
             {
-                atom_to_string_helper(os, *i);
+                value_to_string_helper(os, *i, prfx);
             }
             os << ")";
             break;
         }
+        default:
+        {
+            assert(!"Implement output for type");
+        }
     }
 }
 
-const std::string atom_to_string(const Atom& atom)
+const std::string value_to_string(const Value& v)
 {
     std::ostringstream stream;
-    atom_to_string_helper(stream, atom);
+    value_to_string_helper(stream, v, 0);
     return stream.str();
+}
+
+const std::string value_to_typed_string(const Value& v)
+{
+    std::ostringstream stream;
+    value_to_string_helper(stream, v, value_type_to_string);
+    return stream.str();
+}
+
+
+const char* value_type_to_string(const Value& v)
+{
+    switch(v.type)
+    {
+        case NUMBER:
+        {
+            if(v.value.number.type == Number::INT) return "NUMBER:INT";
+            else                                   return "NUMBER:FLOAT";
+        }
+        case STRING: return "STRING";
+        case SYMBOL: return "SYMBOL";
+        case CLOSURE: return "CLOSURE";
+        case VECTOR: return "VECTOR";
+        case LIST: return "LIST";
+        case MAP: return "MAP";
+        case OBJECT: return "OBJECT";
+    }
+    return "";
 }
 
 ///// Evaluation utilities /////
