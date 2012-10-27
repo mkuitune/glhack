@@ -32,6 +32,19 @@ ClosureRef hide(Closure* ref){ClosureRef r = {ref};return r;}
 ObjectRef hide(Object* ref){ObjectRef r = {ref};return r;}
 VectorRef hide(Vector* ref){VectorRef r = {ref};return r;}
 
+
+List* reveal_list(Value& v) {return reveal(v.value.list);}
+
+void append_to_value_list(Value& container, const Value& v)
+{
+    if(container.type != LIST) assert("append_to_value_list error: container not list.");
+
+    List* list = reveal_list(container);
+    // TODO: do again once plist in use. then *list = list->add(v);
+    list->push_back(v);
+}
+
+
 Value make_value_number(const Number& num)
 {
     Value a;
@@ -131,6 +144,8 @@ Value make_value_vector()
 
 Value::Value()
 {
+    type = LIST;
+    value.list.data = 0;
 }
 
 
@@ -491,11 +506,12 @@ public:
         reading_string = false;
     }
 
+
+#if 0
     // List stack.
 
     typedef std::list<Value> value_list;
     std::stack<value_list* > stack;
-
     value_list* push_list(value_list* list)
     {
         value_list* result = 0;
@@ -522,6 +538,7 @@ public:
         }
         return result;
     }
+#endif
 
     bool reading_string;
 
@@ -545,7 +562,7 @@ public:
 
     bool is(char ch){return *c_ == ch;}
 
-    bool at_end(){return c_ == end_;}
+    bool at_end(){return c_ >= end_;}
 
     void init(const char* start, const char* end){c_ = start; end_ = end;}
 
@@ -607,6 +624,100 @@ public:
         return result;
     }
 
+    Value get_value()
+    {
+        Number tmp_number;
+        const char* tmp_string_begin;
+        const char* tmp_string_end;
+
+        if(is('"')) //> string
+        {
+            const charptr first = c_ + 1;
+            const charptr last = parse_string();
+            set(last + 1);
+            return make_value_string(first, last);
+        }
+        else if(is('(')) // Enter list
+        {
+            Value result = make_value_list();
+            move_forward();
+            recursive_parse(result);
+            return result;
+        }
+        else if(parse_number(tmp_number))
+        {
+            move_forward();
+            return make_value_number(tmp_number);
+        }
+        else if(parse_symbol(&tmp_string_begin, &tmp_string_end))
+        {
+            set(tmp_string_end);
+            return make_value_symbol(tmp_string_begin, tmp_string_end);
+        }
+        else
+        {
+            assert(!"Masp parse error."); // 
+            return Value();
+        }
+    }
+
+    void recursive_parse(Value& root)
+    {
+        while(! at_end())
+        {
+            if(is(';'))  //> Quote, go to newline
+            {
+                to_newline();
+                if(c_ != end_) move_forward();
+            }
+            else if(is(')')) // Exit list
+            {
+                move_forward();
+                return;
+            }
+            else if(is_space(*c_))
+            {
+                move_forward();
+                // Skip whitespace
+                // After this we know that the input is either number or symbol
+            }
+            else
+            {
+                // append to root  
+                // push_to_value(root, get_value());
+                Value v = get_value();
+                append_to_value_list(root, v);
+            }
+
+            if(at_end()) break;
+        }
+    }
+
+    parser_result parse(Masp& m, const char* str)
+    {
+        size_t size = strlen(str);
+        init(str, str + size);
+
+        bool scope_valid = check_scope(c_, end_, ";", '(', ')');
+        if(!scope_valid)
+            return parser_result("Could not parse, error in list scope - misplaced '(' or ')' ");
+        
+        scope_valid = check_scope(c_, end_, ";", '[', ']');
+        if(!scope_valid)
+            return parser_result("Could not parse, error in vector scope - misplaced '[' or ']' ");
+        
+        scope_valid = check_scope(c_, end_, ";", '{', '}');
+        if(!scope_valid)
+            return parser_result("Could not parse, error in map scope - misplaced '{' or '}' ");
+
+        Value root = make_value_list();
+        
+        recursive_parse(root);
+
+        return parser_result(root);
+    }
+
+#if 0
     parser_result parse(Masp& m, const char* str)
     {
         Value root = make_value_list();
@@ -678,6 +789,7 @@ public:
 
         return parser_result(root);
     }
+#endif
 
 };
 

@@ -22,11 +22,11 @@ UTEST(masp, simple)
 
     auto parsestr = [&m](const char* str)
     {
-            parser_result a = string_to_atom(m, str);
+            parser_result a = string_to_value(m, str);
 
         if(a.valid())
         {
-            GLH_TEST_LOG(atom_to_string(*a));
+            GLH_TEST_LOG(value_to_string(*a));
         }
     };
 

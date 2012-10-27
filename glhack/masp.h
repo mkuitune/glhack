@@ -119,7 +119,7 @@ const std::string value_to_typed_string(const Value& v);
 const char* value_type_to_string(const Value& v);
 
 /** Evaluate the datastructure held within the atom in the context of the Masp env. Return result as atom.*/
-Atom eval(Masp& m, const Value& v);
+Value eval(Masp& m, const Value& v);
 
 }//Namespace masp
 
