@@ -506,40 +506,6 @@ public:
         reading_string = false;
     }
 
-
-#if 0
-    // List stack.
-
-    typedef std::list<Value> value_list;
-    std::stack<value_list* > stack;
-    value_list* push_list(value_list* list)
-    {
-        value_list* result = 0;
-        if(list)
-        {
-            stack.push(list);
-            result = list;
-        }
-        else
-        {
-            assert(!"AtomParser: Attempted to push null list to stack.");
-        }
-        return result;
-    }
-
-    /** Pop list stack, return popped list if not empty.*/
-    value_list* pop_list()
-    {
-        value_list* result = 0;
-        if(!stack.empty())
-        {
-            result = stack.top();
-            stack.pop();
-        }
-        return result;
-    }
-#endif
-
     bool reading_string;
 
     // Parse order:
@@ -717,80 +683,6 @@ public:
         return parser_result(root);
     }
 
-#if 0
-    parser_result parse(Masp& m, const char* str)
-    {
-        Value root = make_value_list();
-        value_list* list = push_list(reveal(root.value.list));
-
-        size_t size = strlen(str);
-        init(str, str + size);
-
-        bool scope_valid = check_scope(c_, end_, ";", '(', ')');
-        if(!scope_valid)
-            return parser_result("Could not parse, error in list scope - misplaced '(' or ')' ");
-        
-        scope_valid = check_scope(c_, end_, ";", '[', ']');
-        if(!scope_valid)
-            return parser_result("Could not parse, error in list scope - misplaced '[' or ']' ");
-        
-        scope_valid = check_scope(c_, end_, ";", '{', '}');
-        if(!scope_valid)
-            return parser_result("Could not parse, error in list scope - misplaced '{' or '}' ");
-
-
-        Number tmp_number;
-        const char* tmp_string_begin;
-        const char* tmp_string_end;
-        while(! at_end())
-        {
-            if(is('"')) //> string
-            {
-                const charptr last = parse_string();
-                list->push_back(make_value_string(next(), last));
-                set(last);
-            }
-            else if(is(';'))  //> Quote, go to newline
-            {
-                to_newline();
-            }
-            else if(is('(')) // Enter list
-            {
-                list->push_back(make_value_list());
-                value_list* new_list = reveal(list->back().value.list);
-                list = push_list(new_list);
-            }
-            else if(is(')')) // Exit list
-            {
-                list = pop_list();
-            }
-            else if(is_space(*c_))
-            {
-                // After this we know that the input is either number or symbol
-            }
-            else if(parse_number(tmp_number))
-            {
-                list->push_back(make_value_number(tmp_number));
-            }
-            else if(parse_symbol(&tmp_string_begin, &tmp_string_end))
-            {
-                list->push_back(make_value_symbol(tmp_string_begin, tmp_string_end));
-                set(tmp_string_end - 1);
-            }
-            else
-            {
-                assert(!"Masp parse error."); // 
-            }
-
-            if(at_end()) break;
-
-            move_forward();
-        }
-
-        return parser_result(root);
-    }
-#endif
-
 };
 
 parser_result string_to_value(Masp& m, const char* str)
@@ -888,19 +780,31 @@ const char* value_type_to_string(const Value& v)
 ///// Evaluation utilities /////
 
 ///// Masp::Env //////
+
 class Masp::Env
 {
 public:
 
-    typedef glh::PMapPool<std::string, Value>      value_pool;
+    typedef glh::PMapPool<std::string, Value>      value_map_pool;
     typedef glh::PMapPool<std::string, Value>::Map value_map;
+    typedef glh::PListPool<Value>                  value_list_pool;
+    typedef glh::PListPool<Value>::List            value_list;
 
     Masp::Env():env_pool_()
     {
         env_stack_.push(env_pool_.new_map());
     }
 
-    value_pool            env_pool_;
+    value_list get_list(){list_pool_.new_list();}
+
+    void gc()
+    {
+        env_pool_.gc();
+        list_pool_.gc();
+    }
+
+    value_map_pool            env_pool_;
+    value_list_pool           list_pool_;
     std::stack<value_map> env_stack_;
 };
 
