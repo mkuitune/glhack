@@ -11,9 +11,11 @@
 
 namespace masp{
 
-////// Masp::Value ///////
+////// Opaque value wrappers. ///////
 
-typedef std::list<Value> List;
+typedef glh::PListPool<Value>       ListPool;
+typedef glh::PListPool<Value>::List List;
+
 struct Map{int i;};
 struct Closure{int i;};
 struct Object{int i;};
@@ -35,13 +37,66 @@ VectorRef hide(Vector* ref){VectorRef r = {ref};return r;}
 
 List* reveal_list(Value& v) {return reveal(v.value.list);}
 
+
+///// Masp::Env //////
+
+class Masp::Env
+{
+public:
+
+    typedef glh::PMapPool<std::string, Value>      value_map_pool;
+    typedef glh::PMapPool<std::string, Value>::Map value_map;
+
+    Masp::Env():env_pool_()
+    {
+        env_stack_.push(env_pool_.new_map());
+    }
+
+    List new_list(){return list_pool_.new_list();}
+
+    List* new_list_alloc()
+    {
+        return new List(list_pool_.new_list());
+    }
+
+    ListPool& list_pool(){return list_pool_;}
+
+    size_t reserved_size_bytes()
+    {
+        return list_pool_.reserved_size_bytes();
+    }
+
+    size_t live_size_bytes()
+    {
+        return list_pool_.live_size_bytes();
+    }
+
+    void gc()
+    {
+        env_pool_.gc();
+        list_pool_.gc();
+    }
+
+    value_map_pool        env_pool_;
+    ListPool              list_pool_;
+
+    std::stack<value_map> env_stack_;
+};
+
+// Value
+
+void append_to_value_stl_list(std::list<Value>& value_list, const Value& v)
+{
+    value_list.push_back(v);
+}
+
+
 void append_to_value_list(Value& container, const Value& v)
 {
     if(container.type != LIST) assert("append_to_value_list error: container not list.");
 
     List* list = reveal_list(container);
-    // TODO: do again once plist in use. then *list = list->add(v);
-    list->push_back(v);
+    *list = list->add(v);
 }
 
 
@@ -102,11 +157,12 @@ Value make_value_symbol(const char* str, const char* str_end)
     return a;
 }
 
-Value make_value_list()
+Value make_value_list(Masp& m)
 {
     Value a;
     a.type = LIST;
-    a.value.list = hide(new std::list<Value>());
+    List* list_ptr = m.env()->new_list_alloc();
+    a.value.list = hide(list_ptr);
     return a;
 }
 
@@ -321,14 +377,14 @@ void Value::alloc_str(const char* str, const char* str_end)
     ((char*)value.string)[size -1] = '\0';
 }
 
-
+inline List* value_list(Value& v){return reveal(v.value.list);}
 
 ///// Utility functions /////
 
 static inline bool is_digit(char c){return isdigit(c) != 0;}
 static inline bool is_space(char c){return isspace(c) != 0;}
 
-const char* g_delimiters = "(){}[];";
+const char* g_delimiters = "(){}[];'";
 
 enum DelimEnum{
     LEFT_PAREN    = 0,
@@ -337,7 +393,8 @@ enum DelimEnum{
     RIGHT_BRACE   = 3,
     LEFT_BRACKET  = 4,
     RIGHT_BRACKET = 5,
-    SEMICOLON     = 6
+    SEMICOLON     = 6,
+    QUOTE         = 7
 };
 
 std::regex g_regfloat("^([-+]?[0-9]+(\\.[0-9]*)?|\\.[0-9]+)([eE][-+]?[0-9]+)?$");
@@ -495,27 +552,33 @@ static bool check_scope(const char* begin, const char* end, const char* comment,
     return result;
 }
 
+class ParseException
+{
+public:
+
+    ParseException(const char* msg):msg_(msg){}
+    ~ParseException(){}
+
+    std::string get_message(){return msg_;}
+
+    std::string msg_;
+};
 
 /** Parse string to atom. Use one instance of AtomParser per string/atom pair. */
 class ValueParser
 {
 public:
 
-    ValueParser()
+    Masp& masp_;
+
+    ValueParser(Masp& masp):masp_(masp)
     {
         reading_string = false;
     }
 
     bool reading_string;
 
-    // Parse order:
-    // 1. check if ;; and skip to next line
-    // 2. check if ( and push list
-    // 3. check if ) and pop list
-    // 4. check if is float and parse number
-    // 5. check if is int and parse number
-    // 6. check if is string and read string
-    // 7. check if is symbol and read symbol
+    // TODO: Write explanation of the parsing sequence
     //
     // a. Unless reading string symbols are broken on ', whitespace, (, ) and ;;
     // b. if reading string string is broken only when reading matching quote as on start
@@ -605,7 +668,7 @@ public:
         }
         else if(is('(')) // Enter list
         {
-            Value result = make_value_list();
+            Value result = make_value_list(masp_);
             move_forward();
             recursive_parse(result);
             return result;
@@ -622,13 +685,17 @@ public:
         }
         else
         {
-            assert(!"Masp parse error."); // 
+            throw ParseException("get_value: Masp parse error.");
             return Value();
         }
     }
 
     void recursive_parse(Value& root)
     {
+        if(root.type != LIST) throw ParseException("recursive_parse: root type is not LIST.");
+
+        std::list<Value> build_list;
+
         while(! at_end())
         {
             if(is(';'))  //> Quote, go to newline
@@ -639,7 +706,7 @@ public:
             else if(is(')')) // Exit list
             {
                 move_forward();
-                return;
+                break;
             }
             else if(is_space(*c_))
             {
@@ -652,14 +719,17 @@ public:
                 // append to root  
                 // push_to_value(root, get_value());
                 Value v = get_value();
-                append_to_value_list(root, v);
+                append_to_value_stl_list(build_list, v);
             }
 
             if(at_end()) break;
         }
+
+        List* list_ptr = value_list(root);
+        *list_ptr = masp_.env()->list_pool().new_list(build_list);
     }
 
-    parser_result parse(Masp& m, const char* str)
+    parser_result parse(const char* str)
     {
         size_t size = strlen(str);
         init(str, str + size);
@@ -676,9 +746,14 @@ public:
         if(!scope_valid)
             return parser_result("Could not parse, error in map scope - misplaced '{' or '}' ");
 
-        Value root = make_value_list();
-        
-        recursive_parse(root);
+        Value root = make_value_list(masp_);
+
+        try{
+            recursive_parse(root);
+        }
+        catch(ParseException& e){
+            return parser_result(e.get_message());
+        }
 
         return parser_result(root);
     }
@@ -687,9 +762,9 @@ public:
 
 parser_result string_to_value(Masp& m, const char* str)
 {
-    ValueParser parser;
+    ValueParser parser(m);
 
-    return parser.parse(m, str);
+    return parser.parse(str);
 }
 
 typedef const char* (*PrefixHelper)(const Value& v);
@@ -727,8 +802,9 @@ static void value_to_string_helper(std::ostream& os, const Value& v, PrefixHelpe
         }
         case LIST:
         {
+            List* lst_ptr = reveal(v.value.list);
             out() << "(";
-            for(auto i = reveal(v.value.list)->begin(); i != reveal(v.value.list)->end(); ++i)
+            for(auto i = lst_ptr->begin(); i != lst_ptr->end(); ++i)
             {
                 value_to_string_helper(os, *i, prfx);
             }
@@ -779,34 +855,6 @@ const char* value_type_to_string(const Value& v)
 
 ///// Evaluation utilities /////
 
-///// Masp::Env //////
-
-class Masp::Env
-{
-public:
-
-    typedef glh::PMapPool<std::string, Value>      value_map_pool;
-    typedef glh::PMapPool<std::string, Value>::Map value_map;
-    typedef glh::PListPool<Value>                  value_list_pool;
-    typedef glh::PListPool<Value>::List            value_list;
-
-    Masp::Env():env_pool_()
-    {
-        env_stack_.push(env_pool_.new_map());
-    }
-
-    value_list get_list(){list_pool_.new_list();}
-
-    void gc()
-    {
-        env_pool_.gc();
-        list_pool_.gc();
-    }
-
-    value_map_pool            env_pool_;
-    value_list_pool           list_pool_;
-    std::stack<value_map> env_stack_;
-};
 
 
 ////// Masp ///////
@@ -820,5 +868,13 @@ Masp::~Masp()
 {
     delete env_;
 }
+
+Masp::Env* Masp::env(){return env_;}
+
+void Masp::gc(){env_->gc();}
+
+size_t Masp::reserved_size_bytes(){return env_->reserved_size_bytes();}
+
+size_t Masp::live_size_bytes(){return env_->live_size_bytes();}
 
 } // Namespace masp ends

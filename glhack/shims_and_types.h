@@ -804,6 +804,20 @@ Collection filter(const Collection& collection, const Fun fun)
     return out;
 }
 
+
+/** Fold left operation */
+template<class RES, class CONT>
+RES fold_left(RES res, std::function<RES(const RES& r, const typename CONT::value_type& v)> fun, const CONT& c)
+{
+    for(auto i = c.begin(); i != c.end(); ++i)
+    {
+        res = fun(res, *i);
+    }
+
+    return res;
+}
+
+
 /** Iterat*/
 
 //////////// Streams //////////////

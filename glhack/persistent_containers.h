@@ -188,6 +188,13 @@ struct Chunk
             }
         }
     }
+
+    /** Return total size used. */
+    size_t reserved_size_bytes() const {return sizeof(*this);}
+
+    /** Return size of referred storage used. */
+    size_t live_size_bytes() const {return sizeof(T) * count_bits(used_elements);}
+
 };
 
 
@@ -360,6 +367,17 @@ public:
 
     chunk_container& chunks(){return chunks_;}
     chunk_type* free_chunks(){return free_chunks_;}
+
+    size_t reserved_size_bytes() const {
+        return sizeof(chunk_type) * chunks_.size();
+    }
+
+    size_t live_size_bytes() const
+    {
+        auto collect = [](size_t r, const chunk_type& t)->size_t {return r + t.live_size_bytes();};
+        size_t init = 0;
+        return fold_left<size_t, chunk_container>(init, collect, chunks_);
+    }
 
 private:
     chunk_container chunks_;
@@ -647,6 +665,21 @@ public:
         }   
     }
     
+    /** Return number of bytes used by the chunk pool in total. */
+    size_t reserved_size_bytes()
+    {
+        size_t ref_map_size = ref_count_.size() * (sizeof(Node*) + sizeof(int));
+        size_t total = sizeof(*this) + ref_map_size + chunks_.reserved_size_bytes(); 
+        return total;
+    }
+
+    size_t live_size_bytes()
+    {
+        size_t ref_map_size = ref_count_.size() * (sizeof(Node*) + sizeof(int));
+        size_t total = sizeof(*this) + ref_map_size +  chunks_.live_size_bytes();
+        return total;
+    }
+
     // Collect all slots taken by unvisitable nodes //TODO: 
     void gc()
     {

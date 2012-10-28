@@ -4,7 +4,10 @@
 
 void print_help()
 {
-    std::cout << "Welcome to Masp parser version " << MASP_VERSION << "\n";
+    std::cout << "Welcome to Masp parser version " << MASP_VERSION << "\n" <<
+                 "'help' Show this help.\n" <<
+                 "'quit' Exit interpreter.\n" <<
+                 "'memory' Display used memory (live/reserved).\n";
 }
 
 int main(int argc, char* argv[])
@@ -33,6 +36,13 @@ int main(int argc, char* argv[])
         else if(strcmp(line, "help") == 0)
         {
             print_help();
+        }
+        else if(strcmp(line, "memory") == 0)
+        {
+            size_t live_size = M.live_size_bytes();
+            size_t reserved_size = M.reserved_size_bytes();
+
+            cout << "Bytes used: " << live_size << " / " << reserved_size << endl;
         }
         else
         {
