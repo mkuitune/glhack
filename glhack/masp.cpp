@@ -8,19 +8,35 @@
 #include<cctype>
 #include<regex>
 #include<sstream>
+#include<functional>
 
 namespace masp{
 
+
 ////// Opaque value wrappers. ///////
 
-typedef glh::PListPool<Value>       ListPool;
-typedef glh::PListPool<Value>::List List;
+typedef glh::PMapPool<Value, Value>        MapPool;
+typedef glh::PMapPool<Value, Value>::Map   Map;
+typedef glh::PListPool<Value>              ListPool;
+typedef glh::PListPool<Value>::List        List;
 
-struct Map{int i;};
-struct Closure{int i;};
-struct Object{int i;};
-struct Vector{int i;};
+typedef std::vector<const Value&>        VRefContainer;
+typedef typename VRefContainer::iterator VRefIterator;
+typedef std::function<Value(Masp& m, VRefIterator arg_start, VRefIterator arg_end)> ValueFunction;
 
+typedef int Object; // TODO
+typedef int Vector; // TODO
+typedef int Lambda; // TODO
+struct Closure{Lambda lambda; Map env;};
+
+struct Function{ValueFunction fun;};
+
+ListRef     hide(const List& ref){ListRef r = {ref};return r;}
+MapRef      hide(const Map& ref){MapRef r = {ref};return r;}
+ClosureRef  hide(const Closure& ref){ClosureRef r = {ref};return r;}
+ObjectRef   hide(const Object& ref){ObjectRef r = {ref};return r;}
+VectorRef   hide(const Vector& ref){VectorRef r = {ref};return r;}
+FunctionRef hide(const Function& ref){FunctionRef r = {fun}; return r;}
 
 List* reveal(const ListRef& ref){return reinterpret_cast<List*>(ref.data);}
 Map* reveal(const MapRef& ref){return reinterpret_cast<Map*>(ref.data);}
@@ -35,168 +51,46 @@ ObjectRef hide(Object* ref){ObjectRef r = {ref};return r;}
 VectorRef hide(Vector* ref){VectorRef r = {ref};return r;}
 
 
-List* reveal_list(Value& v) {return reveal(v.value.list);}
+struct LambdaRef{void* data;};
+struct ListRef{void* data;};
+struct MapRef{void* data;};
+struct ClosureRef{void* data;};
+struct ObjectRef{void* data;};
+struct VectorRef{void* data;};
+struct FunctionRef{void * data;};
 
 
-///// Masp::Env //////
-
-class Masp::Env
+class Value
 {
 public:
-
-    typedef glh::PMapPool<std::string, Value>      value_map_pool;
-    typedef glh::PMapPool<std::string, Value>::Map value_map;
-
-    Masp::Env():env_pool_()
+    Type type;
+    union
     {
-        env_stack_.push(env_pool_.new_map());
-    }
+        Number      number;
+        const char* string; //> Data for string | symbol
+        List*       list;
+        Map*        map;
+        Closure*    closure;
+        Object*     object;
+        Vector*     vector;
+        Function*   function;
+    } value;
 
-    List new_list(){return list_pool_.new_list();}
+    Value();
+    ~Value();
+    Value(const Value& v);
+    Value(Value&& v);
+    Value& operator=(const Value& v);
+    Value& operator=(Value&& v);
+    void alloc_str(const char* str);
+    void alloc_str(const char* str, const char* end);
 
-    List* new_list_alloc()
-    {
-        return new List(list_pool_.new_list());
-    }
+private:
+    void dealloc();
+    void copy(const Value& v);
+    void movefrom(Value& v);
 
-    ListPool& list_pool(){return list_pool_;}
-
-    size_t reserved_size_bytes()
-    {
-        return list_pool_.reserved_size_bytes();
-    }
-
-    size_t live_size_bytes()
-    {
-        return list_pool_.live_size_bytes();
-    }
-
-    void gc()
-    {
-        env_pool_.gc();
-        list_pool_.gc();
-    }
-
-    value_map_pool        env_pool_;
-    ListPool              list_pool_;
-
-    std::stack<value_map> env_stack_;
 };
-
-// Value
-
-void append_to_value_stl_list(std::list<Value>& value_list, const Value& v)
-{
-    value_list.push_back(v);
-}
-
-
-void append_to_value_list(Value& container, const Value& v)
-{
-    if(container.type != LIST) assert("append_to_value_list error: container not list.");
-
-    List* list = reveal_list(container);
-    *list = list->add(v);
-}
-
-
-Value make_value_number(const Number& num)
-{
-    Value a;
-    a.value.number.set(num);
-    a.type = NUMBER;
-    return a;
-}
-
-Value make_value_number(int i)
-{
-    Value a;
-    a.value.number.set(i);
-    a.type = NUMBER;
-    return a;
-}
-
-Value make_value_number(double d)
-{
-    Value a;
-    a.value.number.set(d);
-    a.type = NUMBER;
-    return a;
-}
-
-Value make_value_string(const char* str)
-{
-    Value a;
-    a.type = STRING;
-    a.alloc_str(str);
-    return a;
-}
-
-Value make_value_string(const char* str, const char* str_end)
-{
-    Value a;
-    a.type = STRING;
-    a.alloc_str(str, str_end);
-    return a;
-}
-
-
-Value make_value_symbol(const char* str)
-{
-    Value a;
-    a.type = SYMBOL;
-    a.alloc_str(str);
-    return a;
-}
-
-Value make_value_symbol(const char* str, const char* str_end)
-{
-    Value a;
-    a.type = SYMBOL;
-    a.alloc_str(str, str_end);
-    return a;
-}
-
-Value make_value_list(Masp& m)
-{
-    Value a;
-    a.type = LIST;
-    List* list_ptr = m.env()->new_list_alloc();
-    a.value.list = hide(list_ptr);
-    return a;
-}
-
-Value make_value_map()
-{
-    Value a;
-    a.type = MAP;
-    a.value.map = hide(new Map);
-    return a;
-}
-
-Value make_value_closure()
-{
-    Value a;
-    a.type = CLOSURE;
-    a.value.closure = hide(new Closure);
-    return a;
-}
-
-Value make_value_object()
-{
-    Value a;
-    a.type = OBJECT;
-    a.value.object = hide(new Object);
-    return a;
-}
-
-Value make_value_vector()
-{
-    Value a;
-    a.type = VECTOR;
-    a.value.vector = hide(new Vector);
-    return a;
-}
 
 Value::Value()
 {
@@ -375,6 +269,215 @@ void Value::alloc_str(const char* str, const char* str_end)
     strncat(((char*)value.string), str, size - 1);
 
     ((char*)value.string)[size -1] = '\0';
+}
+
+
+
+
+void free_value(Value* v)
+{
+    if(v) delete v;
+}
+
+Value* new_value()
+{
+    return new Value();
+}
+
+List* reveal_list(Value& v) {return reveal(v.value.list);}
+
+
+///// Masp::Env //////
+
+class Masp::Env
+{
+public:
+
+    typedef glh::PMapPool<std::string, Value>      value_map_pool;
+    typedef glh::PMapPool<std::string, Value>::Map value_map;
+
+    Masp::Env():env_pool_()
+    {
+        env_ = env_pool_.new_map();
+        load_default_env();
+    }
+
+    List new_list(){return list_pool_.new_list();}
+
+    List* new_list_alloc()
+    {
+        return new List(list_pool_.new_list());
+    }
+
+    ListPool& list_pool(){return list_pool_;}
+
+    size_t reserved_size_bytes()
+    {
+        return list_pool_.reserved_size_bytes();
+    }
+
+    size_t live_size_bytes()
+    {
+        return list_pool_.live_size_bytes();
+    }
+
+    void gc()
+    {
+        env_pool_.gc();
+        list_pool_.gc();
+    }
+
+    void add_fun(const char* name, Function f)
+    {
+        env_ = env_.add();
+    }
+
+    void load_default_env();
+
+    // Locals
+    value_map_pool        env_pool_;
+    ListPool              list_pool_;
+
+    value_map             env_;
+};
+
+// Native operators
+namespace {
+    Value op_add(Masp& m, VRefIterator arg_start, VRefIterator arg_end)
+    {
+        Number n;
+        n.set(11);
+        return make_value_number(n);
+    }
+
+}
+
+void Masp::Env::load_default_env()
+{
+    add_fun("+", std::ptr_fun(op_add));
+}
+
+
+// Value
+
+void append_to_value_stl_list(std::list<Value>& value_list, const Value& v)
+{
+    value_list.push_back(v);
+}
+
+
+void append_to_value_list(Value& container, const Value& v)
+{
+    if(container.type != LIST) assert("append_to_value_list error: container not list.");
+
+    List* list = reveal_list(container);
+    *list = list->add(v);
+}
+
+
+Value make_value_number(const Number& num)
+{
+    Value a;
+    a.value.number.set(num);
+    a.type = NUMBER;
+    return a;
+}
+
+Value make_value_number(int i)
+{
+    Value a;
+    a.value.number.set(i);
+    a.type = NUMBER;
+    return a;
+}
+
+Value make_value_number(double d)
+{
+    Value a;
+    a.value.number.set(d);
+    a.type = NUMBER;
+    return a;
+}
+
+Value make_value_string(const char* str)
+{
+    Value a;
+    a.type = STRING;
+    a.alloc_str(str);
+    return a;
+}
+
+Value make_value_string(const char* str, const char* str_end)
+{
+    Value a;
+    a.type = STRING;
+    a.alloc_str(str, str_end);
+    return a;
+}
+
+
+Value make_value_symbol(const char* str)
+{
+    Value a;
+    a.type = SYMBOL;
+    a.alloc_str(str);
+    return a;
+}
+
+Value make_value_symbol(const char* str, const char* str_end)
+{
+    Value a;
+    a.type = SYMBOL;
+    a.alloc_str(str, str_end);
+    return a;
+}
+
+Value make_value_list(Masp& m)
+{
+    Value a;
+    a.type = LIST;
+    List* list_ptr = m.env()->new_list_alloc();
+    a.value.list = hide(list_ptr);
+    return a;
+}
+
+Value make_value_map()
+{
+    Value a;
+    a.type = MAP;
+    a.value.map = hide(new Map);
+    return a;
+}
+
+Value make_value_closure()
+{
+    Value a;
+    a.type = CLOSURE;
+    a.value.closure = hide(new Closure);
+    return a;
+}
+
+Value make_value_function(Function f)
+{
+    Value v;
+    v.type = FUNCTION;
+
+}
+
+Value make_value_object()
+{
+    Value a;
+    a.type = OBJECT;
+    a.value.object = hide(new Object);
+    return a;
+}
+
+Value make_value_vector()
+{
+    Value a;
+    a.type = VECTOR;
+    a.value.vector = hide(new Vector);
+    return a;
 }
 
 inline List* value_list(Value& v){return reveal(v.value.list);}
@@ -760,6 +863,30 @@ public:
 
 };
 
+////// Masp ///////
+
+Masp::Masp()
+{
+    env_ = new Env();
+}
+
+Masp::~Masp()
+{
+    delete env_;
+}
+
+Masp::Env* Masp::env(){return env_;}
+
+void Masp::gc(){env_->gc();}
+
+size_t Masp::reserved_size_bytes(){return env_->reserved_size_bytes();}
+
+size_t Masp::live_size_bytes(){return env_->live_size_bytes();}
+
+
+
+///// Evaluation utilities /////
+
 parser_result string_to_value(Masp& m, const char* str)
 {
     ValueParser parser(m);
@@ -853,8 +980,13 @@ const char* value_type_to_string(const Value& v)
     return "";
 }
 
-///// Evaluation utilities /////
+Value eval(Masp& m, const Value& v)
+{
+    std::vector<Value> value_stack;
+    std::vector<const Value&> ref_stack;
 
+    // value - if not in place, add to value_stack, add reference to ref_stack
+    // add value references to eval stack
 
 
 ////// Masp ///////

@@ -10,6 +10,8 @@ void print_help()
                  "'memory' Display used memory (live/reserved).\n";
 }
 
+//TODO: gc
+
 int main(int argc, char* argv[])
 {
     using namespace masp;

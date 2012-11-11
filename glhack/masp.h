@@ -5,16 +5,12 @@
 #include "annotated_result.h"
 
 #include<list>
+#include<memory>
+
 
 namespace masp{
 
-enum Type{NUMBER, STRING, SYMBOL, CLOSURE, VECTOR, LIST, MAP, OBJECT};
-
-struct ListRef{void* data;};
-struct MapRef{void* data;};
-struct ClosureRef{void* data;};
-struct ObjectRef{void* data;};
-struct VectorRef{void* data;};
+enum Type{NUMBER, STRING, SYMBOL, CLOSURE, VECTOR, LIST, MAP, OBJECT, FUNCTION, LAMBDA};
 
 struct Number{
     enum Type{INT, FLOAT};
@@ -47,38 +43,21 @@ struct Number{
     }
 };
 
-class Value
+class Value;
+void free_value(Value* v);
+
+class ValueRef
 {
-public:
-    Type type;
-    union
-    {
-        Number      number;
-        const char* string; //> Data for string | symbol
-        ListRef     list;
-        MapRef      map;
-        ClosureRef  closure;
-        ObjectRef   object;
-        VectorRef   vector;
-    } value;
+    public:
+    ValueRef():v(0){}
+    ~ValueRef(){if(v) free_value(v);}
 
-    Value();
-    ~Value();
-    Value(const Value& v);
-    Value(Value&& v);
-    Value& operator=(const Value& v);
-    Value& operator=(Value&& v);
-    void alloc_str(const char* str);
-    void alloc_str(const char* str, const char* end);
+    Value* get() const {return v;}
 
-private:
-    void dealloc();
-    void copy(const Value& v);
-    void movefrom(Value& v);
-
+    Value* v;
 };
 
-
+typedef std::shared_ptr<ValueRef> ValueRefPtr;
 
 /** Script environment. */
 class Masp
@@ -115,22 +94,22 @@ private:
     Env* env_;
 };
 
-typedef glh::AnnotatedResult<Value> parser_result;
+typedef glh::AnnotatedResult<ValueRefPtr> parser_result;
 
 /** Parse string to value data structure.*/
 parser_result string_to_value(Masp& m, const char* str);
 
 /** Return string representation of value. */
-const std::string value_to_string(const Value& v);
+const std::string value_to_string(const Value* v);
 
 /** Return string representation of value annotated with type. */
-const std::string value_to_typed_string(const Value& v);
+const std::string value_to_typed_string(const Value* v);
 
 /** Return type of value as string.*/
-const char* value_type_to_string(const Value& v);
+const char* value_type_to_string(const Value* v);
 
 /** Evaluate the datastructure held within the atom in the context of the Masp env. Return result as atom.*/
-Value eval(Masp& m, const Value& v);
+ValueRefPtr eval(Masp& m, const Value* v);
 
 }//Namespace masp
 
