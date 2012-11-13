@@ -9,14 +9,32 @@
 #include<regex>
 #include<sstream>
 #include<functional>
+#include<numeric>
 
 namespace masp{
 
 
 ////// Opaque value wrappers. ///////
 
-typedef glh::PMapPool<Value, Value>        MapPool;
-typedef glh::PMapPool<Value, Value>::Map   Map;
+// define hash function for value
+
+class Value;
+
+class ValuesAreEqual { public:
+    static bool compare(const Value& k1, const Value& k2){return k1 == k2;} 
+};
+
+class ValueHash { public:
+    static uint32_t hash(const Value& h){return h.get_hash();}
+};
+
+
+typedef glh::PMapPool<Value, Value, ValuesAreEqual, ValueHash> MapPool;
+typedef typename MapPool::Map   Map;
+
+typedef glh::PMapPool<std::string, Value>      env_map_pool;
+typedef glh::PMapPool<std::string, Value>::Map env_map;
+
 typedef glh::PListPool<Value>              ListPool;
 typedef glh::PListPool<Value>::List        List;
 
@@ -24,56 +42,61 @@ typedef std::vector<const Value&>        VRefContainer;
 typedef typename VRefContainer::iterator VRefIterator;
 typedef std::function<Value(Masp& m, VRefIterator arg_start, VRefIterator arg_end)> ValueFunction;
 
+typedef std::vector<Value> Vector;
+typedef std::vector<Number> NumberArray;
+
+bool all_are_float(NumberArray& arr)
+{
+    bool result = true;
+    for(auto n = arr.begin(); n != arr.end() && result; ++n) result = n->type == Number::FLOAT;
+    return result;
+}
+
+bool all_are_int(NumberArray& arr)
+{
+    bool result = true;
+    for(auto n = arr.begin(); n != arr.end() && result; ++n) result = n->type == Number::INT;
+    return result;
+}
+
+void convert_to_float(NumberArray& arr)
+{
+    for(auto n = arr.begin(); n != arr.end(); ++n){double d = n->to_float(); n->set(d);}
+}
+
+void convert_to_int(NumberArray& arr)
+{
+    for(auto n = arr.begin(); n != arr.end(); ++n){int i = n->to_int(); n->set(i)}; 
+}
+
+
 typedef int Object; // TODO
-typedef int Vector; // TODO
 typedef int Lambda; // TODO
-struct Closure{Lambda lambda; Map env;};
+
+
+struct Closure{ // TODO
+    Lambda lambda; 
+    env_map env;
+};
 
 struct Function{ValueFunction fun;};
-
-ListRef     hide(const List& ref){ListRef r = {ref};return r;}
-MapRef      hide(const Map& ref){MapRef r = {ref};return r;}
-ClosureRef  hide(const Closure& ref){ClosureRef r = {ref};return r;}
-ObjectRef   hide(const Object& ref){ObjectRef r = {ref};return r;}
-VectorRef   hide(const Vector& ref){VectorRef r = {ref};return r;}
-FunctionRef hide(const Function& ref){FunctionRef r = {fun}; return r;}
-
-List* reveal(const ListRef& ref){return reinterpret_cast<List*>(ref.data);}
-Map* reveal(const MapRef& ref){return reinterpret_cast<Map*>(ref.data);}
-Closure* reveal(const ClosureRef& ref){return reinterpret_cast<Closure*>(ref.data);}
-Object* reveal(const ObjectRef& ref){return reinterpret_cast<Object*>(ref.data);}
-Vector* reveal(const VectorRef& ref){return reinterpret_cast<Vector*>(ref.data);}
-
-ListRef hide(List* ref){ListRef r = {ref};return r;}
-MapRef hide(Map* ref){MapRef r = {ref};return r;}
-ClosureRef hide(Closure* ref){ClosureRef r = {ref};return r;}
-ObjectRef hide(Object* ref){ObjectRef r = {ref};return r;}
-VectorRef hide(Vector* ref){VectorRef r = {ref};return r;}
-
-
-struct LambdaRef{void* data;};
-struct ListRef{void* data;};
-struct MapRef{void* data;};
-struct ClosureRef{void* data;};
-struct ObjectRef{void* data;};
-struct VectorRef{void* data;};
-struct FunctionRef{void * data;};
-
 
 class Value
 {
 public:
     Type type;
+
     union
     {
-        Number      number;
-        const char* string; //> Data for string | symbol
-        List*       list;
-        Map*        map;
-        Closure*    closure;
-        Object*     object;
-        Vector*     vector;
-        Function*   function;
+        Number       number;
+        const char*  string; //> Data for string | symbol
+        List*        list;
+        Map*         map;
+        Closure*     closure;
+        Object*      object;
+        Vector*      vector;
+        Function*    function;
+        NumberArray* number_array;
     } value;
 
     Value();
@@ -84,6 +107,9 @@ public:
     Value& operator=(Value&& v);
     void alloc_str(const char* str);
     void alloc_str(const char* str, const char* end);
+
+    bool operator==(const Value& v) const;
+    uint32_t get_hash() const;
 
 private:
     void dealloc();
@@ -98,18 +124,20 @@ Value::Value()
     value.list.data = 0;
 }
 
-
 void Value::dealloc()
 {
     if((type == STRING || type == SYMBOL) && value.string)
     {
         free(((void*)value.string));
     }
-    else if(type == LIST && value.list.data){ delete reveal(value.list);}
-    else if(type == MAP && value.map.data){ delete reveal(value.map);}
-    else if(type == CLOSURE && value.closure.data){ delete reveal(value.closure);}
-    else if(type == OBJECT && value.object.data){ delete reveal(value.object);}
-    else if(type == VECTOR && value.vector.data){ delete reveal(value.vector);}
+    else if(type == LIST && value.list)      { delete value.list;}
+    else if(type == MAP && value.map)        { delete value.map;}
+    else if(type == CLOSURE && value.closure){ delete value.closure;}
+    else if(type == OBJECT && value.object)  { delete value.object;}
+    else if(type == VECTOR && value.vector)  { delete value.vector;}
+    else if(type == LAMBDA  && value.lambda)  { delete value.lambda;}
+    else if(type == FUNCTION && value.function)  { delete value.function;}
+    else if(type == NUMBER_ARRAY && value.number_array)  { delete value.number_array;}
 }
 
 Value::~Value()
@@ -117,12 +145,15 @@ Value::~Value()
     dealloc();
 }
 
-template<class T, class V>
-V copy_t(const V& v)
+template<class V>
+V* copy_new(const V* v)
 {
-    T* t = 0;
-    if(v.data) t = new T(*reveal(v));
-    return hide(t);
+    V* result = 0;
+    if(v)
+    {
+        result = new V(*v);
+    }
+    return result;
 }
 
 Value::Value(const Value& v)
@@ -133,100 +164,29 @@ Value::Value(const Value& v)
 void Value::copy(const Value& v)
 {
     type = v.type;
-    switch(type)
-    {
-        case NUMBER:
-        {
-            value.number.set(v.value.number);
-            break;
-        }
-        case SYMBOL:
-        case STRING:
-        {
-            alloc_str(v.value.string);
-            break;
-        }
-        case LIST:
-        {
-            value.list = copy_t<List, ListRef>(v.value.list);
-            break;
-        }
-        case MAP:
-        {
-            value.map = copy_t<Map, MapRef>(v.value.map);
-            break;
-        }
-        case CLOSURE:
-        {
-            value.closure = copy_t<Closure, ClosureRef>(v.value.closure);
-            break;
-        }
-        case OBJECT:
-        {
-            value.object = copy_t<Object, ObjectRef>(v.value.object);
-            break;
-        }
-        case VECTOR:
-        {
-            value.vector = copy_t<Vector, VectorRef>(v.value.vector);
-            break;
-        }
-        default:
-            assert(!"Illegal Value type");
-    }
+
+#define COPY_PARAM_V(param_name) value.##param_name = copy_new(v.value.##param_name)
+    if(type == NUMBER) value.number.set(v.value.number);
+    else if(type == SYMBOL || type == STRING) alloc_str(v.value.string);
+    else if(type == LIST)    COPY_PARAM_V(list);
+    else if(type == MAP)     COPY_PARAM_V(map);
+    else if(type == CLOSURE) COPY_PARAM_V(closure);
+    else if(type == OBJECT)  COPY_PARAM_V(object);
+    else if(type == VECTOR)  COPY_PARAM_V(vector);
+    else if(type == LAMBDA)  COPY_PARAM_V(lambda);
+    else if(type == FUNCTION) COPY_PARAM_V(function);
+    else if(type == NUMBER_ARRAY) COPY_PARAM_V(number_array);
+    else {assert("Faulty param type.");}
+#undef COPY_PARAM_V
 }
 
 void Value::movefrom(Value& v)
 {
     type = v.type;
-    
-    switch(type)
-    {
-        case NUMBER:
-        {
-            value.number.set(v.value.number);
-            break;
-        }
-        case SYMBOL:
-        case STRING:
-        {
-            value.string = v.value.string;
-            v.value.string = 0;
-            break;
-        }
-        case LIST:
-        {
-            value.list = v.value.list;
-            v.value.list.data = 0;
-            break;
-        }
-        case MAP:
-        {
-            value.map = v.value.map;
-            v.value.map.data = 0;
-            break;
-        }
-        case CLOSURE:
-        {
-            value.closure = v.value.closure;
-            v.value.closure.data = 0;
-            break;
-        }
-        case OBJECT:
-        {
-            value.object = v.value.object;
-            v.value.object.data= 0;
-            break;
-        }
-        case VECTOR:
-        {
-            value.vector = v.value.vector;
-            v.value.object.data= 0;
-            break;
-        }
-        default:
-            assert(!"Illegal Value type");
-    }
+    void* that_value_ptr = reinterpret_cast<void*>(&v.value); 
+    size_t value_size = sizeof(value);
+    memcpy(reinterpret_cast<void*>(&value), that_value, sizeof(value));  
+    memset(that_value, 0, value_size);
 }
 
 Value::Value(Value&& v)
@@ -246,7 +206,7 @@ Value& Value::operator=(const Value& a)
 
 Value& Value::operator=(Value&& v)
 {
-    if(&v == this)
+    if(&v != this)
     {
         movefrom(v);
     }
@@ -271,7 +231,91 @@ void Value::alloc_str(const char* str, const char* str_end)
     ((char*)value.string)[size -1] = '\0';
 }
 
+bool Value::operator==(const Value& v) const
+{
+    if(v.type != type) return false;
+    bool result = false;
+    if(type == NUMBER)            result = value.number == v.value.number;
+    else if(type == NUMBER_ARRAY) result = (*value.number_array) == (*v.value.number_array);
+    else if(type == STRING || type == SYMBOL) result = strcmp(value.string, v.value.string) == 0;
+    else if(type == CLOSURE)
+    {
+    }
+    else if(type == VECTOR) result = (*value.vector) == *(v.value.vector);
+    else if(type == LIST) result = *(value.list) ==  *(v.value.list);
+    else if(type == MAP) result = *(value.map) == *(v.value.map);
+    else if(type == OBJECT)
+    {
+        // TODO
+    }
+    else if(type == FUNCTION)
+    {
+        // TODO
+    }
+    else if(type == LAMBDA)
+    {
+        // TODO
+    }
 
+    return result;
+}
+
+uint32_t hash_of_number(const Number& n){return *((uint32_t*) &n);}
+uint32_t accum_number_hash(const uint32_t& p, const Number& n){return p * hash_of_number(n);}
+uint32_t accum_value_hash(const uint32_t& p, const Value& v){return p * v.get_hash();}
+
+uint32_t Value::get_hash() const
+{
+    // For collections produce a product of the hashes of contained elements
+    uint32_t h = 0;
+
+    if(type == NUMBER)  h = hash_of_number(value.number);
+    else if(type == NUMBER_ARRAY){
+        uint32_t orig = 0;
+        h = fold_left(orig, accum_number_hash, *value.number_array);
+    }
+    else if(type == STRING || type == SYMBOL) h = hash32(value.string, strlen(value.string));
+    else if(type == CLOSURE)
+    {
+        // TODO
+    }
+    else if(type == VECTOR)
+    {
+        uint32_t orig = 0;
+        h = fold_left(orig, accum_value_hash, *value.vector);
+    }
+    else if(type == LIST) 
+    {
+        uint32_t orig = 0;
+        h = fold_left(orig, accum_value_hash, *value.list);
+    }
+    else if(type == MAP)
+    {
+        uint32_t accum = 0;
+        Map::iterator i = value.map->begin();
+        Map::iterator end = value.map->end();
+        while(i != end)
+        {
+            accum = accum_value_hash(accum_value_hash(accum, i->first), i->second);
+            i++;
+        }
+        h = accum;
+    }
+    else if(type == OBJECT)
+    {
+        // TODO
+    }
+    else if(type == FUNCTION)
+    {
+        // TODO
+    }
+    else if(type == LAMBDA)
+    {
+        // TODO
+    }
+
+    return h;
+}
 
 
 void free_value(Value* v)
@@ -284,18 +328,26 @@ Value* new_value()
     return new Value();
 }
 
-List* reveal_list(Value& v) {return reveal(v.value.list);}
+inline List* value_list(Value& v){return v.value.list;}
 
+void append_to_value_stl_list(std::list<Value>& value_list, const Value& v)
+{
+    value_list.push_back(v);
+}
+
+void append_to_value_list(Value& container, const Value& v)
+{
+    assert((container.type == LIST) && "append_to_value_list error: container not list.");
+
+    List* list = value_list(container);
+    *list = list->add(v);
+}
 
 ///// Masp::Env //////
 
 class Masp::Env
 {
 public:
-
-    typedef glh::PMapPool<std::string, Value>      value_map_pool;
-    typedef glh::PMapPool<std::string, Value>::Map value_map;
-
     Masp::Env():env_pool_()
     {
         env_ = env_pool_.new_map();
@@ -307,6 +359,16 @@ public:
     List* new_list_alloc()
     {
         return new List(list_pool_.new_list());
+    }
+
+    Map* new_map_alloc()
+    {
+        return new Map(map_pool_.new_list());
+    }
+    
+    env_map* new_env_alloc()
+    {
+        return new env_map(env_pool_.new_list());
     }
 
     ListPool& list_pool(){return list_pool_;}
@@ -323,8 +385,9 @@ public:
 
     void gc()
     {
-        env_pool_.gc();
+        map_pool_.gc();
         list_pool_.gc();
+        env_pool_.gc();
     }
 
     void add_fun(const char* name, Function f)
@@ -335,10 +398,11 @@ public:
     void load_default_env();
 
     // Locals
-    value_map_pool        env_pool_;
-    ListPool              list_pool_;
+    MapPool             map_pool_;
+    env_map_pool        env_pool_;
+    ListPool            list_pool_;
 
-    value_map             env_;
+    env_map             env_;
 };
 
 // Native operators
@@ -358,22 +422,7 @@ void Masp::Env::load_default_env()
 }
 
 
-// Value
-
-void append_to_value_stl_list(std::list<Value>& value_list, const Value& v)
-{
-    value_list.push_back(v);
-}
-
-
-void append_to_value_list(Value& container, const Value& v)
-{
-    if(container.type != LIST) assert("append_to_value_list error: container not list.");
-
-    List* list = reveal_list(container);
-    *list = list->add(v);
-}
-
+// Value factories
 
 Value make_value_number(const Number& num)
 {
@@ -437,50 +486,65 @@ Value make_value_list(Masp& m)
     Value a;
     a.type = LIST;
     List* list_ptr = m.env()->new_list_alloc();
-    a.value.list = hide(list_ptr);
+    a.value.list = list_ptr;
     return a;
 }
 
-Value make_value_map()
+Value make_value_map(Masp& m)
 {
     Value a;
     a.type = MAP;
-    a.value.map = hide(new Map);
+    Map* map_ptr = m.env()->new_map_alloc();
+    a.value.map = map_ptr;
     return a;
 }
 
-Value make_value_closure()
+Value make_value_closure(Masp& m)
 {
+    // TODO - pass lambda and current env as parameters
     Value a;
     a.type = CLOSURE;
-    a.value.closure = hide(new Closure);
+    a.value.closure = new Closure();
     return a;
 }
 
-Value make_value_function(Function f)
+Value make_value_function(ValueFunction f)
 {
     Value v;
     v.type = FUNCTION;
+    v.value.function = new Function();
+    v.value.function->fun = f;
+    return v;
 
 }
 
-Value make_value_object()
+Value make_value_object(Masp& m)
 {
+    // TODO
     Value a;
     a.type = OBJECT;
-    a.value.object = hide(new Object);
+    a.value.object = new Object();
     return a;
 }
 
 Value make_value_vector()
 {
+    // TODO ?
     Value a;
     a.type = VECTOR;
-    a.value.vector = hide(new Vector);
+    a.value.vector = new Vector;
     return a;
 }
 
-inline List* value_list(Value& v){return reveal(v.value.list);}
+Value make_value_number_array()
+{
+    // TODO ?
+    Value a;
+    a.type = NUMBER_ARRAY;
+    a.value.number_array = new NumberArray();
+    return a;
+}
+
 
 ///// Utility functions /////
 
@@ -615,8 +679,8 @@ static bool is_delimiter(const char c)
     return is_in_string(c, g_delimiters);
 }
 
-
 /** Verify that given scope delimiters balance out.*/
+// TODO: give nested scope limiters in array so mixed scopes can be verified
 static bool check_scope(const char* begin, const char* end, const char* comment, char scope_start, char scope_end)
 {
     bool result = true;
@@ -980,14 +1044,62 @@ const char* value_type_to_string(const Value& v)
     return "";
 }
 
-Value eval(Masp& m, const Value& v)
+class Evaluator
 {
-    std::vector<Value> value_stack;
-    std::vector<const Value&> ref_stack;
+public:
 
+    Masp& m_masp;
+
+    std::vector<Value> value_stack;
+
+    std::vector<const Value&> ref_stack;
+    
+    std::vector<Value> tmp_values;
+    std::vector<Value> apply_list;
+
+
+    Evaluator(Masp& masp): m_masp(masp)
+    {
+    }
+
+    Value eval(Value& v)
+    {
+        if(v.type == NUMBER || v.type == STRING || v.type == MAP ||
+           v.type == NUMBER_ARRAY || v.type == VECTOR || v.type == FUNCTION) return v;
+        else if(v.type == SYMBOL)
+        {
+            // Find value from env
+        }
+        else if(v.type == LIST)
+        {
+            // eval unless previous was quote?
+        }
+        else if(v.type == LAMBDA)
+        {
+        }
+        else if(v.type == CLOSURE)
+        {
+        }
+    }
+
+    void apply(Value& v)
+    {
+    }
+
+};
+
+ValueRefPtr eval(Masp& m, const Value& v)
+{
+    Evaluator e(m);
+    ValueRefPtr result(new ValueRef());
+
+    Value* vptr = new Value(e.eval(v));
+
+    result->v = vptr;
     // value - if not in place, add to value_stack, add reference to ref_stack
     // add value references to eval stack
-
+    return result;
+}
 
 ////// Masp ///////
 

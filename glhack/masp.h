@@ -6,11 +6,11 @@
 
 #include<list>
 #include<memory>
-
+#include<cstdint>
 
 namespace masp{
 
-enum Type{NUMBER, STRING, SYMBOL, CLOSURE, VECTOR, LIST, MAP, OBJECT, FUNCTION, LAMBDA};
+enum Type{NUMBER, NUMBER_ARRAY, STRING, SYMBOL, CLOSURE, VECTOR, LIST, MAP, OBJECT, FUNCTION, LAMBDA};
 
 struct Number{
     enum Type{INT, FLOAT};
@@ -40,6 +40,11 @@ struct Number{
     {
         if(type == INT) return (double) value.intvalue;
         else return value.floatvalue;
+    }
+
+    bool operator==(const Number& n) const{
+        if(type != n.type) return false
+        else return type == INT ? (value.intvalue == n.value.intvalue) : (value.floatvalue == n.value.floatvalue);
     }
 };
 

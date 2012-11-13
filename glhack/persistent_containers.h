@@ -4,17 +4,15 @@
  * data structures universally, each datastructure has it's own allocator and implementation of
  * garbage collection interface that's required to call explicitly. 
  *
- * Then plan is to implementent:
+ * Datastructures that are implemented:
  *  - persistent list PList
  *      - a simple linked list with distinct heads nodes for reference counting
  *  - persistent map PMap
  *      - a simple persistent map with node copying
- *  - persistent vector PersistentVector
- *      - an implementation similar to Clojure's persistent vector
- *  - persistent hashmap PersistentUnorderedMap
- *      - an implementation similiar to Clojure's
  *
- * TODO: Should be straightforward to modify chunkbuffer so it supports parallel deallocation.
+ * TODO: Should be straightforward to modify chunkbuffer so it supports parallel deallocation. 
+ *
+ * I quickly sketched the parallel marking & collection algorithm below. Might be faulty. TODO: verify.
  *
  * For parallel marking, a portion of the chunks must be 'locked' so no new space can be allocated
  * from them prior to collecting. So, to parallellize:
@@ -49,6 +47,7 @@
 #include<functional>
 #include<sstream>
 #include<new>
+#include<algorithm>
 
 namespace glh{
 
@@ -520,6 +519,11 @@ public:
             Node* n = head_;
             while(n){ n = n->next; s++;}
             return s;
+        }
+
+        bool operator==(const List& l)
+        {
+            return std::equal(begin(), end(), l.begin());
         }
 
     private:
@@ -1308,7 +1312,19 @@ public:
 
         iterator begin(){return iterator(root_);}
         iterator end(){return iterator(0);}
-        
+      
+        bool operator==(const Map& m) const
+        {
+            iterator i = begin(), end = end();
+            while(i != end)
+            {
+                ConstOption<V> opt = m.try_get_value(i->first);
+                if(! (opt.is_valid() && (*opt) == i->second)) return false;
+                i++;
+            }
+            return true;
+        }
+
         friend PMapPool;
 
     private:
