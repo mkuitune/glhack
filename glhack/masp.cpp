@@ -14,6 +14,7 @@
 namespace masp{
 
 
+
 ////// Opaque value wrappers. ///////
 
 // define hash function for value
@@ -21,16 +22,16 @@ namespace masp{
 class Value;
 
 class ValuesAreEqual { public:
-    static bool compare(const Value& k1, const Value& k2){return k1 == k2;} 
+    static bool compare(const Value& k1, const Value& k2);
 };
 
 class ValueHash { public:
-    static uint32_t hash(const Value& h){return h.get_hash();}
+    static uint32_t hash(const Value& h);
 };
 
 
 typedef glh::PMapPool<Value, Value, ValuesAreEqual, ValueHash> MapPool;
-typedef typename MapPool::Map   Map;
+typedef MapPool::Map   Map;
 
 typedef glh::PMapPool<std::string, Value>      env_map_pool;
 typedef glh::PMapPool<std::string, Value>::Map env_map;
@@ -38,12 +39,14 @@ typedef glh::PMapPool<std::string, Value>::Map env_map;
 typedef glh::PListPool<Value>              ListPool;
 typedef glh::PListPool<Value>::List        List;
 
-typedef std::vector<const Value&>        VRefContainer;
-typedef typename VRefContainer::iterator VRefIterator;
+typedef std::vector<Value>        VRefContainer;
+
+typedef VRefContainer::const_iterator VRefIterator;
 typedef std::function<Value(Masp& m, VRefIterator arg_start, VRefIterator arg_end)> ValueFunction;
 
 typedef std::vector<Value> Vector;
 typedef std::vector<Number> NumberArray;
+
 
 bool all_are_float(NumberArray& arr)
 {
@@ -66,7 +69,7 @@ void convert_to_float(NumberArray& arr)
 
 void convert_to_int(NumberArray& arr)
 {
-    for(auto n = arr.begin(); n != arr.end(); ++n){int i = n->to_int(); n->set(i)}; 
+    for(auto n = arr.begin(); n != arr.end(); ++n){int i = n->to_int(); n->set(i);}
 }
 
 
@@ -77,6 +80,7 @@ typedef int Lambda; // TODO
 struct Closure{ // TODO
     Lambda lambda; 
     env_map env;
+    Closure(const env_map& env_in):env(env_in){}
 };
 
 struct Function{ValueFunction fun;};
@@ -97,6 +101,7 @@ public:
         Vector*      vector;
         Function*    function;
         NumberArray* number_array;
+        Lambda*      lambda;
     } value;
 
     Value();
@@ -118,10 +123,14 @@ private:
 
 };
 
+// ValuesAreEqual and ValueHash member implementations
+bool ValuesAreEqual::compare(const Value& k1, const Value& k2){return k1 == k2;} 
+uint32_t ValueHash::hash(const Value& h){return h.get_hash();}
+
 Value::Value()
 {
     type = LIST;
-    value.list.data = 0;
+    value.list = 0;
 }
 
 void Value::dealloc()
@@ -185,8 +194,8 @@ void Value::movefrom(Value& v)
     type = v.type;
     void* that_value_ptr = reinterpret_cast<void*>(&v.value); 
     size_t value_size = sizeof(value);
-    memcpy(reinterpret_cast<void*>(&value), that_value, sizeof(value));  
-    memset(that_value, 0, value_size);
+    memcpy(reinterpret_cast<void*>(&value), that_value_ptr, sizeof(value));  
+    memset(that_value_ptr, 0, value_size);
 }
 
 Value::Value(Value&& v)
@@ -235,6 +244,7 @@ bool Value::operator==(const Value& v) const
 {
     if(v.type != type) return false;
     bool result = false;
+
     if(type == NUMBER)            result = value.number == v.value.number;
     else if(type == NUMBER_ARRAY) result = (*value.number_array) == (*v.value.number_array);
     else if(type == STRING || type == SYMBOL) result = strcmp(value.string, v.value.string) == 0;
@@ -242,8 +252,8 @@ bool Value::operator==(const Value& v) const
     {
     }
     else if(type == VECTOR) result = (*value.vector) == *(v.value.vector);
-    else if(type == LIST) result = *(value.list) ==  *(v.value.list);
-    else if(type == MAP) result = *(value.map) == *(v.value.map);
+    else if(type == LIST) result = (*(value.list) ==  *(v.value.list));
+    else if(type == MAP) result = (*(value.map) == *(v.value.map));
     else if(type == OBJECT)
     {
         // TODO
@@ -272,7 +282,7 @@ uint32_t Value::get_hash() const
     if(type == NUMBER)  h = hash_of_number(value.number);
     else if(type == NUMBER_ARRAY){
         uint32_t orig = 0;
-        h = fold_left(orig, accum_number_hash, *value.number_array);
+        h = glh::fold_left<uint32_t, NumberArray>(orig, accum_number_hash, *value.number_array);
     }
     else if(type == STRING || type == SYMBOL) h = hash32(value.string, strlen(value.string));
     else if(type == CLOSURE)
@@ -282,12 +292,12 @@ uint32_t Value::get_hash() const
     else if(type == VECTOR)
     {
         uint32_t orig = 0;
-        h = fold_left(orig, accum_value_hash, *value.vector);
+        h = glh::fold_left<uint32_t, Vector>(orig, accum_value_hash, *value.vector);
     }
     else if(type == LIST) 
     {
         uint32_t orig = 0;
-        h = fold_left(orig, accum_value_hash, *value.list);
+        h = glh::fold_left<uint32_t, List>(orig, accum_value_hash, *value.list);
     }
     else if(type == MAP)
     {
@@ -297,7 +307,7 @@ uint32_t Value::get_hash() const
         while(i != end)
         {
             accum = accum_value_hash(accum_value_hash(accum, i->first), i->second);
-            i++;
+            ++i;
         }
         h = accum;
     }
@@ -350,28 +360,9 @@ class Masp::Env
 public:
     Masp::Env():env_pool_()
     {
-        env_ = env_pool_.new_map();
+        env_.reset(new env_map(env_pool_.new_map()));
         load_default_env();
     }
-
-    List new_list(){return list_pool_.new_list();}
-
-    List* new_list_alloc()
-    {
-        return new List(list_pool_.new_list());
-    }
-
-    Map* new_map_alloc()
-    {
-        return new Map(map_pool_.new_list());
-    }
-    
-    env_map* new_env_alloc()
-    {
-        return new env_map(env_pool_.new_list());
-    }
-
-    ListPool& list_pool(){return list_pool_;}
 
     size_t reserved_size_bytes()
     {
@@ -390,9 +381,9 @@ public:
         env_pool_.gc();
     }
 
-    void add_fun(const char* name, Function f)
+    void add_fun(const char* name, ValueFunction f)
     {
-        env_ = env_.add();
+        //*env_ = env_->add(); // TODO
     }
 
     void load_default_env();
@@ -402,23 +393,38 @@ public:
     env_map_pool        env_pool_;
     ListPool            list_pool_;
 
-    env_map             env_;
+    std::unique_ptr<env_map> env_;
 };
 
-// Native operators
-namespace {
-    Value op_add(Masp& m, VRefIterator arg_start, VRefIterator arg_end)
-    {
-        Number n;
-        n.set(11);
-        return make_value_number(n);
-    }
 
+inline List new_list(Masp& m){return m.env()->list_pool_.new_list();}
+
+template<class Cont>
+inline List new_list(Masp& m, const Cont& container){return m.env()->list_pool_.new_list(container);}
+
+inline List* new_list_alloc(Masp& m)
+{
+    return new List(m.env()->list_pool_.new_list());
 }
 
-void Masp::Env::load_default_env()
+inline Map* new_map_alloc(Masp& m)
 {
-    add_fun("+", std::ptr_fun(op_add));
+    return new Map(m.env()->map_pool_.new_map());
+}
+
+inline Map new_map(Masp& m)
+{
+    return m.env()->map_pool_.new_map();
+}
+
+inline env_map* new_env_map_alloc(Masp& m)
+{
+    return new env_map(m.env()->env_pool_.new_map());
+}
+
+inline env_map new_env_map(Masp& m)
+{
+    return m.env()->env_pool_.new_map();
 }
 
 
@@ -485,8 +491,17 @@ Value make_value_list(Masp& m)
 {
     Value a;
     a.type = LIST;
-    List* list_ptr = m.env()->new_list_alloc();
+    List* list_ptr = new_list_alloc(m);
     a.value.list = list_ptr;
+    return a;
+}
+
+Value* make_value_list_alloc(Masp& m)
+{
+    Value* a = new Value();
+    a->type = LIST;
+    List* list_ptr = new_list_alloc(m);
+    a->value.list = list_ptr;
     return a;
 }
 
@@ -494,17 +509,17 @@ Value make_value_map(Masp& m)
 {
     Value a;
     a.type = MAP;
-    Map* map_ptr = m.env()->new_map_alloc();
+    Map* map_ptr = new_map_alloc(m);
     a.value.map = map_ptr;
     return a;
 }
 
 Value make_value_closure(Masp& m)
 {
-    // TODO - pass lambda and current env as parameters
+    // TODO - pass lambda and current env as parameters ?
     Value a;
     a.type = CLOSURE;
-    a.value.closure = new Closure();
+    a.value.closure = new Closure(new_env_map(m)); // TODO - use current env? Eval env?
     return a;
 }
 
@@ -545,6 +560,25 @@ Value make_value_number_array()
     return a;
 }
 
+
+
+//////////// Native operators ////////////
+namespace {
+    Value op_add(Masp& m, VRefIterator arg_start, VRefIterator arg_end)
+    {
+        Number n;
+        n.set(11);
+        return make_value_number(n);
+    }
+
+}
+
+//////////// Load environment ////////////
+
+void Masp::Env::load_default_env()
+{
+    add_fun("+", op_add);
+}
 
 ///// Utility functions /////
 
@@ -893,7 +927,7 @@ public:
         }
 
         List* list_ptr = value_list(root);
-        *list_ptr = masp_.env()->list_pool().new_list(build_list);
+        *list_ptr = new_list(masp_, build_list);
     }
 
     parser_result parse(const char* str)
@@ -913,16 +947,16 @@ public:
         if(!scope_valid)
             return parser_result("Could not parse, error in map scope - misplaced '{' or '}' ");
 
-        Value root = make_value_list(masp_);
+        Value* root = make_value_list_alloc(masp_);
 
         try{
-            recursive_parse(root);
+            recursive_parse(*root);
         }
         catch(ParseException& e){
             return parser_result(e.get_message());
         }
 
-        return parser_result(root);
+        return parser_result(ValuePtr(root, ValueDeleter()));
     }
 
 };
@@ -958,7 +992,7 @@ parser_result string_to_value(Masp& m, const char* str)
     return parser.parse(str);
 }
 
-typedef const char* (*PrefixHelper)(const Value& v);
+typedef std::string (*PrefixHelper)(const Value& v);
 
 static void value_to_string_helper(std::ostream& os, const Value& v, PrefixHelper prfx)
 {
@@ -993,7 +1027,7 @@ static void value_to_string_helper(std::ostream& os, const Value& v, PrefixHelpe
         }
         case LIST:
         {
-            List* lst_ptr = reveal(v.value.list);
+            List* lst_ptr = v.value.list;
             out() << "(";
             for(auto i = lst_ptr->begin(); i != lst_ptr->end(); ++i)
             {
@@ -1016,30 +1050,32 @@ const std::string value_to_string(const Value& v)
     return stream.str();
 }
 
-const std::string value_to_typed_string(const Value& v)
+std::string value_type_to_string(const Value& v);
+
+const std::string value_to_typed_string(const Value* v)
 {
     std::ostringstream stream;
-    value_to_string_helper(stream, v, value_type_to_string);
+    value_to_string_helper(stream, *v, value_type_to_string);
     return stream.str();
 }
 
 
-const char* value_type_to_string(const Value& v)
+std::string value_type_to_string(const Value& v)
 {
     switch(v.type)
     {
         case NUMBER:
         {
-            if(v.value.number.type == Number::INT) return "NUMBER:INT";
-            else                                   return "NUMBER:FLOAT";
+            if(v.value.number.type == Number::INT) return std::string("NUMBER:INT");
+            else                                   return std::string("NUMBER:FLOAT");
         }
-        case STRING: return "STRING";
-        case SYMBOL: return "SYMBOL";
-        case CLOSURE: return "CLOSURE";
-        case VECTOR: return "VECTOR";
-        case LIST: return "LIST";
-        case MAP: return "MAP";
-        case OBJECT: return "OBJECT";
+        case STRING: return std::string("STRING");
+        case SYMBOL: return std::string("SYMBOL");
+        case CLOSURE: return std::string("CLOSURE");
+        case VECTOR: return std::string("VECTOR");
+        case LIST: return std::string("LIST");
+        case MAP: return std::string("MAP");
+        case OBJECT: return std::string("OBJECT");
     }
     return "";
 }
@@ -1052,7 +1088,7 @@ public:
 
     std::vector<Value> value_stack;
 
-    std::vector<const Value&> ref_stack;
+    std::vector<Value> ref_stack;
     
     std::vector<Value> tmp_values;
     std::vector<Value> apply_list;
@@ -1062,7 +1098,7 @@ public:
     {
     }
 
-    Value eval(Value& v)
+    Value eval(const Value& v)
     {
         if(v.type == NUMBER || v.type == STRING || v.type == MAP ||
            v.type == NUMBER_ARRAY || v.type == VECTOR || v.type == FUNCTION) return v;
@@ -1080,6 +1116,7 @@ public:
         else if(v.type == CLOSURE)
         {
         }
+        return Value();
     }
 
     void apply(Value& v)
@@ -1088,37 +1125,15 @@ public:
 
 };
 
-ValueRefPtr eval(Masp& m, const Value& v)
+ValuePtr eval(Masp& m, const Value& v)
 {
     Evaluator e(m);
-    ValueRefPtr result(new ValueRef());
 
     Value* vptr = new Value(e.eval(v));
 
-    result->v = vptr;
     // value - if not in place, add to value_stack, add reference to ref_stack
     // add value references to eval stack
-    return result;
+    return ValuePtr(vptr, ValueDeleter());
 }
-
-////// Masp ///////
-
-Masp::Masp()
-{
-    env_ = new Env();
-}
-
-Masp::~Masp()
-{
-    delete env_;
-}
-
-Masp::Env* Masp::env(){return env_;}
-
-void Masp::gc(){env_->gc();}
-
-size_t Masp::reserved_size_bytes(){return env_->reserved_size_bytes();}
-
-size_t Masp::live_size_bytes(){return env_->live_size_bytes();}
 
 } // Namespace masp ends

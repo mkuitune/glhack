@@ -52,7 +52,7 @@ int main(int argc, char* argv[])
             if(result.valid())
             {
                 // Masp::Atom eval_result = eval(M, *result);
-                std::string outline = value_to_typed_string(*result);
+                std::string outline = value_to_typed_string((*result).get());
                 // std::string outline = atom_to_string(eval_result);
                 cout << outline << endl;
             }

@@ -43,7 +43,7 @@ struct Number{
     }
 
     bool operator==(const Number& n) const{
-        if(type != n.type) return false
+        if(type != n.type) return false;
         else return type == INT ? (value.intvalue == n.value.intvalue) : (value.floatvalue == n.value.floatvalue);
     }
 };
@@ -51,18 +51,12 @@ struct Number{
 class Value;
 void free_value(Value* v);
 
-class ValueRef
-{
-    public:
-    ValueRef():v(0){}
-    ~ValueRef(){if(v) free_value(v);}
-
-    Value* get() const {return v;}
-
-    Value* v;
+class ValueDeleter{
+public:
+    void operator()(Value* v){free_value(v);}
 };
 
-typedef std::shared_ptr<ValueRef> ValueRefPtr;
+typedef std::shared_ptr<Value> ValuePtr;
 
 /** Script environment. */
 class Masp
@@ -99,7 +93,7 @@ private:
     Env* env_;
 };
 
-typedef glh::AnnotatedResult<ValueRefPtr> parser_result;
+typedef glh::AnnotatedResult<ValuePtr> parser_result;
 
 /** Parse string to value data structure.*/
 parser_result string_to_value(Masp& m, const char* str);
@@ -114,7 +108,7 @@ const std::string value_to_typed_string(const Value* v);
 const char* value_type_to_string(const Value* v);
 
 /** Evaluate the datastructure held within the atom in the context of the Masp env. Return result as atom.*/
-ValueRefPtr eval(Masp& m, const Value* v);
+ValuePtr eval(Masp& m, const Value* v);
 
 }//Namespace masp
 

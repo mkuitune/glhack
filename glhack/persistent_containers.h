@@ -420,6 +420,8 @@ public:
 
     public:
 
+        typedef typename T value_type;
+
         List(PListPool& pool, Node* head):pool_(pool), head_(head){if(head_) pool_.add_ref(head_);}
         ~List(){if(head_) pool_.remove_ref(head_);}
        
@@ -521,9 +523,16 @@ public:
             return s;
         }
 
-        bool operator==(const List& l)
+        bool operator==(const List& l) const
         {
-            return std::equal(begin(), end(), l.begin());
+            iterator i = begin(), last = end(), li = l.begin(), le = l.end();
+            while(i != last && li != le)
+            {
+                if(!(*i == *li)) return false;
+                ++i; ++li;
+            }
+            if(i != last || li != le) return false;
+            return true;
         }
 
     private:
@@ -1116,7 +1125,7 @@ public:
         bool operator==(const node_iterator& i){return current == i.current;}
         bool operator!=(const node_iterator& i){return current != i.current;}
 
-        const KeyValue* operator*(){return current;}
+        const KeyValue& operator*(){return *current;}
         const KeyValue* operator->(){return current;}
     };
 
@@ -1125,6 +1134,10 @@ public:
     {
     public:
         typedef node_iterator iterator;
+
+        typedef typename K key_type;
+        typedef typename V mapped_type;
+        typedef KeyValue value_type;
 
         Map(PMapPool& pool, Node* root):pool_(pool), root_(root)
         {
@@ -1170,7 +1183,7 @@ public:
             return *this;
         }
 
-        ConstOption<V> try_get_value(const K& key)
+        ConstOption<V> try_get_value(const K& key) const
         {
             uint32_t hash = HashFun::hash(key);
             uint32_t level = 0; 
@@ -1310,17 +1323,17 @@ public:
         // Run garbage collector on the root pool.
         void gc(){pool_.gc();}
 
-        iterator begin(){return iterator(root_);}
-        iterator end(){return iterator(0);}
+        iterator begin() const {return iterator(root_);}
+        iterator end() const {return iterator(0);}
       
         bool operator==(const Map& m) const
         {
-            iterator i = begin(), end = end();
-            while(i != end)
+            iterator i = begin(), last = end();
+            while(i != last)
             {
                 ConstOption<V> opt = m.try_get_value(i->first);
                 if(! (opt.is_valid() && (*opt) == i->second)) return false;
-                i++;
+                ++i;
             }
             return true;
         }
