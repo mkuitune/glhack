@@ -58,6 +58,7 @@ public:
     bool is_valid() const {return ptr != 0;}
     const T& operator*() const {return *ptr;}
     const T& operator->() const {return *ptr;}
+    const T* get(){return ptr;}
 private:
     const T* ptr;
 };

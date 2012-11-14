@@ -93,7 +93,7 @@ public:
     union
     {
         Number       number;
-        const char*  string; //> Data for string | symbol
+        std::string* string; //> Data for string | symbol
         List*        list;
         Map*         map;
         Closure*     closure;
@@ -111,6 +111,7 @@ public:
     Value& operator=(const Value& v);
     Value& operator=(Value&& v);
     void alloc_str(const char* str);
+    void alloc_str(const std::string& str);
     void alloc_str(const char* str, const char* end);
 
     bool operator==(const Value& v) const;
@@ -137,7 +138,7 @@ void Value::dealloc()
 {
     if((type == STRING || type == SYMBOL) && value.string)
     {
-        free(((void*)value.string));
+        delete value.string;
     }
     else if(type == LIST && value.list)      { delete value.list;}
     else if(type == MAP && value.map)        { delete value.map;}
@@ -176,7 +177,7 @@ void Value::copy(const Value& v)
 
 #define COPY_PARAM_V(param_name) value.##param_name = copy_new(v.value.##param_name)
     if(type == NUMBER) value.number.set(v.value.number);
-    else if(type == SYMBOL || type == STRING) alloc_str(v.value.string);
+    else if(type == SYMBOL || type == STRING) COPY_PARAM_V(string);
     else if(type == LIST)    COPY_PARAM_V(list);
     else if(type == MAP)     COPY_PARAM_V(map);
     else if(type == CLOSURE) COPY_PARAM_V(closure);
@@ -223,21 +224,19 @@ Value& Value::operator=(Value&& v)
     return *this; 
 }
 
+void Value::alloc_str(const std::string& str)
+{
+    value.string = new std::string(str);
+}
+
 void Value::alloc_str(const char* str)
 {
-    size_t size = strlen(str) + 1;
-    value.string = (const char*) malloc(size * sizeof(char));
-    strcpy(((char*)value.string), str);
+    value.string = new std::string(str);
 }
 
 void Value::alloc_str(const char* str, const char* str_end)
 {
-    size_t size = str_end - str + 1;
-    value.string = (const char*) malloc(size * sizeof(char));
-    ((char*)value.string)[0] = '\0';
-    strncat(((char*)value.string), str, size - 1);
-
-    ((char*)value.string)[size -1] = '\0';
+    value.string = new std::string(str, str_end);
 }
 
 bool Value::operator==(const Value& v) const
@@ -247,7 +246,7 @@ bool Value::operator==(const Value& v) const
 
     if(type == NUMBER)            result = value.number == v.value.number;
     else if(type == NUMBER_ARRAY) result = (*value.number_array) == (*v.value.number_array);
-    else if(type == STRING || type == SYMBOL) result = strcmp(value.string, v.value.string) == 0;
+    else if(type == STRING || type == SYMBOL) result = (*value.string) == (*v.value.string);
     else if(type == CLOSURE)
     {
     }
@@ -284,7 +283,7 @@ uint32_t Value::get_hash() const
         uint32_t orig = 0;
         h = glh::fold_left<uint32_t, NumberArray>(orig, accum_number_hash, *value.number_array);
     }
-    else if(type == STRING || type == SYMBOL) h = hash32(value.string, strlen(value.string));
+    else if(type == STRING || type == SYMBOL) h = hash32(*value.string);
     else if(type == CLOSURE)
     {
         // TODO
@@ -571,6 +570,10 @@ namespace {
         return make_value_number(n);
     }
 
+    Value op_define(Masp& m, VRefIterator arg_start, VRefIterator arg_end)
+    {
+        return Value();
+    }
 }
 
 //////////// Load environment ////////////
@@ -1017,12 +1020,12 @@ static void value_to_string_helper(std::ostream& os, const Value& v, PrefixHelpe
         }
         case SYMBOL:
         {
-            out() << v.value.string << " ";
+            out() << *(v.value.string) << " ";
             break;
         }
         case STRING:
         {
-            out() << "\"" << v.value.string << "\" ";
+            out() << "\"" << *(v.value.string) << "\" ";
             break;
         }
         case LIST:
@@ -1080,11 +1083,32 @@ std::string value_type_to_string(const Value& v)
     return "";
 }
 
+const Value* lookup(Masp& masp, const std::string& name)
+{
+    glh::ConstOption<Value> res = masp.env()->env_->try_get_value(name);
+
+    return res.get(); // TODO
+}
+
+class EvaluationException
+{
+public:
+
+    EvaluationException(const char* msg):msg_(msg){}
+    EvaluationException(const std::string& msg):msg_(msg){}
+    ~EvaluationException(){}
+
+    std::string get_message(){return msg_;}
+
+    std::string msg_;
+};
+
+
 class Evaluator
 {
 public:
 
-    Masp& m_masp;
+    Masp& masp_;
 
     std::vector<Value> value_stack;
 
@@ -1094,7 +1118,7 @@ public:
     std::vector<Value> apply_list;
 
 
-    Evaluator(Masp& masp): m_masp(masp)
+    Evaluator(Masp& masp): masp_(masp)
     {
     }
 
@@ -1104,7 +1128,10 @@ public:
            v.type == NUMBER_ARRAY || v.type == VECTOR || v.type == FUNCTION) return v;
         else if(v.type == SYMBOL)
         {
-            // Find value from env
+            const Value* r = lookup(masp_, *v.value.string);
+            if(!r) throw EvaluationException(std::string("Symbol not found:") + *v.value.string);
+
+            return *r;
         }
         else if(v.type == LIST)
         {
