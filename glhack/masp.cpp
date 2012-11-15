@@ -10,6 +10,8 @@
 #include<sstream>
 #include<functional>
 #include<numeric>
+#include<tuple>
+#include<utility>
 
 namespace masp{
 
@@ -586,7 +588,7 @@ void Masp::Env::load_default_env()
 ///// Utility functions /////
 
 static inline bool is_digit(char c){return isdigit(c) != 0;}
-static inline bool is_space(char c){return isspace(c) != 0;}
+static inline bool is_space(char c){return (isspace(c) != 0) || (c == ',');}
 
 const char* g_delimiters = "(){}[];'";
 
@@ -716,6 +718,7 @@ static bool is_delimiter(const char c)
     return is_in_string(c, g_delimiters);
 }
 
+#if 0
 /** Verify that given scope delimiters balance out.*/
 // TODO: give nested scope limiters in array so mixed scopes can be verified
 static bool check_scope(const char* begin, const char* end, const char* comment, char scope_start, char scope_end)
@@ -724,7 +727,7 @@ static bool check_scope(const char* begin, const char* end, const char* comment,
     const char* c = begin;
     int scope = 0;
     size_t comment_length = strlen(comment);
-    while(c != end)
+    while(c < end)
     {
         if(match_string(comment, comment_length, c, end))
         {
@@ -755,6 +758,110 @@ static bool check_scope(const char* begin, const char* end, const char* comment,
 
     return result;
 }
+#endif
+
+/** Verify that given scope delimiters balance out.
+ *  The scope start and scope end arrays must be of equal length and contain start and end characters symmetrical
+ *  positions such that scope_start[i] and scope_end[i] contain a character pair for a particular scope.
+ *  @param scope_start string of scope begin characters.
+ *  @param scope_end   string of scope end characters.
+ *  @return <scope_ok:bool, int: line number> Pair with boolean that's true if scope is ok. If not, return integer for line number.
+*/
+// TODO: give nested scope limiters in array so mixed scopes can be verified
+
+struct ScopeError
+{
+    /* If scope left open, return character of scope opening and number of line where scope was opened.
+       If scope scoped pre-emptively, return line of error and and the faulty closing symbol.
+    */
+    enum Result{SCOPE_LEFT_OPEN, FAULTY_SCOPE_CLOSING, OK};
+    int line;
+    char scope;
+    Result result;
+    ScopeError():result(OK){}
+    ScopeError(Result res,char c, int l):result(res), line(l), scope(c){}
+
+    bool success(){return result == OK;}
+
+    std::string report()
+    {
+        if(result == OK) return std::string("Scope ok");
+        else if(result == SCOPE_LEFT_OPEN)
+        {
+            std::ostringstream os;
+            os << "Scope "  << scope << " at line " << line << " not closed.";
+            return os.str();
+        }
+        else if(result == FAULTY_SCOPE_CLOSING)
+        {
+            std::ostringstream os;
+            os << "Premature scope closing "  << scope << " at line " << line  << ".";
+            return os.str();
+        }
+
+        return std::string("");
+    }
+};
+
+static ScopeError check_scope(const char* begin, const char* end, const char* comment, const char* scope_start, const char* scope_end)
+{
+    using namespace std;
+
+    bool result = true;
+    const char* c = begin;
+    int scope = 0;
+    size_t comment_length = strlen(comment);
+    int line_number = 0;
+
+    std::stack<std::pair<int,int>> expected_closing; // Scope index; line number
+
+    while(c < end)
+    {
+
+        if(match_string(comment, comment_length, c, end))
+        {
+            c = to_newline(c, end);
+            line_number++;
+        }
+
+        int scope_start_index = pos_in_string(*c, scope_start);
+        int scope_end_index = pos_in_string(*c, scope_end);
+
+        if(*c == '"')
+        {
+            c = last_quote_of_string(c+1, end);
+        }
+        else if(scope_start_index >= 0)
+        {
+            expected_closing.push(std::make_pair(scope_start_index, line_number));
+        }
+        else if(scope_end_index >= 0)
+        {
+            if(expected_closing.size() > 0 && expected_closing.top().first == scope_end_index)
+            {
+                expected_closing.pop();
+            }
+            else return ScopeError(ScopeError::FAULTY_SCOPE_CLOSING, *c, line_number);
+        }
+
+        if(scope < 0)
+        {
+            break;
+        }
+
+        c++;
+    }
+
+    if(expected_closing.size() > 0)
+    {
+        int scp; int line;
+        std::tie(scp, line) = expected_closing.top();
+        return ScopeError(ScopeError::SCOPE_LEFT_OPEN, scope_start[scp],line);
+    }
+
+    return ScopeError();
+}
+
 
 class ParseException
 {
@@ -938,17 +1045,12 @@ public:
         size_t size = strlen(str);
         init(str, str + size);
 
-        bool scope_valid = check_scope(c_, end_, ";", '(', ')');
-        if(!scope_valid)
-            return parser_result("Could not parse, error in list scope - misplaced '(' or ')' ");
-        
-        scope_valid = check_scope(c_, end_, ";", '[', ']');
-        if(!scope_valid)
-            return parser_result("Could not parse, error in vector scope - misplaced '[' or ']' ");
-        
-        scope_valid = check_scope(c_, end_, ";", '{', '}');
-        if(!scope_valid)
-            return parser_result("Could not parse, error in map scope - misplaced '{' or '}' ");
+        ScopeError scope_result = check_scope(c_, end_, ";", "({[", ")}]");
+
+        if(!scope_result.success())
+        {
+            return parser_result(scope_result.report());
+        }
 
         Value* root = make_value_list_alloc(masp_);
 
