@@ -718,57 +718,6 @@ static bool is_delimiter(const char c)
     return is_in_string(c, g_delimiters);
 }
 
-#if 0
-/** Verify that given scope delimiters balance out.*/
-// TODO: give nested scope limiters in array so mixed scopes can be verified
-static bool check_scope(const char* begin, const char* end, const char* comment, char scope_start, char scope_end)
-{
-    bool result = true;
-    const char* c = begin;
-    int scope = 0;
-    size_t comment_length = strlen(comment);
-    while(c < end)
-    {
-        if(match_string(comment, comment_length, c, end))
-        {
-            c = to_newline(c, end);
-        }
-        if(*c == '"')
-        {
-            c = last_quote_of_string(c, end);
-        }
-        else if(*c == scope_start)
-        {
-            scope = scope + 1;
-        }
-        else if(*c == scope_end)
-        {
-            scope = scope - 1;
-        }
-
-        if(scope < 0)
-        {
-            break;
-        }
-
-        c++;
-    }
-
-    if(scope != 0) result = false;
-
-    return result;
-}
-#endif
-
-/** Verify that given scope delimiters balance out.
- *  The scope start and scope end arrays must be of equal length and contain start and end characters symmetrical
- *  positions such that scope_start[i] and scope_end[i] contain a character pair for a particular scope.
- *  @param scope_start string of scope begin characters.
- *  @param scope_end   string of scope end characters.
- *  @return <scope_ok:bool, int: line number> Pair with boolean that's true if scope is ok. If not, return integer for line number.
-*/
-// TODO: give nested scope limiters in array so mixed scopes can be verified
-
 struct ScopeError
 {
     /* If scope left open, return character of scope opening and number of line where scope was opened.
@@ -802,6 +751,14 @@ struct ScopeError
         return std::string("");
     }
 };
+
+/** Verify that given scope delimiters balance out.
+ *  The scope start and scope end arrays must be of equal length and contain start and end characters symmetrical
+ *  positions such that scope_start[i] and scope_end[i] contain a character pair for a particular scope.
+ *  @param scope_start string of scope begin characters.
+ *  @param scope_end   string of scope end characters.
+ *  @return ScopeError containing the result of the check.
+*/
 
 static ScopeError check_scope(const char* begin, const char* end, const char* comment, const char* scope_start, const char* scope_end)
 {
