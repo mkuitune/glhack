@@ -47,6 +47,14 @@ bool any_of(const T& val, const T& ref0, const T& ref1, const T& ref2){return va
 template<class T>
 bool any_of(const T& val, const T& ref0, const T& ref1, const T& ref2, const T& ref3){return val == ref0 || val == ref1 || val == ref2 || val == ref3;}
 
+template<class T>
+bool none_of(const T& val, const T& ref0, const T& ref1){return val != ref0 && val != ref1;}
+template<class T>
+bool none_of(const T& val, const T& ref0, const T& ref1, const T& ref2){return val != ref0 && val != ref1 && val != ref2;}
+template<class T>
+bool none_of(const T& val, const T& ref0, const T& ref1, const T& ref2, const T& ref3){return val != ref0 && val != ref1 && val != ref2 && val != ref3;}
+
+
 //////// Helpfull small types /////////
 
 /** An immutable accessor to a valid or non-valid pointer. */

@@ -1497,7 +1497,7 @@ public:
 
                 Node::Ref* child_array = ref_chunks_.reserve_consecutive_elements(count);
                 Node::Ref* old_children = current->child_array;
-                std::copy(old_children, old_children + count, child_array);
+                unsafe_copy(old_children, old_children + count, child_array);
 
                 current->child_array = child_array;
 

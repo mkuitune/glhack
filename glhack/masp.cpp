@@ -119,10 +119,12 @@ public:
     bool operator==(const Value& v) const;
     uint32_t get_hash() const;
 
+    void movefrom(Value& v);
+
+
 private:
     void dealloc();
     void copy(const Value& v);
-    void movefrom(Value& v);
 
 };
 
@@ -340,6 +342,13 @@ Value* new_value()
 }
 
 inline List* value_list(Value& v){return v.value.list;}
+
+inline Vector* value_vector(Value& v){return v.value.vector;}
+
+inline NumberArray* value_number_array(Value& v){return v.value.number_array;}
+
+inline Map* value_map(Value& v){return v.value.map;}
+
 
 void append_to_value_stl_list(std::list<Value>& value_list, const Value& v)
 {
@@ -766,7 +775,7 @@ static ScopeError check_scope(const char* begin, const char* end, const char* co
 
     bool result = true;
     const char* c = begin;
-    int scope = 0;
+
     size_t comment_length = strlen(comment);
     int line_number = 0;
 
@@ -799,11 +808,6 @@ static ScopeError check_scope(const char* begin, const char* end, const char* co
                 expected_closing.pop();
             }
             else return ScopeError(ScopeError::FAULTY_SCOPE_CLOSING, *c, line_number);
-        }
-
-        if(scope < 0)
-        {
-            break;
         }
 
         c++;
@@ -941,6 +945,20 @@ public:
             recursive_parse(result);
             return result;
         }
+        else if(is('[')) // Enter vector
+        {
+            Value result = make_value_vector();
+            move_forward();
+            recursive_parse(result);
+            return result;
+        }
+        else if(is('{')) // Enter map
+        {
+            Value result = make_value_map(masp_);
+            move_forward();
+            recursive_parse(result);
+            return result;
+        }
         else if(parse_number(tmp_number))
         {
             move_forward();
@@ -960,7 +978,8 @@ public:
 
     void recursive_parse(Value& root)
     {
-        if(root.type != LIST) throw ParseException("recursive_parse: root type is not LIST.");
+        if(glh::none_of(root.type ,LIST , VECTOR, MAP))
+            throw ParseException("recursive_parse: root type is not container.");
 
         std::list<Value> build_list;
 
@@ -971,7 +990,7 @@ public:
                 to_newline();
                 if(c_ != end_) move_forward();
             }
-            else if(is(')')) // Exit list
+            else if(is(')') || is(']') || is('}')) // Exit container - scope was checked before this
             {
                 move_forward();
                 break;
@@ -993,8 +1012,38 @@ public:
             if(at_end()) break;
         }
 
-        List* list_ptr = value_list(root);
-        *list_ptr = new_list(masp_, build_list);
+        if(root.type == LIST)
+        {
+            List* list_ptr = value_list(root);
+            *list_ptr = new_list(masp_, build_list);
+        }
+        else if(root.type == VECTOR)
+        {
+            Vector* vec_ptr = value_vector(root);
+            size_t size = build_list.size();
+            vec_ptr->resize(size);
+            std::list<Value>::iterator li = build_list.begin();
+            for(Vector::iterator i = vec_ptr->begin(); i != vec_ptr->end(); ++i)
+                i->movefrom(*li++);
+        } else if(root.type == MAP)
+        {
+            Map* map = value_map(root);
+            std::list<Value>::iterator lend = build_list.end();
+            for(std::list<Value>::iterator li = build_list.begin(); li != lend; ++li)
+            {
+                Value* key = &*li;
+                ++li;
+                if(li != lend)
+                {
+                    *map = map->add(*key, *li);
+                }
+                else
+                {
+                    *map = map->add(*key, make_value_list(masp_));
+                    break;
+                }
+            }
+        }
     }
 
     parser_result parse(const char* str)
@@ -1089,13 +1138,37 @@ static void value_to_string_helper(std::ostream& os, const Value& v, PrefixHelpe
         }
         case LIST:
         {
-            List* lst_ptr = v.value.list;
             out() << "(";
+            List* lst_ptr = v.value.list;
             for(auto i = lst_ptr->begin(); i != lst_ptr->end(); ++i)
             {
                 value_to_string_helper(os, *i, prfx);
             }
             os << ")";
+            break;
+        }
+        case MAP:
+        {
+            Map* map_ptr = v.value.map;
+            out() << "{";
+            auto mend = map_ptr->end();
+            for(auto m = map_ptr->begin(); m != mend; ++m)
+            {
+                value_to_string_helper(os, m->first, prfx);
+                value_to_string_helper(os, m->second, prfx);
+            }
+            os << "}";
+            break;
+        }
+        case VECTOR:
+        {
+            Vector* vec_ptr = v.value.vector;
+            out() << "[";
+            for(auto i = vec_ptr->begin(); i != vec_ptr->end(); ++i)
+            {
+                value_to_string_helper(os, *i, prfx);
+            }
+            os << "]";
             break;
         }
         default:
