@@ -94,6 +94,7 @@ private:
 };
 
 typedef glh::AnnotatedResult<ValuePtr> parser_result;
+typedef glh::AnnotatedResult<ValuePtr> evaluation_result;
 
 /** Parse string to value data structure.*/
 parser_result string_to_value(Masp& m, const char* str);
@@ -108,7 +109,7 @@ const std::string value_to_typed_string(const Value* v);
 const char* value_type_to_string(const Value* v);
 
 /** Evaluate the datastructure held within the atom in the context of the Masp env. Return result as atom.*/
-ValuePtr eval(Masp& m, const Value* v);
+evaluation_result eval(Masp& m, const Value* v);
 
 }//Namespace masp
 

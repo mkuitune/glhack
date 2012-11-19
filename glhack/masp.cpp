@@ -571,7 +571,6 @@ Value make_value_number_array()
 }
 
 
-
 //////////// Native operators ////////////
 namespace {
     Value op_add(Masp& m, VRefIterator arg_start, VRefIterator arg_end)
@@ -581,10 +580,44 @@ namespace {
         return make_value_number(n);
     }
 
-    Value op_define(Masp& m, VRefIterator arg_start, VRefIterator arg_end)
+    Value op_sub(Masp& m, VRefIterator arg_start, VRefIterator arg_end)
+    {
+        Number n;
+        n.set(11);
+        return make_value_number(n);
+    }
+
+    Value op_mul(Masp& m, VRefIterator arg_start, VRefIterator arg_end)
+    {
+        Number n;
+        n.set(11);
+        return make_value_number(n);
+    }
+
+    Value op_div(Masp& m, VRefIterator arg_start, VRefIterator arg_end)
+    {
+        Number n;
+        n.set(11);
+        return make_value_number(n);
+    }
+
+    // def'd values are immutable - fails if symbol has been already defined
+    Value op_def(Masp& m, VRefIterator arg_start, VRefIterator arg_end)
     {
         return Value();
     }
+
+    // set always succeeds
+    Value op_set(Masp& m, VRefIterator arg_start, VRefIterator arg_end)
+    {
+        return Value();
+    }
+
+    // quote, first, next, eq, cons, cond. 
+    // lambda : ()
+    // TODO: first next ffirst fnext if cond while < > + - * / dot cross
+    // map filter range apply count
+
 }
 
 //////////// Load environment ////////////
@@ -725,6 +758,11 @@ static bool is_in_string(const char c, const char* str)
 static bool is_delimiter(const char c)
 {
     return is_in_string(c, g_delimiters);
+}
+
+static bool equal(const char* str_1, const char* str_2)
+{
+    return (strcmp(str_1, str_2) == 0);
 }
 
 struct ScopeError
@@ -983,9 +1021,11 @@ public:
 
         std::list<Value> build_list;
 
+        bool next_is_quoted = false;;
+
         while(! at_end())
         {
-            if(is(';'))  //> Quote, go to newline
+            if(is(';'))  //> Comment, go to newline
             {
                 to_newline();
                 if(c_ != end_) move_forward();
@@ -1001,15 +1041,37 @@ public:
                 // Skip whitespace
                 // After this we know that the input is either number or symbol
             }
+            else if(is('\''))
+            {
+                next_is_quoted = true;
+                move_forward();
+            }
             else
             {
                 // append to root  
                 // push_to_value(root, get_value());
                 Value v = get_value();
-                append_to_value_stl_list(build_list, v);
+                if(next_is_quoted)
+                {
+                    Value quote_sym = make_value_symbol("quote");
+                    Value outer = make_value_list(masp_);
+                    *(outer.value.list) = outer.value.list->add(v);
+                    *(outer.value.list) = outer.value.list->add(quote_sym);
+                    append_to_value_stl_list(build_list, outer);
+                    next_is_quoted = false;
+                }
+                else
+                {
+                    append_to_value_stl_list(build_list, v);
+                }
             }
 
             if(at_end()) break;
+        }
+
+        if(next_is_quoted) // Quoted flag was not used.
+        {
+            throw ParseException("Quote cannot be empty.");
         }
 
         if(root.type == LIST)
@@ -1254,20 +1316,39 @@ public:
     {
     }
 
-    Value eval(const Value& v)
+    const Value* eval(const Value& v)
     {
+        const Value* result = 0;
+
         if(v.type == NUMBER || v.type == STRING || v.type == MAP ||
-           v.type == NUMBER_ARRAY || v.type == VECTOR || v.type == FUNCTION) return v;
+           v.type == NUMBER_ARRAY || v.type == VECTOR || v.type == FUNCTION) return &v;
+
         else if(v.type == SYMBOL)
         {
-            const Value* r = lookup(masp_, *v.value.string);
-            if(!r) throw EvaluationException(std::string("Symbol not found:") + *v.value.string);
+            result = lookup(masp_, *v.value.string);
 
-            return *r;
+            if(!result) throw EvaluationException(std::string("Symbol not found:") + *v.value.string);
         }
         else if(v.type == LIST)
         {
             // eval unless previous was quote?
+            List::iterator i = v.value.list->begin();
+            List::iterator e = v.value.list->end();
+
+            // Check if is quote.
+            if(i != e && (i->type == SYMBOL) && equal(i->value.string->c_str(), "quote"))
+            {
+                auto snd = i;
+                ++snd;
+                if(snd != e)
+                {
+                    return &(*e);
+                }
+            }
+            else
+            {
+                // Eval list.
+            }
         }
         else if(v.type == LAMBDA)
         {
@@ -1275,24 +1356,40 @@ public:
         else if(v.type == CLOSURE)
         {
         }
-        return Value();
+
+        return result;
     }
 
-    void apply(Value& v)
+    void apply(const Value& v)
     {
     }
 
 };
 
-ValuePtr eval(Masp& m, const Value& v)
+evaluation_result eval(Masp& m, const Value* v)
 {
     Evaluator e(m);
 
-    Value* vptr = new Value(e.eval(v));
+    ValuePtr result;
+    const Value* vptr = 0;
+
+    //TODO: Return last result of an expression.
+    //If is unquoted list
+
+    try
+    {
+        vptr = e.eval(*v);
+    }catch(EvaluationException& e)
+    {
+        return evaluation_result(e.get_message());
+    }
 
     // value - if not in place, add to value_stack, add reference to ref_stack
     // add value references to eval stack
-    return ValuePtr(vptr, ValueDeleter());
+
+    result.reset(new Value(*vptr), ValueDeleter());
+
+    return evaluation_result(result);
 }
 
 } // Namespace masp ends

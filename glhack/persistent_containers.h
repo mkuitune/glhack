@@ -411,7 +411,8 @@ public:
             iterator(Node* n):node(n){}
             const T& operator*() const {return node->data;}
             T& operator*() {return node->data;}
-            const T& operator->() const {return node->data;}
+            const T* operator->() const {return &(node->data);}
+            T* operator->() {return &(node->data);}
             T* data_ptr() {return &node->data;}
             void operator++(){if(node) node = node->next;}
             bool operator!=(const iterator& i){return node != i.node;}
@@ -836,8 +837,9 @@ public:
             const uint32_t* result = 0;
             if(type == CollisionNode)
             {
-                auto kvi = value.collision_list->begin();
-                result = &(kvi->hash);
+                typename KeyValueList::iterator kvi = value.collision_list->begin();
+                const KeyValue* kv(*kvi.data_ptr());
+                result = &(kv->hash);
 
             }
             else if(type == ValueNode)

@@ -1,6 +1,8 @@
 #include<iostream>
 #include<cstring>
+#include <sstream>
 #include "masp.h"
+
 
 void print_help()
 {
@@ -11,6 +13,42 @@ void print_help()
 }
 
 //TODO: gc
+
+void printing_response(masp::Masp& M, masp::Value* v)
+{
+    std::string outline = masp::value_to_typed_string(v);
+    std::cout << outline << std::endl;
+}
+
+void eval_response(masp::Masp& M, masp::Value* v)
+{
+    masp::evaluation_result result = masp::eval(M,v);
+    if(result.valid())
+    {
+        printing_response(M, (*result).get());
+    }
+    else
+    {
+        std::cout << "Parse error:" << result.message() << std::endl;
+    }
+
+}
+
+std::string memory_string(size_t b)
+{
+    std::ostringstream os;
+
+    if(b < 1024) os << b << " B";
+    else if(b > 1024 && b < 1024 * 1024) os << b/1024 << " kB";
+    else os << b/(1024*1024) << " MB";
+
+    return os.str();
+}
+
+void print_memory(std::ostream& os, const char* prefix, size_t live, size_t reserved)
+{
+    os << "(live/reserved): " << memory_string(live) << " / " << memory_string(reserved) << std::endl;
+}
 
 int main(int argc, char* argv[])
 {
@@ -26,6 +64,9 @@ int main(int argc, char* argv[])
     bool live = true;
     const int line_size = 1024;
     char line[line_size];
+
+    enum {EVAL, PRINT} mode = EVAL;
+    
     while(live)
     {
         cout << ">";
@@ -43,18 +84,43 @@ int main(int argc, char* argv[])
         {
             size_t live_size = M.live_size_bytes();
             size_t reserved_size = M.reserved_size_bytes();
+            print_memory(cout, "Memory used ",live_size, reserved_size);
+        }
+        else if(strcmp(line, "gc") == 0)
+        {
+            size_t live_size_before = M.live_size_bytes();
+            size_t reserved_size_before = M.reserved_size_bytes();
 
-            cout << "Bytes used: " << live_size << " / " << reserved_size << endl;
+            M.gc();
+
+            size_t live_size = M.live_size_bytes();
+            size_t reserved_size = M.reserved_size_bytes();
+
+            cout << "Garbage collection done. Memory usage statistics:";
+            print_memory(cout, "Before collection: ",live_size_before, reserved_size_before);
+            print_memory(cout, "After collection: ",live_size, reserved_size);
+        }
+        else if(strcmp(line, "eval") == 0)
+        {
+            mode = EVAL;
+        }
+        else if(strcmp(line, "print") == 0)
+        {
+            mode = PRINT;
         }
         else
         {
             parser_result result = string_to_value(M, line);
             if(result.valid())
             {
-                // Masp::Atom eval_result = eval(M, *result);
-                std::string outline = value_to_typed_string((*result).get());
-                // std::string outline = atom_to_string(eval_result);
-                cout << outline << endl;
+                if(mode == PRINT)
+                {
+                    printing_response(M, (*result).get());
+                }
+                else if(mode == EVAL)
+                {
+                    eval_response(M, (*result).get());
+                }
             }
             else
             {

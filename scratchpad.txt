@@ -1,0 +1,47 @@
+   // Generic value visitor.
+    class ValueVisitor
+    {
+        void handle_value(Value& v)
+        {
+        }
+
+        void visit_value(Value& v)
+        {
+            if(v.type == LIST) visit_list(v.value.list);
+            else if(v.type == MAP) visit_map(v.value.map);
+            else if(t.type == VECTOR) visit_vector(v.value.vector);
+            else handle_value(v);
+        }
+
+        void visit_list(List* list)
+        {
+            auto i = list->begin();
+            auto e = list->end();
+            for(;i != e; ++e)
+            {
+                visit_value(*i);
+            }
+        }
+
+        void visit_vector(Vector* vector)
+        {
+            auto i = vector->begin();
+            auto e = vector->end();
+            for(;i != e; ++e)
+            {
+                visit_value(*i);
+            }
+        }
+
+        void visit_map(Map* map)
+        {
+            auto m = map->begin();
+            auto e = map->end();
+            for(;i != e; ++e)
+            {
+                visit_value(*(m->first)); 
+                visit_value(*(m->second));
+            }
+        }
+    };
+    
