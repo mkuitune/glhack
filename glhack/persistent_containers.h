@@ -513,6 +513,8 @@ public:
             }
         }
 
+        bool empty(){return head != 0;}
+
         iterator begin() const {return iterator(head_);}
         iterator end() const {return iterator(0);}
 

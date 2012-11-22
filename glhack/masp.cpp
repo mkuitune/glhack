@@ -12,10 +12,10 @@
 #include<numeric>
 #include<tuple>
 #include<utility>
+#include<limits>
+
 
 namespace masp{
-
-
 
 ////// Opaque value wrappers. ///////
 
@@ -104,6 +104,7 @@ public:
         Function*    function;
         NumberArray* number_array;
         Lambda*      lambda;
+        bool         boolean;
     } value;
 
     Value();
@@ -115,7 +116,7 @@ public:
     void alloc_str(const char* str);
     void alloc_str(const std::string& str);
     void alloc_str(const char* str, const char* end);
-
+    bool is_nil() const;
     bool operator==(const Value& v) const;
     uint32_t get_hash() const;
 
@@ -132,11 +133,7 @@ private:
 bool ValuesAreEqual::compare(const Value& k1, const Value& k2){return k1 == k2;} 
 uint32_t ValueHash::hash(const Value& h){return h.get_hash();}
 
-Value::Value()
-{
-    type = LIST;
-    value.list = 0;
-}
+Value::Value():type(NIL){}
 
 void Value::dealloc()
 {
@@ -190,7 +187,9 @@ void Value::copy(const Value& v)
     else if(type == LAMBDA)  COPY_PARAM_V(lambda);
     else if(type == FUNCTION) COPY_PARAM_V(function);
     else if(type == NUMBER_ARRAY) COPY_PARAM_V(number_array);
-    else {assert("Faulty param type.");}
+    else if(type == BOOLEAN) value.boolean = v.value.boolean;
+    else if(type != NIL)
+        {assert("Faulty param type.");}
 #undef COPY_PARAM_V
 }
 
@@ -243,6 +242,8 @@ void Value::alloc_str(const char* str, const char* str_end)
     value.string = new std::string(str, str_end);
 }
 
+bool Value::is_nil(){return type == NIL;}
+
 bool Value::operator==(const Value& v) const
 {
     if(v.type != type) return false;
@@ -269,6 +270,8 @@ bool Value::operator==(const Value& v) const
     {
         // TODO
     }
+    else if(type == BOOLEAN) result = value.boolean == v.value.booolean;
+    else if(type == NIL) result = true;
 
     return result;
 }
@@ -282,7 +285,9 @@ uint32_t Value::get_hash() const
     // For collections produce a product of the hashes of contained elements
     uint32_t h = 0;
 
-    if(type == NUMBER)  h = hash_of_number(value.number);
+    if(type == BOOLEAN) h = (uint32_t) value.boolean;
+    else if(type == nil) h = std::numeric_limits<uint32_t>::max();
+    else if(type == NUMBER)  h = hash_of_number(value.number);
     else if(type == NUMBER_ARRAY){
         uint32_t orig = 0;
         h = glh::fold_left<uint32_t, NumberArray>(orig, accum_number_hash, *value.number_array);
@@ -341,26 +346,49 @@ Value* new_value()
     return new Value();
 }
 
-inline List* value_list(Value& v){return v.value.list;}
+inline List* value_list(Value& v){return v.type == LIST ? v.value.list : 0;}
 
-inline Vector* value_vector(Value& v){return v.value.vector;}
+inline const Value* value_list_first(const Value& v)
+{
+    const Value* result = 0;
+    List* l = value_list(v);
+    if(l && !l->empty()) result = l->begin().data_ptr();
+    return result;
+}
 
-inline NumberArray* value_number_array(Value& v){return v.value.number_array;}
+inline const Value* value_list_nth(const Value& v, size_t n)
+{
+    const Value* result = 0;
+    List* l = value_list(v);
 
-inline Map* value_map(Value& v){return v.value.map;}
+    if(l && !l->empty()){ 
+        auto i = l->begin();
+        auto e = l->end();
+        while(i != e && n > 0) {++i; --n;}
+        if(i != e) result = i.data_ptr();
+    }
+    return result;
+}
 
+inline const Value* value_list_second(const Value& v)
+{
+    return value_list_nth(v, 1);
+}
+
+inline const Value* value_list_third(const Value& v)
+{
+    return value_list_nth(v, 2);
+}
+
+inline Vector* value_vector(Value& v){return v.type == VECTOR ? v.value.vector : 0;}
+
+inline NumberArray* value_number_array(Value& v){return v.type == NUMBER_ARRAY ? v.value.number_array : 0;}
+
+inline Map* value_map(Value& v){return v.type == MAP ? v.value.map : 0;}
 
 void append_to_value_stl_list(std::list<Value>& value_list, const Value& v)
 {
     value_list.push_back(v);
-}
-
-void append_to_value_list(Value& container, const Value& v)
-{
-    assert((container.type == LIST) && "append_to_value_list error: container not list.");
-
-    List* list = value_list(container);
-    *list = list->add(v);
 }
 
 ///// Masp::Env //////
@@ -386,6 +414,10 @@ public:
 
     void gc()
     {
+        // TODO: fix gc. Now does not collect nested lists on first gc
+        // i.e nested list that's alone ((1 2 3)) has it's inner list still referred to when 
+        // collecting. Is this a problem or not...
+        //
         map_pool_.gc();
         list_pool_.gc();
         env_pool_.gc();
@@ -397,6 +429,8 @@ public:
     }
 
     void load_default_env();
+
+    env_map& get_env(){return *env_;}
 
     // Locals
     MapPool             map_pool_;
@@ -570,6 +604,13 @@ Value make_value_number_array()
     return a;
 }
 
+Value make_value_boolean(bool b)
+{
+    Value v;
+    v.type = BOOLEAN;
+    v.value.boolean = b;
+    return v;
+}
 
 //////////// Native operators ////////////
 namespace {
@@ -763,6 +804,23 @@ static bool is_delimiter(const char c)
 static bool equal(const char* str_1, const char* str_2)
 {
     return (strcmp(str_1, str_2) == 0);
+}
+
+static bool string_value_is(const Value& v, const char* str)
+{
+    return (v.type == STRING) ? (strcmp(v.value.string->c_str(), str) == 0) : false;
+}
+
+static bool symbol_value_is(const Value& v, const char* str)
+{
+    return (v.type == SYMBOL) ? (strcmp(v.value.string->c_str(), str) == 0) : false;
+}
+
+static bool match_range(const char* begin, const char* end, const char*str)
+{
+    while(*str && begin != end && *str == *begin){str++;begin++;}
+    if(*str || begin != end) return false;
+    else return true;
 }
 
 struct ScopeError
@@ -1005,7 +1063,10 @@ public:
         else if(parse_symbol(&tmp_string_begin, &tmp_string_end))
         {
             set(tmp_string_end);
-            return make_value_symbol(tmp_string_begin, tmp_string_end);
+            if(match_range(tmp_string_begin, tmp_string_end, "nil")) return Value(); 
+            else if(match_range(tmp_string_begin, tmp_string_end, "true")) return make_value_boolean(true);
+            else if(match_range(tmp_string_begin, tmp_string_end, "false")) return make_value_boolean(false);
+            else return make_value_symbol(tmp_string_begin, tmp_string_end);
         }
         else
         {
@@ -1176,26 +1237,33 @@ static void value_to_string_helper(std::ostream& os, const Value& v, PrefixHelpe
 
     switch(v.type)
     {
+        case NIL:{out() << "nil"; break;} // TODO: Do we need to print nill?
+        case BOOLEAN:
+        {
+            if(v.value.boolean) out() << "true";
+            else out() << "false";
+            break;
+        }
         case NUMBER:
         {
             if(v.value.number.type == Number::INT)
             {
-                out() << v.value.number.to_int() << " ";
+                out() << v.value.number.to_int();
             }
             else
             {
-                out() << v.value.number.to_float() << " ";
+                out() << v.value.number.to_float();
             }
             break;
         }
         case SYMBOL:
         {
-            out() << *(v.value.string) << " ";
+            out() << *(v.value.string);
             break;
         }
         case STRING:
         {
-            out() << "\"" << *(v.value.string) << "\" ";
+            out() << "\"" << *(v.value.string) << "\"";
             break;
         }
         case LIST:
@@ -1205,6 +1273,7 @@ static void value_to_string_helper(std::ostream& os, const Value& v, PrefixHelpe
             for(auto i = lst_ptr->begin(); i != lst_ptr->end(); ++i)
             {
                 value_to_string_helper(os, *i, prfx);
+                out() << " ";
             }
             os << ")";
             break;
@@ -1217,7 +1286,9 @@ static void value_to_string_helper(std::ostream& os, const Value& v, PrefixHelpe
             for(auto m = map_ptr->begin(); m != mend; ++m)
             {
                 value_to_string_helper(os, m->first, prfx);
+                out() << " ";
                 value_to_string_helper(os, m->second, prfx);
+                out() << " ";
             }
             os << "}";
             break;
@@ -1229,10 +1300,12 @@ static void value_to_string_helper(std::ostream& os, const Value& v, PrefixHelpe
             for(auto i = vec_ptr->begin(); i != vec_ptr->end(); ++i)
             {
                 value_to_string_helper(os, *i, prfx);
+                out() << " ";
             }
             os << "]";
             break;
         }
+        // TODO: Number array, lambda, function, object
         default:
         {
             assert(!"Implement output for type");
@@ -1267,6 +1340,8 @@ std::string value_type_to_string(const Value& v)
             else                                   return std::string("NUMBER:FLOAT");
         }
         case STRING: return std::string("STRING");
+        case BOOLEAN: return std::string("BOOLEAN");
+        case NIL: return std::string("");
         case SYMBOL: return std::string("SYMBOL");
         case CLOSURE: return std::string("CLOSURE");
         case VECTOR: return std::string("VECTOR");
@@ -1275,13 +1350,6 @@ std::string value_type_to_string(const Value& v)
         case OBJECT: return std::string("OBJECT");
     }
     return "";
-}
-
-const Value* lookup(Masp& masp, const std::string& name)
-{
-    glh::ConstOption<Value> res = masp.env()->env_->try_get_value(name);
-
-    return res.get(); // TODO
 }
 
 class EvaluationException
@@ -1304,30 +1372,105 @@ public:
 
     Masp& masp_;
 
-    std::vector<Value> value_stack;
-
-    std::vector<Value> ref_stack;
-    
-    std::vector<Value> tmp_values;
-    std::vector<Value> apply_list;
-
+    std::queue<env_map> env_stack;
 
     Evaluator(Masp& masp): masp_(masp)
     {
+        env_stack.push(masp_->env()->get_env());
     }
 
-    const Value* eval(const Value& v)
+    ~Evaluator()
     {
-        const Value* result = 0;
+        if(!env_stack.empty())
+        {
+            // Apply generated env back to masp_
+            masp_->env()->get_env() = env_stack.front();
+        }
+    }
 
-        if(v.type == NUMBER || v.type == STRING || v.type == MAP ||
-           v.type == NUMBER_ARRAY || v.type == VECTOR || v.type == FUNCTION) return &v;
+    static bool self_evaluating(const Value& v)
+    {
+        return v.type == NUMBER || v.type == STRING || v.type == MAP ||
+           v.type == NUMBER_ARRAY || v.type == VECTOR || v.type == FUNCTION || v.type == LAMBDA;
+    }
 
+    const Value* lookup(const Value& v)
+    {
+        glh::ConstOption<Value> res = env_stack.top().try_get_value(*v.value.string);
+        return res.get();
+    }
+
+    static bool is_tagged_list(const Value& v, const char* symname)
+    {
+        bool result = false;
+        const Value* first = value_list_first(v);
+        if(first) result = symbol_value_is(*first, symname);
+        return result;
+    }
+
+    static bool is_quoted(const Value& v){ return is_tagged_list(v,"quote");}
+    static bool is_assignment(const Value& v){ return is_tagged_list(v,"def");}
+    static bool is_if(const Value& v){return is_tagged_list(v, "if");} 
+    static bool is_true(const Value& v)
+    {
+        bool v_is_false = v.type == NIL || (v.type == BOOLEAN && (!v.value.boolean));
+        return !v_is_false;
+    }
+
+
+    const Value* assignment_var(const Value& v){return value_list_second(v);}
+    const Value* assignment_value(const Value& v){return value_list_third(v);}
+
+    Value eval(const Value& v)
+    {
+        if(self_evaluating(v)) return v;
         else if(v.type == SYMBOL)
         {
-            result = lookup(masp_, *v.value.string);
+            const Value* ref_result = lookup(v);
+            if(!ref_result) throw EvaluationException(std::string("Symbol not found:") + *v.value.string);
+            return *ref_result;
+        }
+        else if(is_quoted(v))
+        {
+            const Value* ref_result = value_list_second(v);
+            if(!ref_result) throw EvaluationException(std::string("Quote was not followed by an element"));
+            return *ref_result;
+        }
+        else if(is_assignment(v))
+        {
+            Value *asgn_var = assignment_var(v);
+            Value *asgn_val = assignment_value(v);
+            if(asgn_var && asgn_val)
+            {
+                if(asgn_var->type != SYMBOL)
+                    throw EvaluationException(std::string("Value to assign to was not symbol"));
 
-            if(!result) throw EvaluationException(std::string("Symbol not found:") + *v.value.string);
+                env_stack.top() = env_stack.top().add(*asgn_var->value.string, eval(*asgn_val));
+            }
+            else
+            {
+                if(!result) throw EvaluationException(std::string("Did not find anything to assign to."));
+            }
+            return Value();
+        }
+        else if(is_if(v))
+        {
+            const Value* if_predicate = value_list_second(v);
+            if(if_predicate)
+            {
+               if(is_true(eval(*if_predicate)))
+               {
+                    const Value* if_then = value_list_third(v);
+                    if(if_then) return eval(*if_then);
+                    else throw EvaluationException(std::string("Did not find 'fst' in expected form (if pred fst snd)"));
+               }
+               else
+               {
+                    const Value* if_else = value_list_nth(v, 3);
+                    if(if_else) return eval(*if_else);
+               }
+            }
+            else  throw EvaluationException(std::string("Did not find 'pred' in expected form (if pred fst snd)"));
         }
         else if(v.type == LIST)
         {
@@ -1335,8 +1478,10 @@ public:
             List::iterator i = v.value.list->begin();
             List::iterator e = v.value.list->end();
 
+            // 
+
             // Check if is quote.
-            if(i != e && (i->type == SYMBOL) && equal(i->value.string->c_str(), "quote"))
+            if(i != e && (i->type == SYMBOL) && string_value_is(*i, "quote"))
             {
                 auto snd = i;
                 ++snd;
@@ -1356,8 +1501,11 @@ public:
         else if(v.type == CLOSURE)
         {
         }
+        
+        
+        throw EvaluationException(std::string("Could not find evaluable value."));
 
-        return result;
+        return Value();
     }
 
     void apply(const Value& v)
@@ -1370,15 +1518,14 @@ evaluation_result eval(Masp& m, const Value* v)
 {
     Evaluator e(m);
 
-    ValuePtr result;
-    const Value* vptr = 0;
+    ValuePtr result(new Value(), ValueDeleter());
 
     //TODO: Return last result of an expression.
     //If is unquoted list
 
     try
     {
-        vptr = e.eval(*v);
+        *result = e.eval(*v);
     }catch(EvaluationException& e)
     {
         return evaluation_result(e.get_message());
@@ -1386,8 +1533,6 @@ evaluation_result eval(Masp& m, const Value* v)
 
     // value - if not in place, add to value_stack, add reference to ref_stack
     // add value references to eval stack
-
-    result.reset(new Value(*vptr), ValueDeleter());
 
     return evaluation_result(result);
 }
