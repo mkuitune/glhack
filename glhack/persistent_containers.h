@@ -513,6 +513,33 @@ public:
             }
         }
 
+        /** Return list containing all but the first element or emtpy list. */
+        List rest()
+        {
+            return head_ ? List(pool_, head_->next) : List(pool_, 0);
+        }
+        
+        /** Return list containing all but the two first elements or emtpy list. */
+        List rrest()
+        {
+            if(head_ && head_->next) return List(pool_, head_->next->next);
+            else return List(pool_, 0);
+        }
+       
+        /** Return reference to the first element of list or null.*/
+        const T* first()
+        {
+            return head_ ? &head_->data : 0;
+        }
+       
+        /** Return the second element in the list or empty.*/ 
+        const T* second()
+        {
+            if(head_ && head_->next && head_->next->next)
+                return &head_->next->next->data;
+            else return 0
+        }
+
         bool empty(){return head != 0;}
 
         iterator begin() const {return iterator(head_);}

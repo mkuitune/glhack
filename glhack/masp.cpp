@@ -35,9 +35,6 @@ class ValueHash { public:
 typedef glh::PMapPool<Value, Value, ValuesAreEqual, ValueHash> MapPool;
 typedef MapPool::Map   Map;
 
-typedef glh::PMapPool<std::string, Value>      env_map_pool;
-typedef glh::PMapPool<std::string, Value>::Map env_map;
-
 typedef glh::PListPool<Value>              ListPool;
 typedef glh::PListPool<Value>::List        List;
 
@@ -74,16 +71,8 @@ void convert_to_int(NumberArray& arr)
     for(auto n = arr.begin(); n != arr.end(); ++n){int i = n->to_int(); n->set(i);}
 }
 
-
-typedef int Object; // TODO
-typedef int Lambda; // TODO
-
-
-struct Closure{ // TODO
-    Lambda lambda; 
-    env_map env;
-    Closure(const env_map& env_in):env(env_in){}
-};
+typedef int Object; // TODO - is just tagged list?
+typedef int Lambda; // TODO - is just tagged list?
 
 struct Function{ValueFunction fun;};
 
@@ -98,7 +87,6 @@ public:
         std::string* string; //> Data for string | symbol
         List*        list;
         Map*         map;
-        Closure*     closure;
         Object*      object;
         Vector*      vector;
         Function*    function;
@@ -143,7 +131,6 @@ void Value::dealloc()
     }
     else if(type == LIST && value.list)      { delete value.list;}
     else if(type == MAP && value.map)        { delete value.map;}
-    else if(type == CLOSURE && value.closure){ delete value.closure;}
     else if(type == OBJECT && value.object)  { delete value.object;}
     else if(type == VECTOR && value.vector)  { delete value.vector;}
     else if(type == LAMBDA  && value.lambda)  { delete value.lambda;}
@@ -181,7 +168,6 @@ void Value::copy(const Value& v)
     else if(type == SYMBOL || type == STRING) COPY_PARAM_V(string);
     else if(type == LIST)    COPY_PARAM_V(list);
     else if(type == MAP)     COPY_PARAM_V(map);
-    else if(type == CLOSURE) COPY_PARAM_V(closure);
     else if(type == OBJECT)  COPY_PARAM_V(object);
     else if(type == VECTOR)  COPY_PARAM_V(vector);
     else if(type == LAMBDA)  COPY_PARAM_V(lambda);
@@ -252,9 +238,6 @@ bool Value::operator==(const Value& v) const
     if(type == NUMBER)            result = value.number == v.value.number;
     else if(type == NUMBER_ARRAY) result = (*value.number_array) == (*v.value.number_array);
     else if(type == STRING || type == SYMBOL) result = (*value.string) == (*v.value.string);
-    else if(type == CLOSURE)
-    {
-    }
     else if(type == VECTOR) result = (*value.vector) == *(v.value.vector);
     else if(type == LIST) result = (*(value.list) ==  *(v.value.list));
     else if(type == MAP) result = (*(value.map) == *(v.value.map));
@@ -293,10 +276,6 @@ uint32_t Value::get_hash() const
         h = glh::fold_left<uint32_t, NumberArray>(orig, accum_number_hash, *value.number_array);
     }
     else if(type == STRING || type == SYMBOL) h = hash32(*value.string);
-    else if(type == CLOSURE)
-    {
-        // TODO
-    }
     else if(type == VECTOR)
     {
         uint32_t orig = 0;
@@ -396,9 +375,9 @@ void append_to_value_stl_list(std::list<Value>& value_list, const Value& v)
 class Masp::Env
 {
 public:
-    Masp::Env():env_pool_()
+    Masp::Env():
     {
-        env_.reset(new env_map(env_pool_.new_map()));
+        env_.reset(new Map(map_pool_.new_map()));
         load_default_env();
     }
 
@@ -430,14 +409,12 @@ public:
 
     void load_default_env();
 
-    env_map& get_env(){return *env_;}
+    Map& get_env(){return *env_;}
 
     // Locals
     MapPool             map_pool_;
-    env_map_pool        env_pool_;
     ListPool            list_pool_;
-
-    std::unique_ptr<env_map> env_;
+    std::unique_ptr<Map> env_;
 };
 
 
@@ -460,17 +437,6 @@ inline Map new_map(Masp& m)
 {
     return m.env()->map_pool_.new_map();
 }
-
-inline env_map* new_env_map_alloc(Masp& m)
-{
-    return new env_map(m.env()->env_pool_.new_map());
-}
-
-inline env_map new_env_map(Masp& m)
-{
-    return m.env()->env_pool_.new_map();
-}
-
 
 // Value factories
 
@@ -540,6 +506,16 @@ Value make_value_list(Masp& m)
     return a;
 }
 
+Value make_value_list(List& oldlist)
+{
+    Value a;
+    a.type = LIST;
+    List* list_ptr = new List(oldlist);
+    a.value.list = list_ptr;
+    return a;
+}
+
+
 Value* make_value_list_alloc(Masp& m)
 {
     Value* a = new Value();
@@ -558,12 +534,12 @@ Value make_value_map(Masp& m)
     return a;
 }
 
-Value make_value_closure(Masp& m)
+Value make_value_map(Map& oldmap)
 {
-    // TODO - pass lambda and current env as parameters ?
     Value a;
-    a.type = CLOSURE;
-    a.value.closure = new Closure(new_env_map(m)); // TODO - use current env? Eval env?
+    a.type = MAP;
+    Map* map_ptr = new Map(oldmap);
+    a.value.map = map_ptr;
     return a;
 }
 
@@ -1343,7 +1319,6 @@ std::string value_type_to_string(const Value& v)
         case BOOLEAN: return std::string("BOOLEAN");
         case NIL: return std::string("");
         case SYMBOL: return std::string("SYMBOL");
-        case CLOSURE: return std::string("CLOSURE");
         case VECTOR: return std::string("VECTOR");
         case LIST: return std::string("LIST");
         case MAP: return std::string("MAP");
@@ -1372,7 +1347,7 @@ public:
 
     Masp& masp_;
 
-    std::queue<env_map> env_stack;
+    std::queue<Map> env_stack;
 
     Evaluator(Masp& masp): masp_(masp)
     {
@@ -1396,7 +1371,7 @@ public:
 
     const Value* lookup(const Value& v)
     {
-        glh::ConstOption<Value> res = env_stack.top().try_get_value(*v.value.string);
+        glh::ConstOption<Value> res = env_stack.top().try_get_value(*v);
         return res.get();
     }
 
@@ -1411,12 +1386,15 @@ public:
     static bool is_quoted(const Value& v){ return is_tagged_list(v,"quote");}
     static bool is_assignment(const Value& v){ return is_tagged_list(v,"def");}
     static bool is_if(const Value& v){return is_tagged_list(v, "if");} 
+    static bool is_lambda(const Value& v){return is_tagged_list(v, "lambda");} 
+    static bool is_begin(const Value& v){return is_tagged_list(v, "begin");} 
+    static bool is_cond(const Value& v){return is_tagged_list(v, "cond");} 
+
     static bool is_true(const Value& v)
     {
         bool v_is_false = v.type == NIL || (v.type == BOOLEAN && (!v.value.boolean));
         return !v_is_false;
     }
-
 
     const Value* assignment_var(const Value& v){return value_list_second(v);}
     const Value* assignment_value(const Value& v){return value_list_third(v);}
@@ -1444,8 +1422,10 @@ public:
             {
                 if(asgn_var->type != SYMBOL)
                     throw EvaluationException(std::string("Value to assign to was not symbol"));
-
-                env_stack.top() = env_stack.top().add(*asgn_var->value.string, eval(*asgn_val));
+                if(self_evaluating(*asgn_val))
+                    env_stack.top() = env_stack.top().add(*asgn_var, *asgn_val);
+                else
+                    env_stack.top() = env_stack.top().add(*asgn_var, eval(*asgn_val));
             }
             else
             {
@@ -1461,19 +1441,54 @@ public:
                if(is_true(eval(*if_predicate)))
                {
                     const Value* if_then = value_list_third(v);
-                    if(if_then) return eval(*if_then);
+                    if(if_then)
+                    {
+                        if(self_evaluating(*if_then)) return *if_then;
+                        else return eval(*if_then);
+                    }
                     else throw EvaluationException(std::string("Did not find 'fst' in expected form (if pred fst snd)"));
                }
                else
                {
                     const Value* if_else = value_list_nth(v, 3);
-                    if(if_else) return eval(*if_else);
+                    if(if_else)
+                    {
+                        if(self_evaluating(*if_else))
+                            return *if_else;
+                        else
+                            return eval(*if_else);
+                    }
                }
             }
             else  throw EvaluationException(std::string("Did not find 'pred' in expected form (if pred fst snd)"));
         }
-        else if(v.type == LIST)
+        else if(is_lambda(v))
         {
+            const Value* lambda_parameters = value_list_second(v);
+            const Value* lambda_body = value_list_third(v);
+            
+            if(lambda_parameters && lambda_body)
+            {
+                std::list<Value> lambda_list = glh::list(make_value_symbol("procedure"), *lambda_parameters, *lambda_body, make_value_map(env_stack.top()));
+                return new_list(masp_, lambda_list);
+            }
+            else
+            {
+                throw EvaluationException(std::string("Could not find one or more of 'params' 'body' in (lambda params body) expression."));
+            }
+        }
+        else if(is_begin(v))
+        {
+            // (eval-sequence 'v.list.rest' env)
+
+        }
+        else if(is_cond(v))
+        {
+            // eval cond
+        }
+        else if(v.type == LIST) // Is application
+        {
+            // (apply (eval (operator exp) env) (list-of-values (operands exp) env))
             // eval unless previous was quote?
             List::iterator i = v.value.list->begin();
             List::iterator e = v.value.list->end();
@@ -1494,12 +1509,6 @@ public:
             {
                 // Eval list.
             }
-        }
-        else if(v.type == LAMBDA)
-        {
-        }
-        else if(v.type == CLOSURE)
-        {
         }
         
         
