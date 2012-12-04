@@ -40,8 +40,9 @@ typedef glh::PListPool<Value>::List        List;
 
 typedef std::vector<Value>        VRefContainer;
 
-typedef VRefContainer::const_iterator VRefIterator;
-typedef std::function<Value(Masp& m, VRefIterator arg_start, VRefIterator arg_end)> ValueFunction;
+//typedef VRefContainer::const_iterator VRefIterator;
+typedef List::iterator VRefIterator;
+typedef std::function<Value(Masp& m, VRefIterator arg_start, VRefIterator arg_end, Map& env)> ValueFunction;
 
 typedef std::vector<Value> Vector;
 typedef std::vector<Number> NumberArray;
@@ -105,6 +106,7 @@ public:
     void alloc_str(const std::string& str);
     void alloc_str(const char* str, const char* end);
     bool is_nil() const;
+    bool is(const Type t) const{return type == t;}
     bool operator==(const Value& v) const;
     uint32_t get_hash() const;
 
@@ -133,7 +135,6 @@ void Value::dealloc()
     else if(type == MAP && value.map)        { delete value.map;}
     else if(type == OBJECT && value.object)  { delete value.object;}
     else if(type == VECTOR && value.vector)  { delete value.vector;}
-    else if(type == LAMBDA  && value.lambda)  { delete value.lambda;}
     else if(type == FUNCTION && value.function)  { delete value.function;}
     else if(type == NUMBER_ARRAY && value.number_array)  { delete value.number_array;}
 }
@@ -170,7 +171,6 @@ void Value::copy(const Value& v)
     else if(type == MAP)     COPY_PARAM_V(map);
     else if(type == OBJECT)  COPY_PARAM_V(object);
     else if(type == VECTOR)  COPY_PARAM_V(vector);
-    else if(type == LAMBDA)  COPY_PARAM_V(lambda);
     else if(type == FUNCTION) COPY_PARAM_V(function);
     else if(type == NUMBER_ARRAY) COPY_PARAM_V(number_array);
     else if(type == BOOLEAN) value.boolean = v.value.boolean;
@@ -249,10 +249,6 @@ bool Value::operator==(const Value& v) const
     {
         // TODO
     }
-    else if(type == LAMBDA)
-    {
-        // TODO
-    }
     else if(type == BOOLEAN) result = value.boolean == v.value.booolean;
     else if(type == NIL) result = true;
 
@@ -303,10 +299,6 @@ uint32_t Value::get_hash() const
         // TODO
     }
     else if(type == FUNCTION)
-    {
-        // TODO
-    }
-    else if(type == LAMBDA)
     {
         // TODO
     }
@@ -365,9 +357,9 @@ inline NumberArray* value_number_array(Value& v){return v.type == NUMBER_ARRAY ?
 
 inline Map* value_map(Value& v){return v.type == MAP ? v.value.map : 0;}
 
-void append_to_value_stl_list(std::list<Value>& value_list, const Value& v)
+void append_to_value_stl_list(std::list<Value>& ext_value_list, const Value& v)
 {
-    value_list.push_back(v);
+    ext_value_list.push_back(v);
 }
 
 ///// Masp::Env //////
@@ -588,30 +580,32 @@ Value make_value_boolean(bool b)
     return v;
 }
 
+bool type_is(Value& v, Type t){return v.type == t;}
+
 //////////// Native operators ////////////
 namespace {
-    Value op_add(Masp& m, VRefIterator arg_start, VRefIterator arg_end)
+    Value op_add(Masp& m, VRefIterator arg_start, VRefIterator arg_end, Map& env)
     {
         Number n;
         n.set(11);
         return make_value_number(n);
     }
 
-    Value op_sub(Masp& m, VRefIterator arg_start, VRefIterator arg_end)
+    Value op_sub(Masp& m, VRefIterator arg_start, VRefIterator arg_end, Map& env)
     {
         Number n;
         n.set(11);
         return make_value_number(n);
     }
 
-    Value op_mul(Masp& m, VRefIterator arg_start, VRefIterator arg_end)
+    Value op_mul(Masp& m, VRefIterator arg_start, VRefIterator arg_end, Map& env)
     {
         Number n;
         n.set(11);
         return make_value_number(n);
     }
 
-    Value op_div(Masp& m, VRefIterator arg_start, VRefIterator arg_end)
+    Value op_div(Masp& m, VRefIterator arg_start, VRefIterator arg_end, Map& env)
     {
         Number n;
         n.set(11);
@@ -619,21 +613,20 @@ namespace {
     }
 
     // def'd values are immutable - fails if symbol has been already defined
-    Value op_def(Masp& m, VRefIterator arg_start, VRefIterator arg_end)
+    Value op_def(Masp& m, VRefIterator arg_start, VRefIterator arg_end, Map& env)
+    {
+        return Value();
+    }
+   
+    // Sets a value. Defines it first if it has not been defined. 
+    Value op_set(Masp& m, VRefIterator arg_start, VRefIterator arg_end, Map& env)
     {
         return Value();
     }
 
-    // set always succeeds
-    Value op_set(Masp& m, VRefIterator arg_start, VRefIterator arg_end)
-    {
-        return Value();
-    }
-
-    // quote, first, next, eq, cons, cond. 
-    // lambda : ()
-    // TODO: first next ffirst fnext if cond while < > + - * / dot cross
-    // map filter range apply count
+    // first, next, eq, cons, cond. 
+    // TODO: first next ffirst fnext while < > + - * / dot cross
+    // map filter range apply count zip
 
 }
 
@@ -1111,12 +1104,12 @@ public:
             throw ParseException("Quote cannot be empty.");
         }
 
-        if(root.type == LIST)
+        if(type_is(root, LIST))
         {
             List* list_ptr = value_list(root);
             *list_ptr = new_list(masp_, build_list);
         }
-        else if(root.type == VECTOR)
+        else if(type_is(root, VECTOR))
         {
             Vector* vec_ptr = value_vector(root);
             size_t size = build_list.size();
@@ -1124,7 +1117,7 @@ public:
             std::list<Value>::iterator li = build_list.begin();
             for(Vector::iterator i = vec_ptr->begin(); i != vec_ptr->end(); ++i)
                 i->movefrom(*li++);
-        } else if(root.type == MAP)
+        } else if(type_is(root, MAP))
         {
             Map* map = value_map(root);
             std::list<Value>::iterator lend = build_list.end();
@@ -1340,18 +1333,20 @@ public:
     std::string msg_;
 };
 
-
+/** More or less straightforward translation 
+ *  of the Evaluator in 'Structure and Interpretation of Computer Programs' (Steele 1996)
+ *  Section 4.1.1 'The Core of the Evaluator'*/
 class Evaluator
 {
 public:
 
     Masp& masp_;
 
-    std::queue<Map> env_stack;
+    Map env_;
 
     Evaluator(Masp& masp): masp_(masp)
     {
-        env_stack.push(masp_->env()->get_env());
+        env_ = masp_->env()->get_env();
     }
 
     ~Evaluator()
@@ -1359,22 +1354,16 @@ public:
         if(!env_stack.empty())
         {
             // Apply generated env back to masp_
-            masp_->env()->get_env() = env_stack.front();
+            masp_->env()->get_env() = env_;
         }
     }
 
-    static bool self_evaluating(const Value& v)
+    static bool is_self_evaluating(const Value& v)
     {
         return v.type == NUMBER || v.type == STRING || v.type == MAP ||
-           v.type == NUMBER_ARRAY || v.type == VECTOR || v.type == FUNCTION || v.type == LAMBDA;
+           v.type == NUMBER_ARRAY || v.type == VECTOR || v.type == FUNCTION;
     }
-
-    const Value* lookup(const Value& v)
-    {
-        glh::ConstOption<Value> res = env_stack.top().try_get_value(*v);
-        return res.get();
-    }
-
+    
     static bool is_tagged_list(const Value& v, const char* symname)
     {
         bool result = false;
@@ -1389,6 +1378,21 @@ public:
     static bool is_lambda(const Value& v){return is_tagged_list(v, "lambda");} 
     static bool is_begin(const Value& v){return is_tagged_list(v, "begin");} 
     static bool is_cond(const Value& v){return is_tagged_list(v, "cond");} 
+    static bool is_else(const Value& v){return is_tagged_list(v, "else");}
+    static bool is_application(const Value& v){return v.is(LIST);}
+
+    static Value begin_actions(const Value& v)
+    {
+        List* vlist = value_list(v);
+        if(vlist)
+        {
+            return make_value_list(vlist->rest());  
+        }
+        else
+        {
+            return Value();
+        }
+    }
 
     static bool is_true(const Value& v)
     {
@@ -1399,14 +1403,80 @@ public:
     const Value* assignment_var(const Value& v){return value_list_second(v);}
     const Value* assignment_value(const Value& v){return value_list_third(v);}
 
-    Value eval(const Value& v)
+    Value eval_sequence(const List& action, Map& env)
     {
-        if(self_evaluating(v)) return v;
+
+    }
+
+
+    Value sequence_exp(const List* action)
+    {
+        if(action->empty())
+            return make_value_list(*action);
+        else if(!action->has_rest())
+            return *action->first();
+        else // make begin
+            return make_value_list(action->add(make_value_symbol("begin")));
+    }
+
+    // cond: expand-clauses
+    Value expand_clauses(List* clauses)
+    {
+        if(clauses->empty()) return make_value_symbol("false");
+        else
+        {
+            const Value* first = clauses->first();
+            List* rest = clauses->rest();
+
+            if(!first) throw EvaluationException(std::string("Error interpreting cond clause"));
+
+            if(is_else(*first))
+            {
+                if(rest->empty())
+                {
+                    // Sequence-exp
+                    const List* ca = value_list(*first)->rest(); // cond-actions
+                    return sequence_exp(ca);
+                }
+                else
+                {
+                    throw EvaluationException(std::string("ELSE clause isn't last - COND->iF"));
+                }
+            }
+            else
+            {
+                // make-if
+                Value v_iflist = make_value_list(masp_);
+                List* iflist = value_list(v_iflist);
+
+                const Value* pred = value_list_first(*first); 
+                const List*    ca = value_list(*first)->rest(); // cond-actions
+                Value         seq = sequence_exp(ca);
+                Value     clauses = expand_clauses(rest);
+
+                *iflist = iflist->add(clauses);
+                *iflist = iflist->add(seq);
+                *iflist = iflist->add(*pred);
+
+                return v_iflist;
+            }
+        }
+    }
+
+    // cond: cond->if
+    Value convert_cond_to_if(const Value& v)
+    {
+        return expand_clauses(value_list(v)->rest()); 
+    }
+
+    Value eval(const Value& v, Map& env)
+    {
+        if(is_self_evaluating(v)) return v;
         else if(v.type == SYMBOL)
         {
-            const Value* ref_result = lookup(v);
-            if(!ref_result) throw EvaluationException(std::string("Symbol not found:") + *v.value.string);
-            return *ref_result;
+            ConstOption<Value> result = env.try_get_value(v);
+            if(!result.is_valid()) throw EvaluationException(std::string("Symbol not found:") + *v.value.string);
+            return *result;
         }
         else if(is_quoted(v))
         {
@@ -1422,10 +1492,10 @@ public:
             {
                 if(asgn_var->type != SYMBOL)
                     throw EvaluationException(std::string("Value to assign to was not symbol"));
-                if(self_evaluating(*asgn_val))
-                    env_stack.top() = env_stack.top().add(*asgn_var, *asgn_val);
+                if(is_self_evaluating(*asgn_val))
+                    env = env.add(*asgn_var, *asgn_val);
                 else
-                    env_stack.top() = env_stack.top().add(*asgn_var, eval(*asgn_val));
+                    env = env.add(*asgn_var, eval(*asgn_val, env));
             }
             else
             {
@@ -1438,27 +1508,31 @@ public:
             const Value* if_predicate = value_list_second(v);
             if(if_predicate)
             {
-               if(is_true(eval(*if_predicate)))
-               {
+                if(is_true(eval(*if_predicate, env)))
+                {
                     const Value* if_then = value_list_third(v);
                     if(if_then)
                     {
-                        if(self_evaluating(*if_then)) return *if_then;
-                        else return eval(*if_then);
+                        if(is_self_evaluating(*if_then)) return *if_then;
+                        else return eval(*if_then, env);
                     }
                     else throw EvaluationException(std::string("Did not find 'fst' in expected form (if pred fst snd)"));
-               }
-               else
-               {
+                }
+                else
+                {
                     const Value* if_else = value_list_nth(v, 3);
                     if(if_else)
                     {
-                        if(self_evaluating(*if_else))
+                        if(is_self_evaluating(*if_else))
                             return *if_else;
                         else
-                            return eval(*if_else);
+                            return eval(*if_else, env);
                     }
-               }
+                    else
+                    {
+                        return Value();
+                    }
+                }
             }
             else  throw EvaluationException(std::string("Did not find 'pred' in expected form (if pred fst snd)"));
         }
@@ -1466,11 +1540,14 @@ public:
         {
             const Value* lambda_parameters = value_list_second(v);
             const Value* lambda_body = value_list_third(v);
-            
+
             if(lambda_parameters && lambda_body)
             {
-                std::list<Value> lambda_list = glh::list(make_value_symbol("procedure"), *lambda_parameters, *lambda_body, make_value_map(env_stack.top()));
-                return new_list(masp_, lambda_list);
+                std::list<Value> lambda_list = glh::list(make_value_symbol("procedure"),
+                        *lambda_parameters,
+                        *lambda_body,
+                        make_value_map(env));
+                return make_value_list(new_list(masp_, lambda_list));
             }
             else
             {
@@ -1479,46 +1556,88 @@ public:
         }
         else if(is_begin(v))
         {
-            // (eval-sequence 'v.list.rest' env)
-
+            return eval_sequence(
+                    make_value_list(
+                        value_list(v)->rest()
+                        ), env);
         }
         else if(is_cond(v))
         {
-            // eval cond
+            return eval(convert_cond_to_if(v), env);        
         }
-        else if(v.type == LIST) // Is application
+        else if(is_application(v) && (!value_list(v)->empty())) // Is application
         {
-            // (apply (eval (operator exp) env) (list-of-values (operands exp) env))
-            // eval unless previous was quote?
-            List::iterator i = v.value.list->begin();
-            List::iterator e = v.value.list->end();
+            // Get operator
+            const Value* first = value_list_first(v);
+            Value op;
 
-            // 
-
-            // Check if is quote.
-            if(i != e && (i->type == SYMBOL) && string_value_is(*i, "quote"))
-            {
-                auto snd = i;
-                ++snd;
-                if(snd != e)
-                {
-                    return &(*e);
-                }
-            }
+            if(!is_self_evaluating(*first)) 
+                op = eval(*first, env);
             else
-            {
-                // Eval list.
-            }
+                op = *first;
+
+            List* operands = value_list(*first)->rest();
+           
+            return apply(op, operands->begin(), operands->end());
         }
-        
-        
+
         throw EvaluationException(std::string("Could not find evaluable value."));
 
         return Value();
     }
 
-    void apply(const Value& v)
+    static bool is_primitive_procedure(const Value& v){return v.type == FUNCTION;}
+    static bool is_compound_procedure(const Value& v){return is_tagged_list(v, "procedure");}
+
+    Map extend_env(List& vars, List& vals, Map& env)
     {
+        List::iterator i_var = vars.begin();
+        List::iterator i_val = vals.begin();
+        List::iterator vr = vars.begin();
+        List::iterator vl = vals.begin();
+        List::iterator vars_end = vars.end();
+        List::iterator vals_end = vals.end();
+       
+        for(;vr != vars_end && vl != vals_end; ++vr, ++vl){}
+
+        if((i_val != vals_end) || (i_var != vars_end))
+        {
+            throw EvaluationException(std::string("extend_env: val and var lists are different in length."));
+        }
+       
+        return env.add(i_var, vars_end, i_val, vals_end); 
+    }
+
+    Value apply(const Value& v, VRefIterator args_begin, VRefIterator args_end, Map& env)
+    {
+       if(is_primitive_procedure(v))
+       {
+           return v.value.function(masp_, args_begin, args_end, env);
+       }
+       else if(is_compound_procedure(v))
+       {
+           // eval sequence
+           Value* proc_params = value_list_first(v);
+           Value* proc_body   = value_list_second(v);
+           Value* proc_env    =  value_list_third(v);
+           
+           List* params_list = value_list(proc_params);
+           List* body_list   = value_list(proc_body);
+           Map* proc_env_map     = value_map(proc_env);
+
+           if(proc_params->type != LIST || proc_body->type != LIST || proc_env->type != MAP)
+           {
+                throw EvaluationException(std::string("apply: Malformed compound procedure."));
+           }
+
+           if(!params_list) throw EvaluationException(std::string("apply: params_list is null."));
+           if(!body_list) throw EvaluationException(std::string("apply: body_list is null."));
+           if(!proc_env_map) throw EvaluationException(std::string("apply: env_map is null."));
+
+           return eval_sequence(*proc_body, proc_env_map->add(params_list->begin(), params_list->end(),
+                                                         value_list->begin(), value_list->end()));
+
+       }
     }
 
 };

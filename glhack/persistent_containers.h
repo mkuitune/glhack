@@ -542,6 +542,8 @@ public:
 
         bool empty(){return head != 0;}
 
+        bool has_rest(){return head ? head->next != 0 : false;}
+
         iterator begin() const {return iterator(head_);}
         iterator end() const {return iterator(0);}
 
@@ -1265,6 +1267,12 @@ public:
             return pool_.add(*this, key, value);
         }
 
+        template<class KI, class VI>
+        Map add(const KI i_key, const KI key_end, const VI i_value, const VI value_end) const
+        {
+            return pool_.add(*this, i_key, key_end, i_value, value_end);
+        }
+
         // TODO: map_remove_diff -> map -> value -> diff that implements the element remove operator
         // on a map and also returns a diff between the two versions of the maps.
 
@@ -1437,6 +1445,29 @@ public:
     {
         KeyValue* kv = new_keyvalue(key, value);
         Node* new_root = instantiate_tree_path(old.root_, kv);
+        return Map(*this, new_root);
+    }
+
+    /** Create a new map by adding an elements and values to an existing map*/
+    template<class KI, class VI>
+    Map add(const Map& old, const KI i_key, const KI key_end, const VI i_value, const VI value_end)
+    {
+        Node* new_root = 0;
+
+        while((i_key != key_end) && (i_value != value_end))
+        {
+            KeyValue* kv = new_keyvalue(*i_key, *i_value);
+
+            if(!new_root)
+            {
+                new_root = instantiate_tree_path(old.root_, kv);
+            }
+            else
+            {
+                new_root = instantiate_tree_path(new_root, kv);
+            }
+        }
+
         return Map(*this, new_root);
     }
 
