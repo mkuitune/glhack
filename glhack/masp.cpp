@@ -243,11 +243,11 @@ bool Value::operator==(const Value& v) const
     else if(type == MAP) result = (*(value.map) == *(v.value.map));
     else if(type == OBJECT)
     {
-        // TODO
+        // TODO - what to do.
     }
     else if(type == FUNCTION)
     {
-        // TODO
+        // TODO - what to do
     }
     else if(type == BOOLEAN) result = value.boolean == v.value.booolean;
     else if(type == NIL) result = true;
@@ -1333,38 +1333,16 @@ public:
     std::string msg_;
 };
 
-/** More or less straightforward translation 
- *  of the Evaluator in 'Structure and Interpretation of Computer Programs' (Steele 1996)
- *  Section 4.1.1 'The Core of the Evaluator'*/
-class Evaluator
-{
-public:
+// Evaluation utils
 
-    Masp& masp_;
-
-    Map env_;
-
-    Evaluator(Masp& masp): masp_(masp)
-    {
-        env_ = masp_->env()->get_env();
-    }
-
-    ~Evaluator()
-    {
-        if(!env_stack.empty())
-        {
-            // Apply generated env back to masp_
-            masp_->env()->get_env() = env_;
-        }
-    }
-
-    static bool is_self_evaluating(const Value& v)
+namespace {
+    bool is_self_evaluating(const Value& v)
     {
         return v.type == NUMBER || v.type == STRING || v.type == MAP ||
-           v.type == NUMBER_ARRAY || v.type == VECTOR || v.type == FUNCTION;
+            v.type == NUMBER_ARRAY || v.type == VECTOR || v.type == FUNCTION;
     }
-    
-    static bool is_tagged_list(const Value& v, const char* symname)
+
+    bool is_tagged_list(const Value& v, const char* symname)
     {
         bool result = false;
         const Value* first = value_list_first(v);
@@ -1372,16 +1350,16 @@ public:
         return result;
     }
 
-    static bool is_quoted(const Value& v){ return is_tagged_list(v,"quote");}
-    static bool is_assignment(const Value& v){ return is_tagged_list(v,"def");}
-    static bool is_if(const Value& v){return is_tagged_list(v, "if");} 
-    static bool is_lambda(const Value& v){return is_tagged_list(v, "lambda");} 
-    static bool is_begin(const Value& v){return is_tagged_list(v, "begin");} 
-    static bool is_cond(const Value& v){return is_tagged_list(v, "cond");} 
-    static bool is_else(const Value& v){return is_tagged_list(v, "else");}
-    static bool is_application(const Value& v){return v.is(LIST);}
+    bool is_quoted(const Value& v){ return is_tagged_list(v,"quote");}
+    bool is_assignment(const Value& v){ return is_tagged_list(v,"def");}
+    bool is_if(const Value& v){return is_tagged_list(v, "if");} 
+    bool is_lambda(const Value& v){return is_tagged_list(v, "lambda");} 
+    bool is_begin(const Value& v){return is_tagged_list(v, "begin");} 
+    bool is_cond(const Value& v){return is_tagged_list(v, "cond");} 
+    bool is_else(const Value& v){return is_tagged_list(v, "else");}
+    bool is_application(const Value& v){return v.is(LIST);}
 
-    static Value begin_actions(const Value& v)
+    Value begin_actions(const Value& v)
     {
         List* vlist = value_list(v);
         if(vlist)
@@ -1394,7 +1372,7 @@ public:
         }
     }
 
-    static bool is_true(const Value& v)
+    bool is_true(const Value& v)
     {
         bool v_is_false = v.type == NIL || (v.type == BOOLEAN && (!v.value.boolean));
         return !v_is_false;
@@ -1402,12 +1380,22 @@ public:
 
     const Value* assignment_var(const Value& v){return value_list_second(v);}
     const Value* assignment_value(const Value& v){return value_list_third(v);}
-
-    Value eval_sequence(const List& action, Map& env)
+    
+    Value eval_sequence(const List& expressions, Map& env)
     {
+        if(expresssions.empty())
+            throw EvaluationException(std::string("Trying to evaluate empty sequence"));
 
+        if(!expressions.has_rest()) 
+        {
+            return eval(*expresssions.first(), env);
+        }
+        else
+        {
+            eval(*expresssions.first(), env);
+            return eval_sequence(expressions.rest(), env);
+        }
     }
-
 
     Value sequence_exp(const List* action)
     {
@@ -1468,7 +1456,7 @@ public:
     {
         return expand_clauses(value_list(v)->rest()); 
     }
-
+    
     Value eval(const Value& v, Map& env)
     {
         if(is_self_evaluating(v)) return v;
@@ -1577,7 +1565,7 @@ public:
                 op = *first;
 
             List* operands = value_list(*first)->rest();
-           
+
             return apply(op, operands->begin(), operands->end());
         }
 
@@ -1586,60 +1574,72 @@ public:
         return Value();
     }
 
-    static bool is_primitive_procedure(const Value& v){return v.type == FUNCTION;}
-    static bool is_compound_procedure(const Value& v){return is_tagged_list(v, "procedure");}
-
-    Map extend_env(List& vars, List& vals, Map& env)
-    {
-        List::iterator i_var = vars.begin();
-        List::iterator i_val = vals.begin();
-        List::iterator vr = vars.begin();
-        List::iterator vl = vals.begin();
-        List::iterator vars_end = vars.end();
-        List::iterator vals_end = vals.end();
-       
-        for(;vr != vars_end && vl != vals_end; ++vr, ++vl){}
-
-        if((i_val != vals_end) || (i_var != vars_end))
-        {
-            throw EvaluationException(std::string("extend_env: val and var lists are different in length."));
-        }
-       
-        return env.add(i_var, vars_end, i_val, vals_end); 
-    }
-
+    bool is_primitive_procedure(const Value& v){return v.type == FUNCTION;}
+    bool is_compound_procedure(const Value& v){return is_tagged_list(v, "procedure");}
+    
     Value apply(const Value& v, VRefIterator args_begin, VRefIterator args_end, Map& env)
     {
-       if(is_primitive_procedure(v))
-       {
-           return v.value.function(masp_, args_begin, args_end, env);
-       }
-       else if(is_compound_procedure(v))
-       {
-           // eval sequence
-           Value* proc_params = value_list_first(v);
-           Value* proc_body   = value_list_second(v);
-           Value* proc_env    =  value_list_third(v);
-           
-           List* params_list = value_list(proc_params);
-           List* body_list   = value_list(proc_body);
-           Map* proc_env_map     = value_map(proc_env);
+        if(is_primitive_procedure(v))
+        {
+            return v.value.function(masp_, args_begin, args_end, env);
+        }
+        else if(is_compound_procedure(v))
+        {
+            // eval sequence
+            Value* proc_params = value_list_first(v);
+            Value* proc_body   = value_list_second(v);
+            Value* proc_env    =  value_list_third(v);
 
-           if(proc_params->type != LIST || proc_body->type != LIST || proc_env->type != MAP)
-           {
+            List* params_list = value_list(proc_params);
+            List* body_list   = value_list(proc_body);
+            Map* proc_env_map     = value_map(proc_env);
+
+            if(proc_params->type != LIST || proc_body->type != LIST || proc_env->type != MAP)
+            {
                 throw EvaluationException(std::string("apply: Malformed compound procedure."));
-           }
+            }
 
-           if(!params_list) throw EvaluationException(std::string("apply: params_list is null."));
-           if(!body_list) throw EvaluationException(std::string("apply: body_list is null."));
-           if(!proc_env_map) throw EvaluationException(std::string("apply: env_map is null."));
+            if(!params_list) throw EvaluationException(std::string("apply: params_list is null."));
+            if(!body_list) throw EvaluationException(std::string("apply: body_list is null."));
+            if(!proc_env_map) throw EvaluationException(std::string("apply: env_map is null."));
 
-           return eval_sequence(*proc_body, proc_env_map->add(params_list->begin(), params_list->end(),
-                                                         value_list->begin(), value_list->end()));
+            return eval_sequence(*proc_body, proc_env_map->add(params_list->begin(), params_list->end(),
+                        args_begin, args_end));
 
-       }
+        }
     }
 
+} // empty namespace
+
+/** More or less straightforward translation 
+ *  of the Evaluator in 'Structure and Interpretation of Computer Programs' (Steele 1996)
+ *  Section 4.1.1 'The Core of the Evaluator'*/
+class Evaluator
+{
+public:
+
+    Masp& masp_;
+
+    Map env_;
+
+    Evaluator(Masp& masp): masp_(masp)
+    {
+        env_ = masp_->env()->get_env();
+    }
+
+    ~Evaluator()
+    {
+        if(!env_stack.empty())
+        {
+            // Apply generated env back to masp_
+            masp_->env()->get_env() = env_;
+        }
+    }
+    
+    Value eval_value(const Value& v)
+    {
+        return eval(v, env_);
+    }
 };
 
 evaluation_result eval(Masp& m, const Value* v)
@@ -1653,7 +1653,7 @@ evaluation_result eval(Masp& m, const Value* v)
 
     try
     {
-        *result = e.eval(*v);
+        *result = e.eval_value(*v);
     }catch(EvaluationException& e)
     {
         return evaluation_result(e.get_message());
