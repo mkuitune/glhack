@@ -228,7 +228,7 @@ void Value::alloc_str(const char* str, const char* str_end)
     value.string = new std::string(str, str_end);
 }
 
-bool Value::is_nil(){return type == NIL;}
+bool Value::is_nil() const {return type == NIL;}
 
 bool Value::operator==(const Value& v) const
 {
@@ -249,7 +249,7 @@ bool Value::operator==(const Value& v) const
     {
         // TODO - what to do
     }
-    else if(type == BOOLEAN) result = value.boolean == v.value.booolean;
+    else if(type == BOOLEAN) result = value.boolean == v.value.boolean;
     else if(type == NIL) result = true;
 
     return result;
@@ -265,7 +265,7 @@ uint32_t Value::get_hash() const
     uint32_t h = 0;
 
     if(type == BOOLEAN) h = (uint32_t) value.boolean;
-    else if(type == nil) h = std::numeric_limits<uint32_t>::max();
+    else if(type == NIL) h = std::numeric_limits<uint32_t>::max();
     else if(type == NUMBER)  h = hash_of_number(value.number);
     else if(type == NUMBER_ARRAY){
         uint32_t orig = 0;
@@ -317,7 +317,7 @@ Value* new_value()
     return new Value();
 }
 
-inline List* value_list(Value& v){return v.type == LIST ? v.value.list : 0;}
+inline List* value_list(const Value& v){return v.type == LIST ? v.value.list : 0;}
 
 inline const Value* value_list_first(const Value& v)
 {
@@ -355,7 +355,7 @@ inline Vector* value_vector(Value& v){return v.type == VECTOR ? v.value.vector :
 
 inline NumberArray* value_number_array(Value& v){return v.type == NUMBER_ARRAY ? v.value.number_array : 0;}
 
-inline Map* value_map(Value& v){return v.type == MAP ? v.value.map : 0;}
+inline Map* value_map(const Value& v){return v.type == MAP ? v.value.map : 0;}
 
 void append_to_value_stl_list(std::list<Value>& ext_value_list, const Value& v)
 {
@@ -367,7 +367,7 @@ void append_to_value_stl_list(std::list<Value>& ext_value_list, const Value& v)
 class Masp::Env
 {
 public:
-    Masp::Env():
+    Masp::Env()
     {
         env_.reset(new Map(map_pool_.new_map()));
         load_default_env();
@@ -391,7 +391,6 @@ public:
         //
         map_pool_.gc();
         list_pool_.gc();
-        env_pool_.gc();
     }
 
     void add_fun(const char* name, ValueFunction f)
@@ -498,7 +497,7 @@ Value make_value_list(Masp& m)
     return a;
 }
 
-Value make_value_list(List& oldlist)
+Value make_value_list(const List& oldlist)
 {
     Value a;
     a.type = LIST;
@@ -1336,6 +1335,10 @@ public:
 // Evaluation utils
 
 namespace {
+
+    Value eval(const Value& v, Map& env, Masp& masp);
+    Value apply(const Value& v, VRefIterator args_begin, VRefIterator args_end, Map& env, Masp& masp);
+
     bool is_self_evaluating(const Value& v)
     {
         return v.type == NUMBER || v.type == STRING || v.type == MAP ||
@@ -1381,49 +1384,49 @@ namespace {
     const Value* assignment_var(const Value& v){return value_list_second(v);}
     const Value* assignment_value(const Value& v){return value_list_third(v);}
     
-    Value eval_sequence(const List& expressions, Map& env)
+    Value eval_sequence(const List& expressions, Map& env, Masp& masp)
     {
-        if(expresssions.empty())
+        if(expressions.empty())
             throw EvaluationException(std::string("Trying to evaluate empty sequence"));
 
         if(!expressions.has_rest()) 
         {
-            return eval(*expresssions.first(), env);
+            return eval(*expressions.first(), env, masp);
         }
         else
         {
-            eval(*expresssions.first(), env);
-            return eval_sequence(expressions.rest(), env);
+            eval(*expressions.first(), env, masp);
+            return eval_sequence(expressions.rest(), env, masp);
         }
     }
 
-    Value sequence_exp(const List* action)
+    Value sequence_exp(const List& action)
     {
-        if(action->empty())
-            return make_value_list(*action);
-        else if(!action->has_rest())
-            return *action->first();
+        if(action.empty())
+            return make_value_list(action);
+        else if(!action.has_rest())
+            return *action.first();
         else // make begin
-            return make_value_list(action->add(make_value_symbol("begin")));
+            return make_value_list(action.add(make_value_symbol("begin")));
     }
 
     // cond: expand-clauses
-    Value expand_clauses(List* clauses)
+    Value expand_clauses(const List& clauses, Masp& masp)
     {
-        if(clauses->empty()) return make_value_symbol("false");
+        if(clauses.empty()) return make_value_symbol("false");
         else
         {
-            const Value* first = clauses->first();
-            List* rest = clauses->rest();
+            const Value* first = clauses.first();
+            List rest = clauses.rest();
 
             if(!first) throw EvaluationException(std::string("Error interpreting cond clause"));
 
             if(is_else(*first))
             {
-                if(rest->empty())
+                if(rest.empty())
                 {
                     // Sequence-exp
-                    const List* ca = value_list(*first)->rest(); // cond-actions
+                    List ca = value_list(*first)->rest(); // cond-actions
                     return sequence_exp(ca);
                 }
                 else
@@ -1434,13 +1437,14 @@ namespace {
             else
             {
                 // make-if
-                Value v_iflist = make_value_list(masp_);
+                Value v_iflist = make_value_list(masp);
+
                 List* iflist = value_list(v_iflist);
 
                 const Value* pred = value_list_first(*first); 
-                const List*    ca = value_list(*first)->rest(); // cond-actions
+                const List     ca = value_list(*first)->rest(); // cond-actions
                 Value         seq = sequence_exp(ca);
-                Value     clauses = expand_clauses(rest);
+                Value     clauses = expand_clauses(rest, masp);
 
                 *iflist = iflist->add(clauses);
                 *iflist = iflist->add(seq);
@@ -1452,17 +1456,17 @@ namespace {
     }
 
     // cond: cond->if
-    Value convert_cond_to_if(const Value& v)
+    Value convert_cond_to_if(const Value& v, Masp& masp)
     {
-        return expand_clauses(value_list(v)->rest()); 
+        return expand_clauses(value_list(v)->rest(), masp); 
     }
     
-    Value eval(const Value& v, Map& env)
+    Value eval(const Value& v, Map& env, Masp& masp)
     {
         if(is_self_evaluating(v)) return v;
         else if(v.type == SYMBOL)
         {
-            ConstOption<Value> result = env.try_get_value(v);
+            glh::ConstOption<Value> result = env.try_get_value(v);
             if(!result.is_valid()) throw EvaluationException(std::string("Symbol not found:") + *v.value.string);
             return *result;
         }
@@ -1474,8 +1478,8 @@ namespace {
         }
         else if(is_assignment(v))
         {
-            Value *asgn_var = assignment_var(v);
-            Value *asgn_val = assignment_value(v);
+            const Value *asgn_var = assignment_var(v);
+            const Value *asgn_val = assignment_value(v);
             if(asgn_var && asgn_val)
             {
                 if(asgn_var->type != SYMBOL)
@@ -1483,11 +1487,11 @@ namespace {
                 if(is_self_evaluating(*asgn_val))
                     env = env.add(*asgn_var, *asgn_val);
                 else
-                    env = env.add(*asgn_var, eval(*asgn_val, env));
+                    env = env.add(*asgn_var, eval(*asgn_val, env, masp));
             }
             else
             {
-                if(!result) throw EvaluationException(std::string("Did not find anything to assign to."));
+                throw EvaluationException(std::string("Did not find anything to assign to."));
             }
             return Value();
         }
@@ -1496,13 +1500,13 @@ namespace {
             const Value* if_predicate = value_list_second(v);
             if(if_predicate)
             {
-                if(is_true(eval(*if_predicate, env)))
+                if(is_true(eval(*if_predicate, env, masp)))
                 {
                     const Value* if_then = value_list_third(v);
                     if(if_then)
                     {
                         if(is_self_evaluating(*if_then)) return *if_then;
-                        else return eval(*if_then, env);
+                        else return eval(*if_then, env, masp);
                     }
                     else throw EvaluationException(std::string("Did not find 'fst' in expected form (if pred fst snd)"));
                 }
@@ -1514,7 +1518,7 @@ namespace {
                         if(is_self_evaluating(*if_else))
                             return *if_else;
                         else
-                            return eval(*if_else, env);
+                            return eval(*if_else, env, masp);
                     }
                     else
                     {
@@ -1535,7 +1539,7 @@ namespace {
                         *lambda_parameters,
                         *lambda_body,
                         make_value_map(env));
-                return make_value_list(new_list(masp_, lambda_list));
+                return make_value_list(new_list(masp, lambda_list));
             }
             else
             {
@@ -1544,14 +1548,11 @@ namespace {
         }
         else if(is_begin(v))
         {
-            return eval_sequence(
-                    make_value_list(
-                        value_list(v)->rest()
-                        ), env);
+            return eval_sequence(value_list(v)->rest(), env, masp);
         }
         else if(is_cond(v))
         {
-            return eval(convert_cond_to_if(v), env);        
+            return eval(convert_cond_to_if(v, masp), env, masp);
         }
         else if(is_application(v) && (!value_list(v)->empty())) // Is application
         {
@@ -1560,13 +1561,13 @@ namespace {
             Value op;
 
             if(!is_self_evaluating(*first)) 
-                op = eval(*first, env);
+                op = eval(*first, env, masp);
             else
                 op = *first;
 
-            List* operands = value_list(*first)->rest();
+            List operands = value_list(*first)->rest();
 
-            return apply(op, operands->begin(), operands->end());
+            return apply(op, operands.begin(), operands.end(), env, masp);
         }
 
         throw EvaluationException(std::string("Could not find evaluable value."));
@@ -1576,23 +1577,28 @@ namespace {
 
     bool is_primitive_procedure(const Value& v){return v.type == FUNCTION;}
     bool is_compound_procedure(const Value& v){return is_tagged_list(v, "procedure");}
-    
-    Value apply(const Value& v, VRefIterator args_begin, VRefIterator args_end, Map& env)
+
+    ValueFunction value_function(const Value& v)
+    {
+        return v.value.function->fun;
+    }
+
+    Value apply(const Value& v, VRefIterator args_begin, VRefIterator args_end, Map& env, Masp& masp)
     {
         if(is_primitive_procedure(v))
         {
-            return v.value.function(masp_, args_begin, args_end, env);
+            return value_function(v)(masp, args_begin, args_end, env);
         }
         else if(is_compound_procedure(v))
         {
             // eval sequence
-            Value* proc_params = value_list_first(v);
-            Value* proc_body   = value_list_second(v);
-            Value* proc_env    =  value_list_third(v);
+            const Value* proc_params = value_list_first(v);
+            const Value* proc_body   = value_list_second(v);
+            const Value* proc_env    =  value_list_third(v);
 
-            List* params_list = value_list(proc_params);
-            List* body_list   = value_list(proc_body);
-            Map* proc_env_map     = value_map(proc_env);
+            List* params_list = value_list(*proc_params);
+            List* body_list   = value_list(*proc_body);
+            Map* proc_env_map     = value_map(*proc_env);
 
             if(proc_params->type != LIST || proc_body->type != LIST || proc_env->type != MAP)
             {
@@ -1603,13 +1609,17 @@ namespace {
             if(!body_list) throw EvaluationException(std::string("apply: body_list is null."));
             if(!proc_env_map) throw EvaluationException(std::string("apply: env_map is null."));
 
-            return eval_sequence(*proc_body, proc_env_map->add(params_list->begin(), params_list->end(),
-                        args_begin, args_end));
+            return eval_sequence(*value_list(*proc_body), proc_env_map->add(params_list->begin(), params_list->end(),
+                        args_begin, args_end), masp);
 
         }
+        return value_function(v)(masp, args_begin, args_end, env);
     }
 
+
+
 } // empty namespace
+
 
 /** More or less straightforward translation 
  *  of the Evaluator in 'Structure and Interpretation of Computer Programs' (Steele 1996)
@@ -1622,23 +1632,25 @@ public:
 
     Map env_;
 
-    Evaluator(Masp& masp): masp_(masp)
+    bool eval_ok;
+
+    Evaluator(Masp& masp): masp_(masp), env_(masp_.env()->get_env())
     {
-        env_ = masp_->env()->get_env();
+        eval_ok = true;
     }
 
     ~Evaluator()
     {
-        if(!env_stack.empty())
+        if(eval_ok)
         {
             // Apply generated env back to masp_
-            masp_->env()->get_env() = env_;
+            masp_.env()->get_env() = env_;
         }
     }
     
     Value eval_value(const Value& v)
     {
-        return eval(v, env_);
+        return eval(v, env_, masp_);
     }
 };
 
@@ -1664,5 +1676,6 @@ evaluation_result eval(Masp& m, const Value* v)
 
     return evaluation_result(result);
 }
+
 
 } // Namespace masp ends

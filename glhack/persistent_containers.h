@@ -415,8 +415,8 @@ public:
             T* operator->() {return &(node->data);}
             T* data_ptr() {return &node->data;}
             void operator++(){if(node) node = node->next;}
-            bool operator!=(const iterator& i){return node != i.node;}
-            bool operator==(const iterator& i){return node == i.node;}
+            bool operator!=(const iterator& i) const {return node != i.node;}
+            bool operator==(const iterator& i) const {return node == i.node;}
         };
 
     public:
@@ -459,7 +459,7 @@ public:
         }
 
         /** Find first element from list matching with predicate or return end. */ 
-        iterator find(const List* list, std::function<bool(const T&)>& pred)
+        iterator find(const List* list, std::function<bool(const T&)>& pred) const
         {
             Node* n = head_;
             while(n && ! pred(n->data)) n = n->next;
@@ -514,35 +514,35 @@ public:
         }
 
         /** Return list containing all but the first element or emtpy list. */
-        List rest()
+        List rest() const
         {
             return head_ ? List(pool_, head_->next) : List(pool_, 0);
         }
         
         /** Return list containing all but the two first elements or emtpy list. */
-        List rrest()
+        List rrest() const
         {
             if(head_ && head_->next) return List(pool_, head_->next->next);
             else return List(pool_, 0);
         }
        
         /** Return reference to the first element of list or null.*/
-        const T* first()
+        const T* first() const
         {
             return head_ ? &head_->data : 0;
         }
        
         /** Return the second element in the list or empty.*/ 
-        const T* second()
+        const T* second() const
         {
             if(head_ && head_->next && head_->next->next)
                 return &head_->next->next->data;
             else return 0
         }
 
-        bool empty(){return head != 0;}
+        bool empty() const {return head_ != 0;}
 
-        bool has_rest(){return head ? head->next != 0 : false;}
+        bool has_rest() const {return head_ ? head_->next != 0 : false;}
 
         iterator begin() const {return iterator(head_);}
         iterator end() const {return iterator(0);}
@@ -1454,7 +1454,8 @@ public:
     {
         Node* new_root = 0;
 
-        while((i_key != key_end) && (i_value != value_end))
+        while((i_key != key_end) && 
+              (i_value != value_end))
         {
             KeyValue* kv = new_keyvalue(*i_key, *i_value);
 
