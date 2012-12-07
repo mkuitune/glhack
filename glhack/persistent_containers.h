@@ -540,7 +540,7 @@ public:
             else return 0
         }
 
-        bool empty() const {return head_ != 0;}
+        bool empty() const {return head_ == 0;}
 
         bool has_rest() const {return head_ ? head_->next != 0 : false;}
 

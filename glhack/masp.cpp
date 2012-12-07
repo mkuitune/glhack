@@ -47,7 +47,6 @@ typedef std::function<Value(Masp& m, VRefIterator arg_start, VRefIterator arg_en
 typedef std::vector<Value> Vector;
 typedef std::vector<Number> NumberArray;
 
-
 bool all_are_float(NumberArray& arr)
 {
     bool result = true;
@@ -317,13 +316,29 @@ Value* new_value()
     return new Value();
 }
 
+bool all_are_of_type(VRefIterator begin, VRefIterator end, Type t)
+{
+   while(begin != end) 
+   {
+       if(begin->type != t) return false;
+       ++begin;
+   }
+   return true;
+}
+
+
+inline Number value_number(const Value& v){return v.type == NUMBER ? v.value.number : Number::make(0);}
+
 inline List* value_list(const Value& v){return v.type == LIST ? v.value.list : 0;}
 
 inline const Value* value_list_first(const Value& v)
 {
     const Value* result = 0;
     List* l = value_list(v);
-    if(l && !l->empty()) result = l->begin().data_ptr();
+    if(l && !l->empty())
+    {
+        result = l->begin().data_ptr();
+    }
     return result;
 }
 
@@ -393,10 +408,7 @@ public:
         list_pool_.gc();
     }
 
-    void add_fun(const char* name, ValueFunction f)
-    {
-        //*env_ = env_->add(); // TODO
-    }
+    void add_fun(const char* name, ValueFunction f);
 
     void load_default_env();
 
@@ -582,45 +594,71 @@ Value make_value_boolean(bool b)
 bool type_is(Value& v, Type t){return v.type == t;}
 
 //////////// Native operators ////////////
+
+class EvaluationException
+{
+public:
+
+    EvaluationException(const char* msg):msg_(msg){}
+    EvaluationException(const std::string& msg):msg_(msg){}
+    ~EvaluationException(){}
+
+    std::string get_message(){return msg_;}
+
+    std::string msg_;
+};
+
 namespace {
     Value op_add(Masp& m, VRefIterator arg_start, VRefIterator arg_end, Map& env)
     {
-        Number n;
-        n.set(11);
+        Number n = Number::make(0);
+        if(!all_are_of_type(arg_start, arg_end, NUMBER)) throw EvaluationException("op_add: value's type is not NUMBER");
+        while(arg_start != arg_end)
+        {
+            n += value_number(*arg_start);
+            ++arg_start;
+        }
+
         return make_value_number(n);
     }
 
     Value op_sub(Masp& m, VRefIterator arg_start, VRefIterator arg_end, Map& env)
     {
-        Number n;
-        n.set(11);
+        Number n = Number::make(0);
+        if(!all_are_of_type(arg_start, arg_end, NUMBER)) throw EvaluationException("op_add: value's type is not NUMBER");
+        while(arg_start != arg_end)
+        {
+            n -= value_number(*arg_start);
+            ++arg_start;
+        }
+
         return make_value_number(n);
     }
 
     Value op_mul(Masp& m, VRefIterator arg_start, VRefIterator arg_end, Map& env)
     {
-        Number n;
-        n.set(11);
+        Number n = Number::make(0);
+        if(!all_are_of_type(arg_start, arg_end, NUMBER)) throw EvaluationException("op_add: value's type is not NUMBER");
+        while(arg_start != arg_end)
+        {
+            n *= value_number(*arg_start);
+            ++arg_start;
+        }
+
         return make_value_number(n);
     }
 
     Value op_div(Masp& m, VRefIterator arg_start, VRefIterator arg_end, Map& env)
     {
-        Number n;
-        n.set(11);
-        return make_value_number(n);
-    }
+        Number n = Number::make(0);
+        if(!all_are_of_type(arg_start, arg_end, NUMBER)) throw EvaluationException("op_add: value's type is not NUMBER");
+        while(arg_start != arg_end)
+        {
+            n /= value_number(*arg_start);
+            ++arg_start;
+        }
 
-    // def'd values are immutable - fails if symbol has been already defined
-    Value op_def(Masp& m, VRefIterator arg_start, VRefIterator arg_end, Map& env)
-    {
-        return Value();
-    }
-   
-    // Sets a value. Defines it first if it has not been defined. 
-    Value op_set(Masp& m, VRefIterator arg_start, VRefIterator arg_end, Map& env)
-    {
-        return Value();
+        return make_value_number(n);
     }
 
     // first, next, eq, cons, cond. 
@@ -634,6 +672,14 @@ namespace {
 void Masp::Env::load_default_env()
 {
     add_fun("+", op_add);
+    add_fun("-", op_sub);
+    add_fun("*", op_mul);
+    add_fun("/", op_div);
+}
+
+void Masp::Env::add_fun(const char* name, ValueFunction f)
+{
+    *env_ = env_->add(make_value_symbol(name), make_value_function(f)); // TODO
 }
 
 ///// Utility functions /////
@@ -1158,6 +1204,9 @@ public:
             return parser_result(e.get_message());
         }
 
+        List* root_list = value_list(*root);
+        *root_list = root_list->add(make_value_symbol("begin"));
+
         return parser_result(ValuePtr(root, ValueDeleter()));
     }
 
@@ -1319,18 +1368,6 @@ std::string value_type_to_string(const Value& v)
     return "";
 }
 
-class EvaluationException
-{
-public:
-
-    EvaluationException(const char* msg):msg_(msg){}
-    EvaluationException(const std::string& msg):msg_(msg){}
-    ~EvaluationException(){}
-
-    std::string get_message(){return msg_;}
-
-    std::string msg_;
-};
 
 // Evaluation utils
 

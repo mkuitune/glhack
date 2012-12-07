@@ -46,6 +46,33 @@ struct Number{
         if(type != n.type) return false;
         else return type == INT ? (value.intvalue == n.value.intvalue) : (value.floatvalue == n.value.floatvalue);
     }
+
+    Number& operator+=(const Number& n)
+    {
+        if(type == FLOAT || n.type == FLOAT) return set(to_float() + n.to_float()); 
+        else return set(to_int() + n.to_int());
+    }
+    
+    Number& operator-=(const Number& n)
+    {
+        if(type == FLOAT || n.type == FLOAT) return set(to_float() - n.to_float()); 
+        else return set(to_int() - n.to_int());
+    }
+    
+    Number& operator*=(const Number& n)
+    {
+        if(type == FLOAT || n.type == FLOAT) return set(to_float() * n.to_float()); 
+        else return set(to_int() * n.to_int());
+    }
+    
+    Number& operator/=(const Number& n)
+    {
+        if(type == FLOAT || n.type == FLOAT) return set(to_float() / n.to_float()); 
+        else return set(to_int() / n.to_int());
+    }
+
+    static Number make(int i){Number n; n.set(i); return n;}
+
 };
 
 class Value;
