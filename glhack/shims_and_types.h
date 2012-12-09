@@ -57,7 +57,7 @@ bool none_of(const T& val, const T& ref0, const T& ref1, const T& ref2, const T&
 
 //////// Helpfull small types /////////
 
-/** An immutable accessor to a valid or non-valid pointer. */
+/** A (usually) immutable accessor to a valid or non-valid pointer. */
 template<class T>
 class ConstOption
 {

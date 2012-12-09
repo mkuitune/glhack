@@ -105,7 +105,7 @@ struct Chunk
         // number of elements stored. 
         uint32_t mask = 0;
         uint32_t i = count;
-        while(i--) mask |= 1<<i;
+        while(i--) mask |= (1 << (i));
         
         uint32_t positions_to_search = CHUNK_BUFFER_SIZE - count + 1;
         uint32_t array_start_index = 0;
@@ -518,20 +518,27 @@ public:
         {
             return head_ ? List(pool_, head_->next) : List(pool_, 0);
         }
-        
+
         /** Return list containing all but the two first elements or emtpy list. */
         List rrest() const
         {
             if(head_ && head_->next) return List(pool_, head_->next->next);
             else return List(pool_, 0);
         }
-       
+
+        /** Return list containing all but the three first elements or emtpy list. */
+        List rrrest() const
+        {
+            if(head_ && head_->next && head_->next->next) return List(pool_, head_->next->next);
+            else return List(pool_, 0);
+        }
+
         /** Return reference to the first element of list or null.*/
         const T* first() const
         {
             return head_ ? &head_->data : 0;
         }
-       
+
         /** Return the second element in the list or empty.*/ 
         const T* second() const
         {
@@ -1157,7 +1164,7 @@ public:
 
         bool operator==(const node_iterator& i){return current == i.current;}
         bool operator!=(const node_iterator& i){return current != i.current;}
-
+        const KeyValue* data_ptr(){return current;}
         const KeyValue& operator*(){return *current;}
         const KeyValue* operator->(){return current;}
     };
@@ -1218,6 +1225,8 @@ public:
 
         ConstOption<V> try_get_value(const K& key) const
         {
+            if(!root_) return ConstOption<V>(0);
+
             uint32_t hash = HashFun::hash(key);
             uint32_t level = 0; 
             const V* result = 0;
@@ -1254,6 +1263,20 @@ public:
             }
 
             return ConstOption<V>(result);
+        }
+
+        /** Rewrite value held in existing key. In most instances avoid this if possible. */
+        bool try_replace_value(const K& key, const V& value)
+        {
+            bool result = false;
+            ConstOption<V> opt = try_get_value(key);
+            if(opt.is_valid())
+            {
+                V* v = const_cast<V*>(opt.get());
+                *v = value;
+                result = true;
+            }
+            return result;
         }
 
         // TODO: template<class T> Map.add_seq keyvalue-pair list - add sequence of pairs in one update
@@ -1310,7 +1333,7 @@ public:
 
                 for(;iter != end; ++iter)
                 {
-                    const KeyValue* current = *iter;
+                    const KeyValue* current = iter.data_ptr();
                     if(! keyvalue_match_get(*current, key, hash)) 
                     {
                         kept_keys.push_back(current);
@@ -1450,23 +1473,19 @@ public:
 
     /** Create a new map by adding an elements and values to an existing map*/
     template<class KI, class VI>
-    Map add(const Map& old, const KI i_key, const KI key_end, const VI i_value, const VI value_end)
+    Map add(const Map& old, KI i_key, KI key_end, VI i_value, VI value_end)
     {
-        Node* new_root = 0;
+        Node* new_root = old.root_;
 
         while((i_key != key_end) && 
               (i_value != value_end))
         {
             KeyValue* kv = new_keyvalue(*i_key, *i_value);
 
-            if(!new_root)
-            {
-                new_root = instantiate_tree_path(old.root_, kv);
-            }
-            else
-            {
-                new_root = instantiate_tree_path(new_root, kv);
-            }
+            new_root = instantiate_tree_path(new_root, kv);
+
+            ++i_key;
+            ++i_value;
         }
 
         return Map(*this, new_root);
