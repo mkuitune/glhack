@@ -709,7 +709,7 @@ template<class M>
 typename M::mapped_type* try_get_value(M& map, typename M::key_type& key)
 {
     typename M::mapped_type* result = nullptr;
-    if(map.count(key) > 0)
+    if(map.find(key) != map.end())
     {
         result = &map[key];
     }

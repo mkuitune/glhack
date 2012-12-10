@@ -52,23 +52,40 @@ struct Number{
         if(type == FLOAT || n.type == FLOAT) return set(to_float() + n.to_float()); 
         else return set(to_int() + n.to_int());
     }
-    
+
     Number& operator-=(const Number& n)
     {
         if(type == FLOAT || n.type == FLOAT) return set(to_float() - n.to_float()); 
         else return set(to_int() - n.to_int());
     }
-    
+
     Number& operator*=(const Number& n)
     {
         if(type == FLOAT || n.type == FLOAT) return set(to_float() * n.to_float()); 
         else return set(to_int() * n.to_int());
     }
-    
+
     Number& operator/=(const Number& n)
     {
         if(type == FLOAT || n.type == FLOAT) return set(to_float() / n.to_float()); 
         else return set(to_int() / n.to_int());
+    }
+
+    bool operator<(const Number& n) const
+    {
+        if(type == FLOAT || n.type == FLOAT) return to_float() < n.to_float(); else return to_int() < n.to_int();
+    }
+    bool operator<=(const Number& n) const
+    {
+        if(type == FLOAT || n.type == FLOAT) return to_float() <= n.to_float(); else return to_int() <= n.to_int();
+    }
+    bool operator>=(const Number& n) const
+    {
+        if(type == FLOAT || n.type == FLOAT) return to_float() >= n.to_float(); else return to_int() >= n.to_int();
+    }
+    bool operator>(const Number& n) const
+    {
+        if(type == FLOAT || n.type == FLOAT) return to_float() > n.to_float(); else return to_int() > n.to_int();
     }
 
     static Number make(int i){Number n; n.set(i); return n;}

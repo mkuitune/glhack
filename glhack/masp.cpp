@@ -609,117 +609,6 @@ Value make_value_boolean(bool b)
 
 bool type_is(Value& v, Type t){return v.type == t;}
 
-//////////// Native operators ////////////
-
-class EvaluationException
-{
-public:
-
-    EvaluationException(const char* msg):msg_(msg){}
-    EvaluationException(const std::string& msg):msg_(msg){}
-    ~EvaluationException(){}
-
-    std::string get_message(){return msg_;}
-
-    std::string msg_;
-};
-
-namespace {
-    Value op_add(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
-    {
-        Number n = Number::make(0);
-        if(!all_are_of_type(arg_start, arg_end, NUMBER, 0)) throw EvaluationException("op_add: value's type is not NUMBER");
-        while(arg_start != arg_end)
-        {
-            n += value_number(*arg_start);
-            ++arg_start;
-        }
-
-        return make_value_number(n);
-    }
-
-    Value op_sub(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
-    {
-        Number n = Number::make(0);
-        size_t size = 0;
-        if(!all_are_of_type(arg_start, arg_end, NUMBER, &size)) throw EvaluationException("op_sub: value's type is not NUMBER");
-
-        if(size == 1)
-        {
-            n -= value_number(*arg_start);
-        }
-        else if (size > 1)
-        {
-            n.set( value_number(*arg_start));
-            ++arg_start;
-            while(arg_start != arg_end)
-            {
-                n -= value_number(*arg_start);
-                ++arg_start;
-            }
-        }
-
-        return make_value_number(n);
-    }
-
-    Value op_mul(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
-    {
-        Number n = Number::make(1);
-        if(!all_are_of_type(arg_start, arg_end, NUMBER, 0)) throw EvaluationException("op_mul: value's type is not NUMBER");
-        while(arg_start != arg_end)
-        {
-            n *= value_number(*arg_start);
-            ++arg_start;
-        }
-
-        return make_value_number(n);
-    }
-
-    Value op_div(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
-    {
-        Number n = Number::make(1);
-        size_t size = 0;
-        if(!all_are_of_type(arg_start, arg_end, NUMBER, &size)) throw EvaluationException("op_sub: value's type is not NUMBER");
-
-        if(size == 1)
-        {
-            n /= value_number(*arg_start);
-        }
-        else if (size > 1)
-        {
-            n.set( value_number(*arg_start));
-            ++arg_start;
-            while(arg_start != arg_end)
-            {
-                n /= value_number(*arg_start);
-                ++arg_start;
-            }
-        }
-
-        return make_value_number(n);
-    }
-
-    // first, next, eq, cons, cond. 
-    // TODO: first next ffirst fnext while < > + - * / dot cross
-    // map filter range apply count zip
-
-}
-
-//////////// Load environment ////////////
-
-void Masp::Env::load_default_env()
-{
-    add_fun("+", op_add);
-    add_fun("-", op_sub);
-    add_fun("*", op_mul);
-    add_fun("/", op_div);
-}
-
-void Masp::Env::add_fun(const char* name, PrimitiveFunction f)
-{
-    *env_ = env_->add(make_value_symbol(name), make_value_function(f)); // TODO
-}
-
 ///// Utility functions /////
 
 static inline bool is_digit(char c){return isdigit(c) != 0;}
@@ -975,7 +864,6 @@ static ScopeError check_scope(const char* begin, const char* end, const char* co
     return ScopeError();
 }
 
-
 class ParseException
 {
 public:
@@ -1099,12 +987,12 @@ public:
         }
         else if(is('[')) // Enter vector
         {
-            Value result = make_value_vector();
+            Value result = make_value_vector(); // TODO -> not [...] -> <vector> but [...] -> (vector ...)
             move_forward();
             recursive_parse(result);
             return result;
         }
-        else if(is('{')) // Enter map
+        else if(is('{')) // Enter map // TODO - map is not translated from source. Define (map ... ...) constructor that takes in a sequence of values and returns a map. Not {...} -> <map> but {...} - >(map ... )
         {
             Value result = make_value_map(masp_);
             move_forward();
@@ -1332,7 +1220,7 @@ static void value_to_string_helper(std::ostream& os, const Value& v, PrefixHelpe
             for(auto i = lst_ptr->begin(); i != lst_ptr->end(); ++i)
             {
                 value_to_string_helper(os, *i, prfx);
-                out() << " ";
+                os << " ";
             }
             os << ")";
             break;
@@ -1345,9 +1233,9 @@ static void value_to_string_helper(std::ostream& os, const Value& v, PrefixHelpe
             for(auto m = map_ptr->begin(); m != mend; ++m)
             {
                 value_to_string_helper(os, m->first, prfx);
-                out() << " ";
+                os << " ";
                 value_to_string_helper(os, m->second, prfx);
-                out() << " ";
+                os << " ";
             }
             os << "}";
             break;
@@ -1359,7 +1247,7 @@ static void value_to_string_helper(std::ostream& os, const Value& v, PrefixHelpe
             for(auto i = vec_ptr->begin(); i != vec_ptr->end(); ++i)
             {
                 value_to_string_helper(os, *i, prfx);
-                out() << " ";
+                os << " ";
             }
             os << "]";
             break;
@@ -1423,6 +1311,21 @@ std::string value_type_to_string(const Value& v)
 // More or less straightforward translation of the simple Evaluator 
 // in 'Structure and Interpretation of Computer Programs' (Steele 1996)
 // Section 4.1.1 'The Core of the Evaluator'
+
+class EvaluationException
+{
+public:
+
+    EvaluationException(const char* msg):msg_(msg){}
+    EvaluationException(const std::string& msg):msg_(msg){}
+    ~EvaluationException(){}
+
+    std::string get_message(){return msg_;}
+
+    std::string msg_;
+};
+
+
 namespace {
 
 Value eval(const Value& v, Map& env, Masp& masp);
@@ -1786,6 +1689,20 @@ Value apply(const Value& v, VRefIterator args_begin, VRefIterator args_end, Map&
 
         return eval_sequence(*value_list(*proc_body), seq_env, masp);
     }
+    else if(v.type == MAP)
+    {
+        Map* m = value_map(v);
+        if(args_begin != args_end)
+        {
+            glh::ConstOption<Value> result = m->try_get_value(*args_begin);
+            if(!result.is_valid()) throw EvaluationException(std::string("apply: Map did not contain key:" + value_to_string(*args_begin)));
+            return *result;
+        }
+        else
+        {
+            throw EvaluationException(std::string("apply: Attempting to apply map without key to search for."));
+        }
+    }
     else
     {
         throw EvaluationException(std::string("apply: Attempting to apply non-procedure. Input:") + value_to_string(v));
@@ -1848,6 +1765,218 @@ evaluation_result eval(Masp& m, const Value* v)
 
     return evaluation_result(result);
 }
+
+
+//////////// Native operators ////////////
+
+
+namespace {
+    Value op_add(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
+    {
+        Number n = Number::make(0);
+        if(!all_are_of_type(arg_start, arg_end, NUMBER, 0)) throw EvaluationException("op_add: value's type is not NUMBER");
+        while(arg_start != arg_end)
+        {
+            n += value_number(*arg_start);
+            ++arg_start;
+        }
+
+        return make_value_number(n);
+    }
+
+    Value op_sub(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
+    {
+        Number n = Number::make(0);
+        size_t size = 0;
+        if(!all_are_of_type(arg_start, arg_end, NUMBER, &size)) throw EvaluationException("op_sub: value's type is not NUMBER");
+
+        if(size == 1)
+        {
+            n -= value_number(*arg_start);
+        }
+        else if (size > 1)
+        {
+            n.set( value_number(*arg_start));
+            ++arg_start;
+            while(arg_start != arg_end)
+            {
+                n -= value_number(*arg_start);
+                ++arg_start;
+            }
+        }
+
+        return make_value_number(n);
+    }
+
+    Value op_mul(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
+    {
+        Number n = Number::make(1);
+        if(!all_are_of_type(arg_start, arg_end, NUMBER, 0)) throw EvaluationException("op_mul: value's type is not NUMBER");
+        while(arg_start != arg_end)
+        {
+            n *= value_number(*arg_start);
+            ++arg_start;
+        }
+
+        return make_value_number(n);
+    }
+
+    Value op_div(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
+    {
+        Number n = Number::make(1);
+        size_t size = 0;
+        if(!all_are_of_type(arg_start, arg_end, NUMBER, &size)) throw EvaluationException("op_sub: value's type is not NUMBER");
+
+        if(size == 1)
+        {
+            n /= value_number(*arg_start);
+        }
+        else if (size > 1)
+        {
+            n.set( value_number(*arg_start));
+            ++arg_start;
+            while(arg_start != arg_end)
+            {
+                n /= value_number(*arg_start);
+                ++arg_start;
+            }
+        }
+
+        return make_value_number(n);
+    }
+
+    // Booleans
+
+#define ITER_TO_PTR(iter_param, end_param) ((iter_param != end_param) ? (&(*iter_param)) : 0)
+
+    Value op_equal(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
+    {
+        bool Result = true;
+
+        const Value* first;
+        const Value* second;
+
+        second = ITER_TO_PTR(arg_start, arg_end);
+
+        while(Result && arg_start != arg_end)
+        {
+            first = second;
+            ++arg_start;
+            second = ITER_TO_PTR(arg_start, arg_end);
+            if(first && second)
+            {
+                Result &= ValuesAreEqual::compare(*first, *second);
+            }
+        }
+
+        return make_value_boolean(Result);
+    }
+
+    Value op_not_equal(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
+    {
+        bool Result = true;
+
+        const Value* first;
+        const Value* second;
+
+        second = ITER_TO_PTR(arg_start, arg_end);
+
+        while(Result && arg_start != arg_end)
+        {
+            first = second;
+            ++arg_start;
+            second = ITER_TO_PTR(arg_start, arg_end);
+            if(first && second)
+            {
+                Result &= (!ValuesAreEqual::compare(*first, *second));
+            }
+        }
+
+        return make_value_boolean(Result);
+    }
+
+    class NumGt{public: static bool op(const Number& first, const Number& second){return first > second;} };
+    class NumLess{public: static bool op(const Number& first, const Number& second){return first < second;} };
+    class NumLeq{public: static bool op(const Number& first, const Number& second){return first <= second;} };
+    class NumGeq{public: static bool op(const Number& first, const Number& second){return first >= second;} };
+
+    template<class OP> bool num_op_loop(VecIterator arg_start, VecIterator arg_end)
+    {
+       bool Result = true;
+
+        const Value* first;
+        const Value* second;
+
+        second = ITER_TO_PTR(arg_start, arg_end);
+
+        while(Result && arg_start != arg_end)
+        {
+            first = second;
+            ++arg_start;
+            second = ITER_TO_PTR(arg_start, arg_end);
+
+            if(first && second && (first->type == NUMBER && second->type == NUMBER ))
+            {
+                Result &= OP::op(first->value.number, second->value.number);
+            }
+            else if((first && first->type != NUMBER) || second){Result = false;}
+        }
+
+        return Result;
+    }
+
+    Value op_less_or_eq(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
+    {
+        bool Result = num_op_loop<NumLeq>(arg_start, arg_end);
+        return make_value_boolean(Result);
+    }
+
+    Value op_less(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
+    {
+        bool Result = num_op_loop<NumLess>(arg_start, arg_end);
+        return make_value_boolean(Result);
+    }
+
+    Value op_gt(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
+    {
+        bool Result = num_op_loop<NumGt>(arg_start, arg_end);
+        return make_value_boolean(Result);
+    }
+
+    Value op_gt_or_eq(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
+    {
+        bool Result = num_op_loop<NumGeq>(arg_start, arg_end);
+        return make_value_boolean(Result);
+    }
+
+    // first, next, eq, cons, cond. 
+    // TODO: first next ffirst fnext while < > + - * / dot cross
+    // map filter range apply count zip
+
+}
+
+//////////// Load environment ////////////
+
+void Masp::Env::add_fun(const char* name, PrimitiveFunction f)
+{
+    *env_ = env_->add(make_value_symbol(name), make_value_function(f)); // TODO
+}
+
+void Masp::Env::load_default_env()
+{
+    add_fun("+", op_add);
+    add_fun("-", op_sub);
+    add_fun("*", op_mul);
+    add_fun("/", op_div);
+
+    add_fun("=", op_equal);
+    add_fun("!=", op_not_equal);
+    add_fun("<", op_less);
+    add_fun(">", op_gt);
+    add_fun("<=", op_less_or_eq);
+    add_fun(">=", op_gt_or_eq);
+}
+
 
 
 } // Namespace masp ends
