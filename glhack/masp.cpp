@@ -404,7 +404,9 @@ void map_increment_references(Map& map);
 
 void list_increment_references(List& list)
 {
+#ifdef PRINT_GC
     std::cout << "#Inc: List" << std::endl;
+#endif
     list.increment_ref();
     auto e = list.end();
     for(auto i = list.begin(); i != e; ++i)
@@ -427,7 +429,9 @@ void value_increment_references(const Value& v)
 
 void map_increment_references(Map& map)
 {
+#ifdef PRINT_GC
     std::cout << "#Inc: Map" << std::endl;
+#endif
     map.increment_ref();
     auto e = map.end();
     for(auto i = map.begin(); i != e; ++i)
