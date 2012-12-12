@@ -458,6 +458,12 @@ public:
             return *this;
         }
 
+        /** Warning: Use only if you know what you are doing. */
+        void increment_ref()
+        {
+            if(head_) pool_.add_ref(head_);
+        }
+
         /** Find first element from list matching with predicate or return end. */ 
         iterator find(const List* list, std::function<bool(const T&)>& pred) const
         {
@@ -576,7 +582,7 @@ public:
 
     private:
         PListPool& pool_;
-        Node*               head_; 
+        Node*      head_; 
     };
 
     typedef Chunk<Node>                    node_chunk;
@@ -584,17 +590,23 @@ public:
 
     typedef std::unordered_map<Node*, int> ref_count_map;
     
-    PListPool()
-    {
-    }
-
-    ~PListPool()
+    /** Recycle all memory. */
+    void kill()
     {
         // Deleting ListPool before the end of the lifetime of all heads will result
         // in undefined behaviour.
         // Call destructor on unused elements
         ref_count_.clear();
         gc(); 
+    }
+
+    PListPool()
+    {
+    }
+
+    ~PListPool()
+    {
+        kill();
     }
 
     /** Create new empty list. */
@@ -751,6 +763,12 @@ public:
         // Lastly, go through the blocks, deallocate free's slots and move chunks to free list
         // if space became available on a full one
         chunks_.collect_chunks();
+    }
+
+    /** Clear refcounts. Warning: use only if you know what you are doing. */
+    void clear_root_refcounts()
+    {
+        ref_count_.clear();
     }
 
 private:
@@ -1223,6 +1241,12 @@ public:
             return *this;
         }
 
+        /** Warning: Use only if you know what you are doing. */
+        void increment_ref()
+        {
+            if(root_) pool_.add_ref(root_);
+        }
+
         ConstOption<V> try_get_value(const K& key) const
         {
             if(!root_) return ConstOption<V>(0);
@@ -1407,12 +1431,18 @@ public:
         Node* root_;
     };
 
-    ~PMapPool()
+    /** Recycle all memory. */
+    void kill()
     {
         // Must call destructor on all used cells.
         // TODO: Should this be the responsibility of individual containers?
         ref_count_.clear();
         gc();
+    }
+
+    ~PMapPool()
+    {
+        kill();
     }
 
     /** Remove reference to node */
@@ -1427,6 +1457,12 @@ public:
     {
         if(has_key(ref_count_, n)) ref_count_[n]++;
         else ref_count_[n] = 1;
+    }
+
+    /** Clear refcounts. Warning: use only if you know what you are doing. */
+    void clear_root_refcounts()
+    {
+        ref_count_.clear();
     }
 
     /** Create new empty map */
@@ -1764,7 +1800,22 @@ public:
         return n;
     }
 
+    /** Return number of bytes used by the chunk pool in total. */
+    size_t reserved_size_bytes()
+    {
+        size_t ref_map_size = ref_count_.size() *  sizeof(refcount_map::value_type);
+        size_t total = sizeof(*this) + ref_map_size +  keyvalue_chunks_.reserved_size_bytes() + 
+                       node_chunks_.reserved_size_bytes() +  ref_chunks_.reserved_size_bytes() + collided_list_pool_.reserved_size_bytes();
+        return total;
+    }
 
+    size_t live_size_bytes()
+    {
+        size_t ref_map_size = ref_count_.size() * sizeof(refcount_map::value_type);
+        size_t total = sizeof(*this) + ref_map_size +  keyvalue_chunks_.live_size_bytes() + 
+                       node_chunks_.live_size_bytes() +  ref_chunks_.live_size_bytes() + collided_list_pool_.live_size_bytes();
+        return total;
+    }
 private:
     keyvalue_chunk_box keyvalue_chunks_;
     node_chunk_box     node_chunks_;

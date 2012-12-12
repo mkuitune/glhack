@@ -395,23 +395,91 @@ void append_to_value_stl_list(std::list<Value>& ext_value_list, const Value& v)
 
 ///// Masp::Env //////
 
+
+// Custom Garbage collection to remove dangling references.
+namespace {
+
+void value_increment_references(const Value& v);
+void map_increment_references(Map& map);
+
+void list_increment_references(List& list)
+{
+    std::cout << "#Inc: List" << std::endl;
+    list.increment_ref();
+    auto e = list.end();
+    for(auto i = list.begin(); i != e; ++i)
+    {
+        value_increment_references(*i);
+    }
+}
+
+void value_increment_references(const Value& v)
+{
+    if(v.type == MAP)
+    {
+        map_increment_references(*value_map(v));
+    }
+    else if(v.type == LIST)
+    {
+        list_increment_references(*value_list(v));
+    }
+}
+
+void map_increment_references(Map& map)
+{
+    std::cout << "#Inc: Map" << std::endl;
+    map.increment_ref();
+    auto e = map.end();
+    for(auto i = map.begin(); i != e; ++i)
+    {
+        value_increment_references(i->first);
+        value_increment_references(i->second);
+    }
+}
+
+
+void collect_map_and_list_pools_with_roots(MapPool& map_pool, ListPool& list_pool, Map& map)
+{
+    // Mark all cells that can be visited only through root node
+    // #1 Set reference counts to zero for all roots.
+    // #2 Follow all references through map. For any map or list root cells increment
+    //    reference count.
+    // #3 Run garbage collection 
+    // Caveats: If the dereferenced cells contain data to which a pointer is stored in 
+    // some of the remaining cells, and it is deleted, the pointer is now invalid.
+    map_pool.clear_root_refcounts();
+    list_pool.clear_root_refcounts();
+
+    map_increment_references(map);
+
+    map_pool.gc();
+    list_pool.gc();
+}
+
+}
 class Masp::Env
 {
 public:
-    Masp::Env()
+    Env()
     {
         env_.reset(new Map(map_pool_.new_map()));
         load_default_env();
     }
 
+    ~Env()
+    {
+        map_pool_.kill();
+        list_pool_.kill();
+    }
+
     size_t reserved_size_bytes()
     {
-        return list_pool_.reserved_size_bytes();
+        return list_pool_.reserved_size_bytes() + map_pool_.reserved_size_bytes();
     }
 
     size_t live_size_bytes()
     {
-        return list_pool_.live_size_bytes();
+        return list_pool_.live_size_bytes() + map_pool_.live_size_bytes();
     }
 
     void gc()
@@ -420,8 +488,12 @@ public:
         // i.e nested list that's alone ((1 2 3)) has it's inner list still referred to when 
         // collecting. Is this a problem or not...
         //
+#if 0
         map_pool_.gc();
         list_pool_.gc();
+#else
+        collect_map_and_list_pools_with_roots(map_pool_, list_pool_, *env_);
+#endif
     }
 
     void add_fun(const char* name, PrimitiveFunction f);
@@ -431,8 +503,8 @@ public:
     Map& get_env(){return *env_;}
 
     // Locals
-    MapPool             map_pool_;
-    ListPool            list_pool_;
+    MapPool              map_pool_;
+    ListPool             list_pool_;
     std::unique_ptr<Map> env_;
 };
 
@@ -1648,9 +1720,10 @@ void list_decompose(const List& l, const Value** first, const Value** second, co
 
 Value apply(const Value& v, VRefIterator args_begin, VRefIterator args_end, Map& env, Masp& masp)
 {
+    Vector params = eval_list_to_vector(args_begin, args_end, env, masp);
+
     if(is_primitive_procedure(v))
     {
-        Vector params = eval_list_to_vector(args_begin, args_end, env, masp);
         return value_function(v)(masp, params.begin(), params.end(), env);
     }
     else if(is_compound_procedure(v))
@@ -1685,17 +1758,17 @@ Value apply(const Value& v, VRefIterator args_begin, VRefIterator args_end, Map&
         if(!body_list) throw EvaluationException(std::string("apply: body_list is null."));
         if(!proc_env_map) throw EvaluationException(std::string("apply: env_map is null."));
 
-        Map seq_env = proc_env_map->add(params_list->begin(), params_list->end(), args_begin, args_end);
+        Map seq_env = proc_env_map->add(params_list->begin(), params_list->end(), params.begin(), params.end());
 
         return eval_sequence(*value_list(*proc_body), seq_env, masp);
     }
     else if(v.type == MAP)
     {
         Map* m = value_map(v);
-        if(args_begin != args_end)
+        if(params.begin() != params.end())
         {
-            glh::ConstOption<Value> result = m->try_get_value(*args_begin);
-            if(!result.is_valid()) throw EvaluationException(std::string("apply: Map did not contain key:" + value_to_string(*args_begin)));
+            glh::ConstOption<Value> result = m->try_get_value(*params.begin());
+            if(!result.is_valid()) throw EvaluationException(std::string("apply: Map did not contain key:" + value_to_string(*params.begin())));
             return *result;
         }
         else

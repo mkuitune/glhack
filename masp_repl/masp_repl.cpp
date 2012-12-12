@@ -38,10 +38,10 @@ std::string memory_string(size_t b)
 {
     std::ostringstream os;
 
-    if(b < 1024) os << b << " B";
-    else if(b > 1024 && b < 1024 * 1024) os << b/1024 << " kB";
-    else os << b/(1024*1024) << " MB";
-
+    //if(b < 1024) os << b << " B";
+    //else if(b > 1024 && b < 1024 * 1024) os << b/1024 << " kB";
+    //else os << b/(1024*1024) << " MB";
+    os << b << " B";
     return os.str();
 }
 

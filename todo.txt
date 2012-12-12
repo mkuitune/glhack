@@ -1,0 +1,13 @@
+- def for function : (def (foo x y) (+ x y))
+- first
+- rest
+- cons := (cons elem seq)
+- map constructor
+- vector constructor
+- tail recursion
+- fix gc:
+	- clean heads array
+ 	- rebuild references by following root env map:
+                value_collector(val) if is_list list_collector(l) if is_map map_collector
+		list_collector (+1 list_head, values value_collector)
+		map_collector (+1 map_head, kv-pairs key value_collector value value_collector)
