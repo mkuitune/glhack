@@ -1,13 +1,29 @@
-- def for function : (def (foo x y) (+ x y))
-- first
+Todo:
+
+- symbols to pointers const char* to symbol table
+    std::map<std::string, int> held in masp (latter integer can be 
+    used as a reference counter for the string symbol.)
+
+- def for function : (defn (foo x y) (+ x y))
 - rest
 - cons := (cons elem seq)
-- map constructor
-- vector constructor
+- map
+- make-map constructor
+- make-vector constructor
 - tail recursion
-- fix gc:
+- object interface
+- inline functions
+    - (foo x y) & no defs -> apply_inline( begin..end):
+           reg [8]; replace nth_input symbol with reg_ref in body
+           on apply write reference to begin to reg[0] and so on.
+           i.e (foo x y)(+ x y) -> (foo #reg0 #reg1) (+ #reg0 #reg1)
+           
+
+Done:
+
+- fix gc: 
 	- clean heads array
- 	- rebuild references by following root env map:
-                value_collector(val) if is_list list_collector(l) if is_map map_collector
-		list_collector (+1 list_head, values value_collector)
-		map_collector (+1 map_head, kv-pairs key value_collector value value_collector)
+ 	- rebuild references by following root env map
+
+- first
+

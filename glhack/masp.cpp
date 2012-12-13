@@ -2026,6 +2026,51 @@ namespace {
         return make_value_boolean(Result);
     }
 
+    ////////// Constructors
+
+    // make-vector
+    // make-map
+
+    ////////// List functions
+
+    Value op_first(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
+    {
+        const Value* first = 0;
+        if(arg_start != arg_end)
+        {
+            if(arg_start->type == LIST)
+            {
+                first = value_list(*arg_start)->first();
+            }
+            else if(arg_start->type == VECTOR)
+            {
+                Vector* vec = arg_start->value.vector;
+                if(vec->size() > 0) first = &vec[0];
+            }
+            return first ? *first : Value();
+        }
+        return Value();
+    }
+
+    Value op_first(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
+    {
+        const Value* first = 0;
+        if(arg_start != arg_end)
+        {
+            if(arg_start->type == LIST)
+            {
+                first = value_list(*arg_start)->first();
+            }
+            else if(arg_start->type == VECTOR)
+            {
+                Vector* vec = arg_start->value.vector;
+                if(vec->size() > 0) first = &vec[0];
+            }
+            return first ? *first : Value();
+        }
+        return Value();
+    }
+
     // first, next, eq, cons, cond. 
     // TODO: first next ffirst fnext while < > + - * / dot cross
     // map filter range apply count zip
