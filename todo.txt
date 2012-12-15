@@ -5,9 +5,15 @@ Todo:
     used as a reference counter for the string symbol.)
 
 - def for function : (defn (foo x y) (+ x y))
-- rest
+- eval
 - cons := (cons elem seq)
-- map
+- (filter pred coll): return a lazy sequence of items in coll for which predicate
+  returns true.
+- (drop n coll): return all but first n items
+- (drop-last n s): return all but last n items
+- (drop-while pred col): return sequence starting from element for which predicate
+  returns false. 
+- (map f collection) (map f coll1 coll2) ...
 - make-map constructor
 - make-vector constructor
 - tail recursion
@@ -26,4 +32,9 @@ Done:
  	- rebuild references by following root env map
 
 - first
+- next
+- ffirst (first(first next))
+- fnext (first (next x))
+- nnext (next (next x))
+- nfirst (next (first x))
 

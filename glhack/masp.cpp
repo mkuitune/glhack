@@ -341,6 +341,8 @@ bool all_are_of_type(VI begin, VI end, Type t, size_t* out_size)
 inline Number value_number(const Value& v){return v.type == NUMBER ? v.value.number : Number::make(0);}
 
 inline List* value_list(const Value& v){return v.type == LIST ? v.value.list : 0;}
+inline Vector* value_vector(const Value& v){return v.type == VECTOR ? v.value.vector : 0;}
+
 
 inline const Value* value_list_first(const Value& v)
 {
@@ -666,6 +668,17 @@ Value make_value_vector()
     return a;
 }
 
+template<class I>
+Value make_value_vector(I begin, I end)
+{
+    // TODO ?
+    Value a;
+    a.type = VECTOR;
+    a.value.vector = new Vector(begin, end);
+    return a;
+}
+
+
 Value make_value_number_array()
 {
     // TODO ?
@@ -867,7 +880,7 @@ struct ScopeError
         else if(result == FAULTY_SCOPE_CLOSING)
         {
             std::ostringstream os;
-            os << "Premature scope closing "  << scope << "at character " << char_on_line << " at line " << line  << ".";
+            os << "Excess scope closing "  << scope << " at character " << char_on_line << " at line " << line  << ".";
             return os.str();
         }
 
@@ -1848,6 +1861,9 @@ evaluation_result eval(Masp& m, const Value* v)
 
 
 namespace {
+
+    // Arithmetic operators
+
     Value op_add(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
     {
         Number n = Number::make(0);
@@ -2033,7 +2049,118 @@ namespace {
 
     ////////// List functions
 
+    Value next_of_value(const Value* v)
+    {
+        if(v->type == LIST)
+        {
+            return make_value_list(value_list(*v)->rest());
+        }
+        else if(v->type == VECTOR)
+        {
+            Vector* vec = value_vector(*v);
+
+            if(vec->size() > 0)
+            {
+                auto i = vec->begin();
+                ++i;
+                return make_value_vector(i , vec->end());
+            }
+            else
+            {
+                return make_value_vector();
+            }
+        }
+        return Value();
+    }
+
+    const Value* first_of_value(const Value* v)
+    {
+        const Value* first = 0;
+        if(v->type == LIST)
+        {
+            first = value_list(*v)->first();
+        }
+        else if(v->type == VECTOR)
+        {
+            Vector* vec = v->value.vector;
+            if(vec->size() > 0) first = &(*vec)[0];
+        }
+        return first;
+    }
+
     Value op_first(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
+    {
+        const Value* first = 0;
+        if(arg_start != arg_end)
+        {
+            const Value* v = &(*arg_start);
+            first = first_of_value(v);
+        }
+        return first ? *first : Value();
+    }
+
+    Value op_next(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
+    {
+        if(arg_start != arg_end)
+        {
+            Value* v =  &(*arg_start);
+            return next_of_value(v);
+        }
+        return Value();
+    }
+
+    Value op_fnext(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
+    {
+        if(arg_start != arg_end)
+        {
+            if(arg_start->type == LIST)
+            {
+                List* l = value_list(*arg_start);
+                auto b = l->begin();
+                auto e = l->end();
+                if(b != e) ++b;
+                if(b != e) return *b;
+            }
+            else if(arg_start->type == VECTOR)
+            {
+                Vector* vec = value_vector(*arg_start);
+                auto i = vec->begin();
+                auto e = vec->end();
+                if(i != e) ++i;
+                if(i != e) return *i;
+            }
+        }
+        return Value();
+    }
+
+    Value op_nnext(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
+    {
+        if(arg_start != arg_end)
+        {
+            if(arg_start->type == LIST)
+            {
+                return make_value_list(value_list(*arg_start)->rrest());
+            }
+            else if(arg_start->type == VECTOR)
+            {
+                Vector* vec = value_vector(*arg_start);
+
+                if(vec->size() > 1)
+                {
+                    auto i = vec->begin();
+                    ++i;++i;
+                    return make_value_vector(i , vec->end());
+                }
+                else
+                {
+                    return make_value_vector();
+                }
+            }
+        }
+        return Value();
+    }
+
+    Value op_nfirst(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
     {
         const Value* first = 0;
         if(arg_start != arg_end)
@@ -2045,34 +2172,31 @@ namespace {
             else if(arg_start->type == VECTOR)
             {
                 Vector* vec = arg_start->value.vector;
-                if(vec->size() > 0) first = &vec[0];
+                if(vec->size() > 0) first = &(*vec)[0];
             }
-            return first ? *first : Value();
+
+            if(first)
+            {
+                return next_of_value(first);
+            }
         }
         return Value();
     }
 
-    Value op_first(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
+    Value op_ffirst(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
     {
-        const Value* first = 0;
+        const Value* ffirst = 0;
         if(arg_start != arg_end)
         {
-            if(arg_start->type == LIST)
-            {
-                first = value_list(*arg_start)->first();
-            }
-            else if(arg_start->type == VECTOR)
-            {
-                Vector* vec = arg_start->value.vector;
-                if(vec->size() > 0) first = &vec[0];
-            }
-            return first ? *first : Value();
+            const Value* v = &(*arg_start);
+            const Value* first = first_of_value(v);
+            if(first) ffirst = first_of_value(first);
         }
-        return Value();
+
+        return ffirst ? *ffirst : Value();
     }
 
-    // first, next, eq, cons, cond. 
-    // TODO: first next ffirst fnext while < > + - * / dot cross
+    // TODO:  cons while  dot cross
     // map filter range apply count zip
 
 }
@@ -2097,6 +2221,14 @@ void Masp::Env::load_default_env()
     add_fun(">", op_gt);
     add_fun("<=", op_less_or_eq);
     add_fun(">=", op_gt_or_eq);
+
+    add_fun("first", op_first);
+    add_fun("ffirst", op_ffirst);
+    add_fun("next",  op_next);
+    add_fun("fnext", op_fnext);
+    add_fun("nnext", op_nnext);
+    add_fun("nfirst",op_nfirst);
+
 }
 
 
