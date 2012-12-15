@@ -18,7 +18,6 @@ Todo:
 - (drop-while pred col): return sequence starting from element for which predicate
   returns false. 
 - (map f collection) (map f coll1 coll2) ...
-- make-vector constructor
 - merge (merge map1 map2 ...)
 - tail recursion
 - object interface
@@ -49,3 +48,4 @@ Done:
 - type query operators: integer?, float?, string?, map?, vector?, list?
                         fn?, symbol?, boolean?, object?
 - make-map constructor
+- make-vector constructor

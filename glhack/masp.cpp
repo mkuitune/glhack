@@ -719,7 +719,7 @@ enum DelimEnum{
 };
 
 std::regex g_regfloat("^([-+]?[0-9]+(\\.[0-9]*)?|\\.[0-9]+)([eE][-+]?[0-9]+)?$");
-std::regex g_regint("^(?:([-+]?[1-9][0-9]*)|(0[xX][0-9A-Fa-f]+)|0[bB]([01]+))$");
+std::regex g_regint("^(?:([-+]?[1-9][0-9]*)|(0)|(0[xX][0-9A-Fa-f]+)|0[bB]([01]+))$");
 
 typedef enum ParseResult_t{PARSE_NIL, PARSE_INT, PARSE_FLOAT} ParseResult;
 
@@ -734,7 +734,8 @@ ParseResult parsenum(const char* num, const char* numend, int& intvalue, double&
 
         if(is[0] == '0')
         {
-            if(is[1] == 'x' ||is[1] == 'X') intvalue = strtol(is.c_str(), 0, 16);
+            if(is.size() == 1) intvalue = 0;
+            else if(is[1] == 'x' ||is[1] == 'X') intvalue = strtol(is.c_str(), 0, 16);
             else if(is[1] == 'b' || is[1] == 'B') intvalue = strtol(res[3].str().c_str(), 0, 2); 
         }
         else
@@ -1078,16 +1079,18 @@ public:
         }
         else if(is('[')) // Enter vector
         {
-            Value result = make_value_vector(); // TODO -> not [...] -> <vector> but [...] -> (vector ...)
+            Value result = make_value_list(masp_);
             move_forward();
             recursive_parse(result);
+            *result.value.list = result.value.list->add(make_value_symbol("make-vector"));
             return result;
         }
         else if(is('{')) // Enter map
         {
-            Value result = make_value_map(masp_);
+            Value result = make_value_list(masp_);
             move_forward();
             recursive_parse(result);
+            *result.value.list = result.value.list->add(make_value_symbol("make-map"));
             return result;
         }
         else if(parse_number(tmp_number))
@@ -1784,16 +1787,36 @@ Value apply(const Value& v, VRefIterator args_begin, VRefIterator args_end, Map&
     else if(v.type == MAP)
     {
         Map* m = value_map(v);
+
         if(params.begin() != params.end())
         {
             glh::ConstOption<Value> result = m->try_get_value(*params.begin());
-            if(!result.is_valid()) throw EvaluationException(std::string("apply: Map did not contain key:" + value_to_string(*params.begin())));
+            if(!result.is_valid()) return Value();
             return *result;
         }
         else
         {
             throw EvaluationException(std::string("apply: Attempting to apply map without key to search for."));
         }
+    }
+    else if(v.type == VECTOR)
+    {
+        Vector* vec = value_vector(v);
+        size_t param_size = params.size();
+        if(param_size != 1)
+        {
+            throw EvaluationException(std::string("apply: Vector: Invalid number of arguments:") + glh::to_string(param_size));
+        }
+
+        if(params.begin()->type != NUMBER || params.begin()->value.number.type != Number::INT) 
+            throw EvaluationException(std::string("apply: Vector: Index parameter must be integer. Was:") + value_to_string(*params.begin()));
+
+        int index = params.begin()->value.number.to_int();
+
+        if(index < 0 || index >= vec->size())
+            throw EvaluationException(std::string("apply: Vector: Index parameter out of range:") + glh::to_string(index));
+
+        return (*vec)[index];
     }
     else
     {
@@ -2046,11 +2069,6 @@ namespace {
         return make_value_boolean(Result);
     }
 
-    ////////// Constructors
-
-    // make-vector
-    // make-map
-
     ////////// List functions
 
     Value next_of_value(const Value* v)
@@ -2253,6 +2271,11 @@ namespace {
         return make_value_map(map_pool(m).add(map, arg_start, arg_end));
     }
 
+    OPDEF(op_make_vector, arg_start, arg_end)
+    {
+        return make_value_vector(arg_start, arg_end);
+    }
+
     // TODO:  cons while  dot cross str
     // map filter range apply count zip
 
@@ -2298,6 +2321,7 @@ void Masp::Env::load_default_env()
     add_fun("object?", op_value_is_object);
 
     add_fun("make-map", op_make_map);
+    add_fun("make-vector", op_make_vector);
 }
 
 
