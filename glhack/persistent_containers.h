@@ -1527,6 +1527,31 @@ public:
         return Map(*this, new_root);
     }
 
+    /** Create a new map by adding an elements and values to an existing map. Usable in case key and 
+    *   value types are the same.*/
+    template<class KVI>
+    Map add(const Map& old, KVI i_elems, KVI elems_end)
+    {
+        Node* new_root = old.root_;
+
+        KVI first;
+
+        while((i_elems != elems_end))
+        {
+            first = i_elems;
+            ++i_elems;
+            if(i_elems != elems_end)
+            {
+                KeyValue* kv = new_keyvalue(*first, *i_elems);
+                new_root = instantiate_tree_path(new_root, kv);
+            }
+            
+            ++i_elems;
+        }
+
+        return Map(*this, new_root);
+    }
+
     /** Create a new map by adding an allocated keyvalue instance to an existing map.*/
     Map add(const Map& old, const KeyValue* keyvalue)
     {

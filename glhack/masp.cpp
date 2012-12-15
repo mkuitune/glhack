@@ -530,6 +530,8 @@ inline Map* new_map_alloc(Masp& m)
     return new Map(m.env()->map_pool_.new_map());
 }
 
+inline MapPool& map_pool(Masp& m){return m.env()->map_pool_;}
+
 inline Map new_map(Masp& m)
 {
     return m.env()->map_pool_.new_map();
@@ -1081,7 +1083,7 @@ public:
             recursive_parse(result);
             return result;
         }
-        else if(is('{')) // Enter map // TODO - map is not translated from source. Define (map ... ...) constructor that takes in a sequence of values and returns a map. Not {...} -> <map> but {...} - >(map ... )
+        else if(is('{')) // Enter map
         {
             Value result = make_value_map(masp_);
             move_forward();
@@ -1864,7 +1866,9 @@ namespace {
 
     // Arithmetic operators
 
-    Value op_add(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
+#define OPDEF(name_param, i_start_param, i_end_param) Value name_param(Masp& m, VecIterator i_start_param, VecIterator i_end_param, Map& env)
+
+    OPDEF(op_add, arg_start, arg_end)
     {
         Number n = Number::make(0);
         if(!all_are_of_type(arg_start, arg_end, NUMBER, 0)) throw EvaluationException("op_add: value's type is not NUMBER");
@@ -1877,7 +1881,7 @@ namespace {
         return make_value_number(n);
     }
 
-    Value op_sub(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
+    OPDEF(op_sub, arg_start, arg_end)
     {
         Number n = Number::make(0);
         size_t size = 0;
@@ -1901,7 +1905,7 @@ namespace {
         return make_value_number(n);
     }
 
-    Value op_mul(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
+    OPDEF(op_mul, arg_start, arg_end)
     {
         Number n = Number::make(1);
         if(!all_are_of_type(arg_start, arg_end, NUMBER, 0)) throw EvaluationException("op_mul: value's type is not NUMBER");
@@ -1914,7 +1918,7 @@ namespace {
         return make_value_number(n);
     }
 
-    Value op_div(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
+    OPDEF(op_div, arg_start, arg_end)
     {
         Number n = Number::make(1);
         size_t size = 0;
@@ -1942,7 +1946,7 @@ namespace {
 
 #define ITER_TO_PTR(iter_param, end_param) ((iter_param != end_param) ? (&(*iter_param)) : 0)
 
-    Value op_equal(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
+    OPDEF(op_equal, arg_start, arg_end)
     {
         bool Result = true;
 
@@ -2196,7 +2200,60 @@ namespace {
         return ffirst ? *ffirst : Value();
     }
 
-    // TODO:  cons while  dot cross
+    // Type query operations
+
+#define OP_1_DEFN(opval_param, i_param)    Value opval_param(Masp& m, VecIterator i_param, VecIterator arg_end, Map& env) \
+    {if(i_param != arg_end){
+
+    OP_1_DEFN(op_value_is_integer, vi)
+        if(vi->type == NUMBER && vi->value.number.type == Number::INT) return make_value_boolean(true);
+    } return make_value_boolean(false);}
+    
+    OP_1_DEFN(op_value_is_float, vi)
+        if(vi->type == NUMBER && vi->value.number.type == Number::FLOAT) return make_value_boolean(true);
+    } return make_value_boolean(false);}
+
+    OP_1_DEFN(op_value_is_string, vi)
+        if(vi->type == STRING) return make_value_boolean(true);
+    } return make_value_boolean(false);}
+
+    OP_1_DEFN(op_value_is_boolean, vi)
+        if(vi->type == BOOLEAN) return make_value_boolean(true);
+    } return make_value_boolean(false);}
+
+    OP_1_DEFN(op_value_is_symbol, vi)
+        if(vi->type == SYMBOL) return make_value_boolean(true);
+    } return make_value_boolean(false);}
+
+    OP_1_DEFN(op_value_is_map, vi)
+        if(vi->type == MAP) return make_value_boolean(true);
+    } return make_value_boolean(false);}
+
+    OP_1_DEFN(op_value_is_vector, vi)
+        if(vi->type == VECTOR) return make_value_boolean(true);
+    } return make_value_boolean(false);}
+    
+    OP_1_DEFN(op_value_is_list, vi)
+        if(vi->type == LIST) return make_value_boolean(true);
+    } return make_value_boolean(false);}
+
+    OP_1_DEFN(op_value_is_fn, vi)
+        if(is_primitive_procedure(*vi) || is_compound_procedure(*vi)) return make_value_boolean(true);
+    } return make_value_boolean(false);}
+
+    OP_1_DEFN(op_value_is_object, vi)
+        if(vi->type == OBJECT) return make_value_boolean(true);
+    } return make_value_boolean(false);}
+
+    // Container constructors
+
+    OPDEF(op_make_map, arg_start, arg_end)
+    {
+        Map map = new_map(m);
+        return make_value_map(map_pool(m).add(map, arg_start, arg_end));
+    }
+
+    // TODO:  cons while  dot cross str
     // map filter range apply count zip
 
 }
@@ -2229,6 +2286,18 @@ void Masp::Env::load_default_env()
     add_fun("nnext", op_nnext);
     add_fun("nfirst",op_nfirst);
 
+    add_fun("integer?", op_value_is_integer);
+    add_fun("float?", op_value_is_float);
+    add_fun("string?", op_value_is_string);
+    add_fun("boolean?", op_value_is_boolean);
+    add_fun("symbol?", op_value_is_symbol);
+    add_fun("map?", op_value_is_map);
+    add_fun("vector?", op_value_is_vector);
+    add_fun("list?", op_value_is_list);
+    add_fun("fn?", op_value_is_fn);
+    add_fun("object?", op_value_is_object);
+
+    add_fun("make-map", op_make_map);
 }
 
 

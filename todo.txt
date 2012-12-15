@@ -1,12 +1,16 @@
 Todo:
 
-- symbols to pointers const char* to symbol table
-    std::map<std::string, int> held in masp (latter integer can be 
-    used as a reference counter for the string symbol.)
-
+- proper map-access
+- contains?
+- count
+- println
+- str (print string representation )
+- string operations: ...
 - def for function : (defn (foo x y) (+ x y))
 - eval
-- cons := (cons elem seq)
+- (cons elem seq)
+- (conj seq elem1 elem2 ...)
+- (assoc map key val) -> add key/val to map or set element of vector at key to val
 - (filter pred coll): return a lazy sequence of items in coll for which predicate
   returns true.
 - (drop n coll): return all but first n items
@@ -14,10 +18,15 @@ Todo:
 - (drop-while pred col): return sequence starting from element for which predicate
   returns false. 
 - (map f collection) (map f coll1 coll2) ...
-- make-map constructor
 - make-vector constructor
+- merge (merge map1 map2 ...)
 - tail recursion
 - object interface
+
+- symbols to pointers const char* to symbol table
+    std::map<std::string, int> held in masp (latter integer can be 
+    used as a reference counter for the string symbol.)
+
 - inline functions
     - (foo x y) & no defs -> apply_inline( begin..end):
            reg [8]; replace nth_input symbol with reg_ref in body
@@ -37,4 +46,6 @@ Done:
 - fnext (first (next x))
 - nnext (next (next x))
 - nfirst (next (first x))
-
+- type query operators: integer?, float?, string?, map?, vector?, list?
+                        fn?, symbol?, boolean?, object?
+- make-map constructor
