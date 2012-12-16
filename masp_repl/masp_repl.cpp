@@ -98,7 +98,7 @@ int main(int argc, char* argv[])
 
             cout << "Garbage collection done. Memory usage statistics:";
             print_memory(cout, "Before collection: ",live_size_before, reserved_size_before);
-            print_memory(cout, "After collection: ",live_size, reserved_size);
+            print_memory(cout, "After collection: ", live_size, reserved_size);
         }
         else if(strcmp(line, "eval") == 0)
         {

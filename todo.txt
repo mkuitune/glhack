@@ -1,24 +1,20 @@
 Todo:
-
-- proper map-access
-- contains?
 - count
-- println
-- str (print string representation )
-- string operations: ...
-- def for function : (defn (foo x y) (+ x y))
+- contains?
 - eval
-- (cons elem seq)
-- (conj seq elem1 elem2 ...)
-- (assoc map key val) -> add key/val to map or set element of vector at key to val
-- (filter pred coll): return a lazy sequence of items in coll for which predicate
-  returns true.
-- (drop n coll): return all but first n items
-- (drop-last n s): return all but last n items
-- (drop-while pred col): return sequence starting from element for which predicate
+- cons elem seq)
+- conj seq elem1 elem2 ...)
+- assoc map key val) -> add key/val to map or set element of vector at key to val
+- filter pred coll): return a lazy sequence of items in coll for which predicate
+  eturns true.
+- drop n coll): return all but first n items (should work also on strings)
+- drop-last n s): return all but last n items
+- drop-while pred col): return sequence starting from element for which predicate
   returns false. 
-- (map f collection) (map f coll1 coll2) ...
+- map f collection) (map f coll1 coll2) ...
 - merge (merge map1 map2 ...)
+
+- def for function : (defn (foo x y) (+ x y))
 - tail recursion
 - object interface
 
@@ -32,6 +28,8 @@ Todo:
            on apply write reference to begin to reg[0] and so on.
            i.e (foo x y)(+ x y) -> (foo #reg0 #reg1) (+ #reg0 #reg1)
            
+- contains?
+- string operations: ...
 
 Done:
 
@@ -49,3 +47,7 @@ Done:
                         fn?, symbol?, boolean?, object?
 - make-map constructor
 - make-vector constructor
+- proper map-access
+- configure masp output
+- println
+- str (print string representation )

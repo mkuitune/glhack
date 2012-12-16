@@ -7,6 +7,7 @@
 #include<list>
 #include<memory>
 #include<cstdint>
+#include<ostream>
 
 namespace masp{
 
@@ -131,6 +132,12 @@ public:
 
     /** Number of bytes marked used.*/
     size_t live_size_bytes();
+
+    /** Set output stream for messages. */
+    void set_output(std::ostream* os);
+
+    /** Get handle to output stream.*/
+    std::ostream& get_output();
 
 private:
 

@@ -470,6 +470,7 @@ public:
     {
         env_.reset(new Map(map_pool_.new_map()));
         load_default_env();
+        out_ = &std::cout;
     }
 
     ~Env()
@@ -512,6 +513,7 @@ public:
     MapPool              map_pool_;
     ListPool             list_pool_;
     std::unique_ptr<Map> env_;
+    std::ostream*        out_;
 };
 
 
@@ -564,6 +566,14 @@ Value make_value_number(double d)
 }
 
 Value make_value_string(const char* str)
+{
+    Value a;
+    a.type = STRING;
+    a.alloc_str(str);
+    return a;
+}
+
+Value make_value_string(const std::string& str)
 {
     Value a;
     a.type = STRING;
@@ -1256,7 +1266,17 @@ size_t Masp::reserved_size_bytes(){return env_->reserved_size_bytes();}
 
 size_t Masp::live_size_bytes(){return env_->live_size_bytes();}
 
+void Masp::set_output(std::ostream* os)
+{
+    if(env_) env_->out_ = os;
+}
 
+/** Get handle to output stream.*/
+std::ostream& Masp::get_output()
+{
+    if(env_) return *(env_->out_);
+    else return std::cout;
+}
 
 ///// Evaluation utilities /////
 
@@ -1887,9 +1907,9 @@ evaluation_result eval(Masp& m, const Value* v)
 
 namespace {
 
-    // Arithmetic operators
-
 #define OPDEF(name_param, i_start_param, i_end_param) Value name_param(Masp& m, VecIterator i_start_param, VecIterator i_end_param, Map& env)
+
+    // Arithmetic operators
 
     OPDEF(op_add, arg_start, arg_end)
     {
@@ -2276,9 +2296,38 @@ namespace {
         return make_value_vector(arg_start, arg_end);
     }
 
+    // Printers
+
+    std::string value_iters_to_string(VecIterator i_start, VecIterator i_end, const char* spacer)
+    {
+        std::ostringstream os;
+        for(;i_start != i_end;)
+        {
+            if (i_start->type == SYMBOL || i_start->type == STRING) os << *i_start->value.string;
+            else os <<  value_to_string(*i_start);
+            ++i_start;
+            if(i_start != i_end) os << spacer;
+        }
+        return os.str();
+    }
+
+    OPDEF(op_str, arg_start, arg_end)
+    {
+        return make_value_string(value_iters_to_string(arg_start, arg_end, ""));
+    }
+
+    OPDEF(op_println, arg_start, arg_end)
+    {
+        m.get_output() << value_iters_to_string(arg_start, arg_end, " ");
+        m.get_output() << "\n";
+        return Value();
+    }
+
     // TODO:  cons while  dot cross str
     // map filter range apply count zip
 
+#undef OPDEF
+#undef OP_1_DEFN
 }
 
 //////////// Load environment ////////////
@@ -2322,6 +2371,9 @@ void Masp::Env::load_default_env()
 
     add_fun("make-map", op_make_map);
     add_fun("make-vector", op_make_vector);
+
+    add_fun("println", op_println);
+    add_fun("str", op_str);
 }
 
 
