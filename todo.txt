@@ -1,7 +1,9 @@
 Todo:
-- count
 - contains?
 - eval
+- all memory allocations of values and their members through masp (wrap new/malloc/delete/free)
+- configure memory usage (max heap/array size etc)
+- string_to_value
 - cons elem seq)
 - conj seq elem1 elem2 ...)
 - assoc map key val) -> add key/val to map or set element of vector at key to val
@@ -13,6 +15,8 @@ Todo:
   returns false. 
 - map f collection) (map f coll1 coll2) ...
 - merge (merge map1 map2 ...)
+- wrap math.h
+- figure out how to implement linear algebra operators
 
 - def for function : (defn (foo x y) (+ x y))
 - tail recursion
@@ -28,7 +32,6 @@ Todo:
            on apply write reference to begin to reg[0] and so on.
            i.e (foo x y)(+ x y) -> (foo #reg0 #reg1) (+ #reg0 #reg1)
            
-- contains?
 - string operations: ...
 
 Done:
@@ -51,3 +54,5 @@ Done:
 - configure masp output
 - println
 - str (print string representation )
+- persistent list size, map size
+- count

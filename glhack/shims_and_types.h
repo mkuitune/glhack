@@ -826,8 +826,14 @@ RES fold_left(RES res, std::function<RES(const RES& r, const typename CONT::valu
     return res;
 }
 
-
-/** Iterat*/
+/** Count number of entries the iterator range holds. */
+template<class I>
+size_t iterator_range_length(I& i, I& end)
+{
+    size_t length = 0;
+    for(;i != end; ++i) ++length;
+    return length;
+}
 
 //////////// Streams //////////////
 

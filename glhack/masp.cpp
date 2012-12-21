@@ -2323,6 +2323,17 @@ namespace {
         return Value();
     }
 
+    OPDEF(op_count, arg_i, arg_end)
+    {
+        int count = 0;
+        if(arg_i != arg_end)
+        {
+            if(arg_i->type == VECTOR)     {count = arg_i->value.vector->size();}
+            else if(arg_i->type == LIST)  {count = arg_i->value.list->size();}
+            else if(arg_i->type == MAP)   {count = arg_i->value.map->size();}
+            else if(arg_i->type == STRING){count = arg_i->value.string->size();}
+    } return make_value_number(Number::make(count));}
+
     // TODO:  cons while  dot cross str
     // map filter range apply count zip
 
@@ -2374,6 +2385,8 @@ void Masp::Env::load_default_env()
 
     add_fun("println", op_println);
     add_fun("str", op_str);
+
+    add_fun("count", op_count); 
 }
 
 

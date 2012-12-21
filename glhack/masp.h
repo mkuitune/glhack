@@ -90,6 +90,7 @@ struct Number{
     }
 
     static Number make(int i){Number n; n.set(i); return n;}
+    static Number make(double f){Number n; n.set(f); return n;}
 
 };
 

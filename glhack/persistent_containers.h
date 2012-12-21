@@ -1424,6 +1424,11 @@ public:
             return true;
         }
 
+        const size_t size() const
+        {
+            return glh::iterator_range_length(begin(), end());
+        }
+
         friend PMapPool;
 
     private:
