@@ -480,6 +480,13 @@ public:
             return List(pool_, n);
         }
 
+        /** Add iterator range to list.*/
+        template<class I>
+        List add_end(I ibegin, I iend)
+        {
+            return pool_.add(*this, ibegin, iend);
+        }
+
         /** Remove element from list. */
         List remove(const iterator& i) const
         {
@@ -648,6 +655,56 @@ public:
 
         return List( *this, head);
     }
+ 
+    template<class I>
+    Node* add_elem(I i_begin, I i_end) 
+    {
+        if(i_begin == i_end) return 0;
+        else
+        {
+            Node* n = new_node(*i_begin);
+            ++i_begin;
+            n->next = add_elem(i_begin, i_end);
+            
+            return n;
+        }
+    }
+
+    /** Create new list by appending elements in iterator range to list. */
+    template<class I>
+    List add(const List& old, I i_begin, I i_end)
+    {
+        //if(i_begin == i_end) return List(*old); // TODO: need this?
+
+
+        auto o_i = old.begin();
+        auto o_end = old.end();
+
+        Node* cpy_head = 0;
+        Node* cpy_pos;
+        while(o_i != o_end)
+        {
+            Node* n = new_node(*o_i);
+
+            if(!cpy_head)
+            {
+                cpy_head = n;
+                cpy_pos = cpy_head;
+            }
+            else
+            {
+                cpy_pos->next = n;
+                cpy_pos = n;
+            }
+
+            ++o_i;
+        }
+
+        cpy_pos->next = add_elem(i_begin, i_end);
+
+        return List( *this, cpy_head);
+    }
+
 
     /** Create new list from a number of input values. */
     List new_list(const T& a)

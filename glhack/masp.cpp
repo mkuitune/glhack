@@ -680,6 +680,41 @@ Value make_value_vector()
     return a;
 }
 
+Value make_value_vector(Vector& old, Value& v)
+{
+    // TODO ?
+    Value a;
+    a.type = VECTOR;
+    a.value.vector = new Vector(old);
+    a.value.vector->push_back(v);
+    return a;
+}
+
+template<class I>
+Value make_value_vector(Vector& old, I app_begin, I app_end )
+{
+    // TODO ?
+    Value a;
+    a.type = VECTOR;
+    a.value.vector = new Vector(old);
+    while(app_begin != app_end)
+    {
+        a.value.vector->push_back(*app_begin);
+        ++app_begin;
+    }
+    return a;
+}
+
+Value make_value_vector(Value& v, Vector& old)
+{
+    // TODO ?
+    Value a;
+    a.type = VECTOR;
+    a.value.vector = new Vector(old);
+    a.value.vector->push_front(v);
+    return a;
+}
+
 template<class I>
 Value make_value_vector(I begin, I end)
 {
@@ -1737,6 +1772,20 @@ Vector eval_list_to_vector(VRefIterator args_begin, VRefIterator args_end, Map& 
     return v;
 }
 
+/** Attempts to assign addresses to elements accessible through iterator range. 
+ *  @return false if range is shorter than the number of reference addresses.*/
+template<class IT, class PPTR>
+bool range_decompose(IT begin, IT end, PPTR a, PPTR b)
+{
+    bool result = true;
+
+    if(begin != end){ *a = &(*begin); ++begin;} else result = false;
+    if(begin != end){ *b = &(*begin); ++begin;} else result = false;
+
+    return result;
+}
+
+/** Attempts to read as many entries from the list into input parameters.*/
 void list_decompose(const List& l, const Value** first, const Value** second, const Value** third, const Value** fourth)
 {
     auto i = l.begin();
@@ -2323,6 +2372,8 @@ namespace {
         return Value();
     }
 
+    // Container operations
+
     OPDEF(op_count, arg_i, arg_end)
     {
         int count = 0;
@@ -2334,7 +2385,59 @@ namespace {
             else if(arg_i->type == STRING){count = arg_i->value.string->size();}
     } return make_value_number(Number::make(count));}
 
-    // TODO:  cons while  dot cross str
+    OPDEF(op_cons, arg_i, arg_end) 
+    {
+        Value* fst;
+        Value* snd;
+
+        if(range_decompose(arg_i, arg_end, &fst, &snd))
+        {
+            if(snd->type == LIST)
+            {
+                List* l = value_list(*snd);
+                return make_value_list(l->add(*fst));
+            }
+            else if(snd->type == VECTOR)
+            {
+                Vector* v = value_vector(*snd);
+                
+                return make_value_vector(*fst, *v);
+            }
+            else throw EvaluationException("op_cons: value to append to must be LIST or VECTOR (was:" +  value_to_string(*snd) + ")."); 
+        }
+
+        throw EvaluationException("op_cons: bad syntax. Cons must be applied to two parameters: (cons param1 param2)."); 
+        return Value();
+    }
+
+    OPDEF(op_conj, arg_i, arg_end) 
+    {
+        Value* fst;
+        Value* snd;
+
+        if(range_decompose(arg_i, arg_end, &fst, &snd))
+        {
+            if(fst->type == LIST)
+            {
+                List* l = value_list(*fst);
+                ++arg_i;
+                return make_value_list(l->add_end(arg_i, arg_end));
+            }
+            else if(fst->type == VECTOR)
+            {
+                Vector* v = value_vector(*snd);
+                ++arg_i; 
+                return make_value_vector(*v, arg_i, arg_end);
+            }
+            else throw EvaluationException("op_conj: value to append to must be LIST or VECTOR (was:" +  value_to_string(*fst) + ")."); 
+        }
+
+        throw EvaluationException("op_conj: bad syntax. Cons must be applied to at least two parameters: (conj collection elem ... )."); 
+        return Value();
+    }
+    
+
+    // TODO:while  dot cross str
     // map filter range apply count zip
 
 #undef OPDEF
@@ -2387,6 +2490,7 @@ void Masp::Env::load_default_env()
     add_fun("str", op_str);
 
     add_fun("count", op_count); 
+    add_fun("cons", op_cons);
 }
 
 

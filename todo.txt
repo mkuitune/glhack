@@ -4,8 +4,7 @@ Todo:
 - all memory allocations of values and their members through masp (wrap new/malloc/delete/free)
 - configure memory usage (max heap/array size etc)
 - string_to_value
-- cons elem seq)
-- conj seq elem1 elem2 ...)
+- loop construct
 - assoc map key val) -> add key/val to map or set element of vector at key to val
 - filter pred coll): return a lazy sequence of items in coll for which predicate
   eturns true.
@@ -33,6 +32,7 @@ Todo:
            i.e (foo x y)(+ x y) -> (foo #reg0 #reg1) (+ #reg0 #reg1)
            
 - string operations: ...
+- '==' operator for all iterators 
 
 Done:
 
@@ -56,3 +56,5 @@ Done:
 - str (print string representation )
 - persistent list size, map size
 - count
+- cons elem seq)
+- conj seq elem1 elem2 ...)
