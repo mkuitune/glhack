@@ -102,6 +102,7 @@ public:
     void alloc_str(const std::string& str);
     void alloc_str(const char* str, const char* end);
     bool is_nil() const;
+    bool is_str(const char* str){return glh::any_of(type, STRING, SYMBOL) && strcmp(value.string->c_str(), str) == 0;}
     bool is(const Type t) const{return type == t;}
     bool operator==(const Value& v) const;
     uint32_t get_hash() const;
@@ -1158,10 +1159,37 @@ public:
         }
     }
 
+    void rewrite_defn(std::list<Value>& build_list, List* list_ptr)
+    {
+            if(build_list.size() < 4) throw ParseException("recursive_parse: defn must contain at least 3 params.");
+
+            // Decompose build list to parts
+            auto build_iter = build_list.begin(); //build_list := (defn iname ilambda_params)
+            auto iname = build_iter; ++iname;
+            auto ilambda_params = iname; ++ilambda_params;
+            auto iend = build_list.end();
+
+            std::list<Value> rewritten_list;
+            rewritten_list.push_back(make_value_symbol("def"));
+            rewritten_list.push_back(*iname);
+
+            // Compose lambda_expressions
+            std::list<Value> lambda_list;
+            lambda_list.push_back(make_value_symbol("fn"));
+            lambda_list.insert(lambda_list.end(), ilambda_params, iend);
+
+            // Alloc storage for value containing lambda expression
+            rewritten_list.push_back(make_value_list(masp_));
+            List* lambda_list_ptr = value_list(rewritten_list.back());
+            *lambda_list_ptr = new_list(masp_, lambda_list);
+
+            *list_ptr = new_list(masp_, rewritten_list);
+    }
+
     void recursive_parse(Value& root)
     {
-        if(glh::none_of(root.type ,LIST , VECTOR, MAP))
-            throw ParseException("recursive_parse: root type is not container.");
+        if(glh::is_not(root.type, LIST))
+            throw ParseException("recursive_parse: root type is not LIST.");
 
         std::list<Value> build_list;
 
@@ -1218,37 +1246,18 @@ public:
             throw ParseException("Quote cannot be empty.");
         }
 
-        if(type_is(root, LIST))
+
+        List* list_ptr = value_list(root);
+
+        // Term rewritings that we prefer to do in parsing rather than evaluation stage ("poor mans macro system").
+
+        if(build_list.front().is_str("defn"))
         {
-            List* list_ptr = value_list(root);
-            *list_ptr = new_list(masp_, build_list);
+           rewrite_defn(build_list, list_ptr);
         }
-        else if(type_is(root, VECTOR))
+        else
         {
-            Vector* vec_ptr = value_vector(root);
-            size_t size = build_list.size();
-            vec_ptr->resize(size);
-            std::list<Value>::iterator li = build_list.begin();
-            for(Vector::iterator i = vec_ptr->begin(); i != vec_ptr->end(); ++i)
-                i->movefrom(*li++);
-        } else if(type_is(root, MAP))
-        {
-            Map* map = value_map(root);
-            std::list<Value>::iterator lend = build_list.end();
-            for(std::list<Value>::iterator li = build_list.begin(); li != lend; ++li)
-            {
-                Value* key = &*li;
-                ++li;
-                if(li != lend)
-                {
-                    *map = map->add(*key, *li);
-                }
-                else
-                {
-                    *map = map->add(*key, make_value_list(masp_));
-                    break;
-                }
-            }
+            *list_ptr = new_list(masp_, build_list);
         }
     }
 
@@ -1496,6 +1505,7 @@ bool is_tagged_list(const Value& v, const char* symname)
 
 bool is_quoted(const Value& v){ return is_tagged_list(v,"quote");}
 bool is_assignment(const Value& v){ return is_tagged_list(v,"def");}
+bool is_function_assignment(const Value& v){ return is_tagged_list(v,"defn");}
 bool is_reassignment(const Value& v){ return is_tagged_list(v,"set");}
 bool is_if(const Value& v){return is_tagged_list(v, "if");} 
 bool is_lambda(const Value& v){return is_tagged_list(v, "fn");} 

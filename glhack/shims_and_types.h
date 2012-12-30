@@ -48,6 +48,8 @@ template<class T>
 bool any_of(const T& val, const T& ref0, const T& ref1, const T& ref2, const T& ref3){return val == ref0 || val == ref1 || val == ref2 || val == ref3;}
 
 template<class T>
+bool is_not(const T& val, const T& ref0){return val != ref0;}
+template<class T>
 bool none_of(const T& val, const T& ref0, const T& ref1){return val != ref0 && val != ref1;}
 template<class T>
 bool none_of(const T& val, const T& ref0, const T& ref1, const T& ref2){return val != ref0 && val != ref1 && val != ref2;}

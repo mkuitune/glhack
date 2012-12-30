@@ -16,10 +16,11 @@ Todo:
 - merge (merge map1 map2 ...)
 - wrap math.h
 - figure out how to implement linear algebra operators
-
-- def for function : (defn (foo x y) (+ x y))
+- documentation interface: all functions have a doc string, language signifier pair.
 - tail recursion
 - object interface
+- unit tests
+- embed interface: access values stored in env values and maps through URIs.
 
 - symbols to pointers const char* to symbol table
     std::map<std::string, int> held in masp (latter integer can be 
@@ -32,7 +33,6 @@ Todo:
            i.e (foo x y)(+ x y) -> (foo #reg0 #reg1) (+ #reg0 #reg1)
            
 - string operations: ...
-- '==' operator for all iterators 
 
 Done:
 
@@ -58,3 +58,6 @@ Done:
 - count
 - cons elem seq)
 - conj seq elem1 elem2 ...)
+- [30.12.2012] def for function : (defn foo (x y) (+ x y) ... ) ->  (def foo (lambda  (x y) (+ x y ) ... ))  
+                   := (defn p1 p2 ... pn) -> <name> = nfirst (p1); <lambda-body> = rrest -> (def <name> (lambda <lambda-body>))
+- [30.12.2012] clean up parser code
