@@ -33,8 +33,8 @@ int main(int argc, char* argv[])
     return 0;
 }
 
+    \author Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)
  */
-
 
 // This library is for quick 'hacks' and prototypes. Therefore, we include all the required
 // source files here directly for now.

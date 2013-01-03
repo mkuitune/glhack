@@ -1,9 +1,19 @@
-// This file unittester.cpp is part of Tiny Unittesting Framework (TU).
-// This code is in the public domain. There is no warranty implied; use this code at your own risk. 
+// This file unittester.cpp is part of Tiny Unittesting Framework.
 //
 // See unittester.h for instructions.
 //
-// Author: Mikko Kuitunen (mkuitune.kapsi.fi)
+// This code is int the public domain.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+// IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+// OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+// ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+// OTHER DEALINGS IN THE SOFTWARE.
+//
+// Author: Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)
+//
 #include "unittester.h"
 
 TestSet* g_tests = 0;
@@ -14,15 +24,15 @@ struct ActiveGroups
     ~ActiveGroups()
     {
         if(g_active_groups) delete g_active_groups;
+
         if(g_tests) delete g_tests;
     }
     void init(){
         if(!g_active_groups ) g_active_groups = new std::list<std::string>();
+
         if(!g_tests) g_tests = new TestSet();
     }
 } g_ag;
-
-
 
 
 UtTestAdd::UtTestAdd(const TestCallback& callback)
@@ -32,7 +42,6 @@ UtTestAdd::UtTestAdd(const TestCallback& callback)
 
     (*g_tests)[callback.group][callback.name] = callback;
 }
-
 
 
 // Globals

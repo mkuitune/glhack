@@ -1,4 +1,6 @@
-/** \file allocator.h Memory allocators.*/
+/** \file allocator.h Memory allocators.
+    \author Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)
+*/
 #pragma once
 
 

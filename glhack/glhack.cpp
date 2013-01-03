@@ -1,4 +1,5 @@
-/** \file glhack.cpp OpenGL platform agnostic rendering and other utilities. */
+/** \file glhack.cpp OpenGL platform agnostic rendering and other utilities. 
+    \author Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)*/
 
 #include "glhack.h"
 #include "shims_and_types.h"
@@ -109,7 +110,11 @@ std::list<ShaderVar> parse_shader_vars(cstring& shader)
     return vars;
 }
 
-/** At this point an unholy mess containing all data relevant to a shader program management. */
+bool release_program(ShaderProgram& program);
+/** At this point an unholy mess containing all data relevant to a shader program management. '
+    The lifetime of the wrapped program object is tied to the lifetime of this object: 
+    do not allocate from stack (usually).
+*/
 class ShaderProgram 
 {
 public:
@@ -117,6 +122,8 @@ public:
 
     std::list<ShaderVar> input_vars;
     std::list<ShaderVar> output_vars;
+
+    // TODO: ShaderVar -> program handle map?
 
     std::string geometry_shader;
     std::string vertex_shader;
@@ -131,10 +138,14 @@ public:
         fragment_handle(0), vertex_handle(0), geometry_handle(0)
     {}
 
+    ~ShaderProgram(){release_program(*this);}
+
 };
 
+// TODO: Figure out proper handle usage
 ShaderProgramHandle::ShaderProgramHandle(ShaderProgram* p){program = p;}
-ShaderProgramHandle::~ShaderProgramHandle(){if(program) delete program;}
+ShaderProgramHandle::~ShaderProgramHandle(){} 
+//ShaderProgramHandle::~ShaderProgramHandle(){if(program) delete program;} 
 bool ShaderProgramHandle::is_valid(){return program != 0;}
 
 namespace
@@ -209,13 +220,13 @@ namespace
         bool result = false;
 
         bool geometry_result = compile_shader(GL_GEOMETRY_SHADER, program.geometry_handle, "geometry shader",program.geometry_shader);
-        bool vertex_result = compile_shader(GL_VERTEX_SHADER, program.vertex_handle, "vertex shader",program.vertex_shader);
+        bool vertex_result   = compile_shader(GL_VERTEX_SHADER, program.vertex_handle, "vertex shader",program.vertex_shader);
         bool fragment_result = compile_shader(GL_FRAGMENT_SHADER, program.fragment_handle, "fragment shader",program.fragment_shader);
 
         if(geometry_result && vertex_result && fragment_result)
         {
             if(program.geometry_handle) glAttachShader(program.program_handle, program.geometry_handle);
-            if(program.vertex_handle) glAttachShader(program.program_handle, program.vertex_handle);
+            if(program.vertex_handle)   glAttachShader(program.program_handle, program.vertex_handle);
             if(program.fragment_handle) glAttachShader(program.program_handle, program.fragment_handle);
 
             result = true;
@@ -226,7 +237,7 @@ namespace
 
     void locate_program_variable_handles(ShaderProgram& program)
     {
-
+        // TODO?
     }
 
     bool compile_program(ShaderProgram& program)
@@ -250,6 +261,7 @@ namespace
                 if(status != GL_FALSE)
                 {
                     glUseProgram(program.program_handle);
+                    init_var_lists(program);
                     locate_program_variable_handles(program);
                     result = true;
                 }
@@ -262,39 +274,40 @@ namespace
 
         return result;
     }
+}// end anonymoys namespace
 
-    bool release_program(ShaderProgram& program)
+bool release_program(ShaderProgram& program)
+{
+    auto finalize_shader = [](GLuint program_handle,  GLuint shader_handle)
     {
-        auto finalize_shader = [](GLuint program_handle,  GLuint shader_handle)
+        if(shader_handle != 0)
         {
-            if(shader_handle != 0)
-            {
-                if(program_handle != 0) glDetachShader(program_handle, shader_handle);
-                glDeleteShader(shader_handle);
-            }
-        };
-
-        bool result = false;
-
-        glUseProgram(0);
-
-        finalize_shader(program.program_handle, program.vertex_handle);
-        finalize_shader(program.program_handle, program.geometry_handle);
-        finalize_shader(program.program_handle, program.fragment_handle);
-
-        if(program.program_handle != 0) glDeleteProgram(program.program_handle);
-
-        result = check_gl_error();
-
-        if(!result)
-        {
-            GLH_LOG_EXPR("Shader program finalization failed");
+            if(program_handle != 0) glDetachShader(program_handle, shader_handle);
+            glDeleteShader(shader_handle);
         }
+    };
 
-        return result;
+    bool result = false;
+
+    glUseProgram(0);
+
+    finalize_shader(program.program_handle, program.vertex_handle);
+    finalize_shader(program.program_handle, program.geometry_handle);
+    finalize_shader(program.program_handle, program.fragment_handle);
+
+    if(program.program_handle != 0) glDeleteProgram(program.program_handle);
+
+    result = check_gl_error();
+
+    if(!result)
+    {
+        GLH_LOG_EXPR("Shader program finalization failed");
     }
 
-}// end anonymoys namespace
+    return result;
+}
+
+
 
 ShaderProgram* create_program(cstring& name, cstring& geometry_shader, cstring& vertex_shader, cstring& fragment_shader)
 {
@@ -305,9 +318,8 @@ ShaderProgram* create_program(cstring& name, cstring& geometry_shader, cstring& 
     program->vertex_shader   = vertex_shader;
     program->fragment_shader = fragment_shader;
 
-    init_var_lists(*program);
-
     /* Then compile the shader */
+    result = compile_program(*program);
 
     // If something is wrong, delete program
     if(!result)
@@ -326,29 +338,35 @@ class GraphicsManagerInt : public GraphicsManager
 {
 public:
 
-    typedef std::unique_ptr<ShaderProgram> ShaderProgramPtr;
+    typedef std::shared_ptr<ShaderProgram> ShaderProgramPtr;
 
 
-    std::list<ShaderProgramPtr> programs;
+    std::map<std::string, ShaderProgramPtr> programs_;
 
 
     ~GraphicsManagerInt()
     {
-        foreach(programs, [](ShaderProgramPtr& p){release_program(*p);});
     }
 
-    virtual ShaderProgramHandle get_shader_program(cstring& name, cstring& geometry, cstring& vertex, cstring& fragment) override
+    virtual ShaderProgramHandle create_shader_program(cstring& name, cstring& geometry, cstring& vertex, cstring& fragment) override
     {
 
         ShaderProgram* p = create_program(name, geometry, vertex, fragment);
 
-        if(p) programs.push_back(ShaderProgramPtr(p));
+        if(p) programs_[name] = ShaderProgramPtr(p);
 
         ShaderProgramHandle h(p);
 
         return h;
     }
 
+     virtual ShaderProgramHandle shader_program(cstring& name) override
+     {
+         auto pi = programs_.find(name);
+         ShaderProgram* p = 0;
+         if(pi != programs_.end()) p = pi->second.get();
+         return ShaderProgramHandle(p);
+     }
 
 };
 
@@ -387,6 +405,9 @@ void apply(const RenderPassSettings& pass)
         glClear(pass.clear_mask);
     }
 }
+
+
+/////////////////////// Minimal app callbacks ///////////////////////
 
 /** The minimal scene callbacks setup. */
 void minimal_scene()

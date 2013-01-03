@@ -34,8 +34,9 @@
  *
  * Should all types of chunkbuffers implement a collection -interface so two mark and deallocation queues can be used for all types of chunkbuffers.
  * The mark thread should contain different marking implementations for all data structures (i.e. how to navigate a hash array trie forest v.s. a list forest)
+ * 
+ * \author Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)
  * */
-
 #pragma once
 
 

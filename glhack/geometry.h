@@ -1,4 +1,6 @@
-/** \file geometry.h Geometry functions and utilities. */
+/** \file geometry.h Geometry functions and utilities. 
+    \author Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)*/
+
 #pragma once
 
 

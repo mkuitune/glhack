@@ -1,6 +1,9 @@
 /** \file glhack.h OpenGL platform agnostic rendering and other utilities. 
 Targeted OpenGL version: 3.2. Targeted GLSL version: 1.5.
+ 
+ \author Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)
 */
+
 #pragma once
 
 #include "glbase.h"
@@ -68,11 +71,14 @@ private:
 
 DeclInterface(GraphicsManager,
     /** This function will create a shader program based on the source files passed to it*/
-    virtual ShaderProgramHandle get_shader_program(cstring& name, cstring& geometry, cstring& vertex, cstring& fragment) = 0;
+    virtual ShaderProgramHandle create_shader_program(cstring& name, cstring& geometry, cstring& vertex, cstring& fragment) = 0;
+    /** Find shader by name. If not found return empty handle. */
+    virtual ShaderProgramHandle shader_program(cstring& name) = 0;
 );
 
 GraphicsManager* create_graphics_manager();
 
+// TODO: Functions to map vars to shaders through ShaderProgramHandle
 
 ///////////// RenderPassSettings ///////////////
 

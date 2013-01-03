@@ -1,4 +1,6 @@
-/** \file managed_structures.h Garbage collectable and persistent data structures.*/
+/** \file managed_structures.h Garbage collectable and persistent data structures.
+    \author Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)
+*/
 #pragma once
 
 /** Interface for garbage collectable data structures.  */

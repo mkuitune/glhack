@@ -1,6 +1,36 @@
-/** Demonstrating various line-drawing schemes. */
+/** ... */
 
 #include "glhack.h"
+
+
+/*
+
+
+scenegraph:
+
+node 
+transform
+bounding-box
+
+node tra
+
+
+
+*/
+
+
+class SCNode
+{
+public:
+
+};
+
+
+class SceneGraph
+{
+public:
+
+};
 
 
 glh::RenderPassSettings g_renderpass_settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT,

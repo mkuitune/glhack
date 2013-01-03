@@ -1,5 +1,6 @@
 /** \file glbase.h Wraps a functionality that enables the development of a modern
  * OpenGL application in a backend agnostic manner.
+    \author Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)
  */
 #pragma once
 

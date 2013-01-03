@@ -1,4 +1,6 @@
-/** \file geometry.cpp Geometry functions and utilities. */
+/** \file geometry.cpp Geometry functions and utilities. 
+    \author Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)
+*/
 
 #include "geometry.h"
 #include <vector>
@@ -26,13 +28,13 @@ public:
 
     }
 
-    /** @returns Pointer to vertex data*/
+    /** @return Pointer to vertex data*/
     virtual float* vertices() override
     {
         return (float*) &triangles_[0];
     }
 
-    /** @returns The number of triangles.*/
+    /** @return The number of triangles.*/
     virtual int triangle_count() override
     {
         return triangles_.size();

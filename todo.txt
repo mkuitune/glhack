@@ -1,4 +1,6 @@
-Todo:
+Todo Masp:
+----------
+- repl: words : returns a list of all the words resereved in the current root env (for checking for reserved words)
 - contains?
 - eval
 - all memory allocations of values and their members through masp (wrap new/malloc/delete/free)
@@ -18,7 +20,19 @@ Todo:
 - figure out how to implement linear algebra operators
 - documentation interface: all functions have a doc string, language signifier pair.
 - tail recursion
-- object interface
+- object interface: IObjectReference, IObjectMemberFunction:
+    - IObjectMemberFunction: virtual call(masp, pstart, pend, env) = 0
+    - on call ((someobject Foo) x y z) -> if someobject := object
+        - find member function pointer pFoo through symbol Foo () -> if found, return pFoo->call(...) 
+          where input parameter array is initialized to x, y and z
+    - on function wrapping declaration, declare wrapper object:
+        - SomeObjectMsp : public IObjectReference
+        - with a factory function that constructs SomeObjectMsp pointers, returns them as
+          std::shared_ptr<IObjectReference>
+        - map filled with singleton anonymous member function reference objects of type
+            SomeObjectFooMsp : IObjectMemberFunction
+        - factory function itself added to map as __SomeObjectMsp__
+
 - unit tests
 - embed interface: access values stored in env values and maps through URIs.
 
@@ -26,16 +40,21 @@ Todo:
     std::map<std::string, int> held in masp (latter integer can be 
     used as a reference counter for the string symbol.)
 
-- inline functions
-    - (foo x y) & no defs -> apply_inline( begin..end):
-           reg [8]; replace nth_input symbol with reg_ref in body
-           on apply write reference to begin to reg[0] and so on.
-           i.e (foo x y)(+ x y) -> (foo #reg0 #reg1) (+ #reg0 #reg1)
+- inline lambdas:
+    - (foo x y) & no defs & no function calls-> fn_inline: env not copied with function (not a closure)
+        - if has function calls and those calls are of form fn_inline, then the type of a lambda may
+          itself be lowered to fn_inline: For all function and lambda references found traverse those
+          until a) a non-fn_inline form is found b) no function references are found. If we reach 
+          condition b) then the lambda is legally of fn_inline form. NOTE: The corollary to this is that
+          set! _MUST_BE_NOT_ALLOWED_ if the previous value of a symbol is a fn_inline!
+        - the scan is done only for values that are already found in env. If the particular value is not
+          found then the lambda cannot be declared of form fn_inline.
            
-- string operations: ...
+- string operations
+- file system handling
 
-Done:
-
+Done Masp:
+----------
 - fix gc: 
 	- clean heads array
  	- rebuild references by following root env map
@@ -61,3 +80,30 @@ Done:
 - [30.12.2012] def for function : (defn foo (x y) (+ x y) ... ) ->  (def foo (lambda  (x y) (+ x y ) ... ))  
                    := (defn p1 p2 ... pn) -> <name> = nfirst (p1); <lambda-body> = rrest -> (def <name> (lambda <lambda-body>))
 - [30.12.2012] clean up parser code
+
+------------------------------------------------------------------------------------------------------
+======================================================================================================
+
+Todo glh:
+---------
+- half-edge mesh
+- boolean operations
+- simple mesh rendering (ogl)
+- hidden line mesh rendering (ogl)
+- on-screen font rendering (from texture)
+- off-screen font rendering (use wavelet rendering, to texture)
+- ui scene graph
+- masp command line
+- inteface to masp through commandlets?
+- texture loading
+- masp interface objects for types passable to shader parameters
+    - can. eg. configure shaders through repl:
+        * (def g (graphicscontext))
+        * ((g AddShader) name geom_shader_str ... )
+        * (def mytex (loadtexture "file/path/texture.png"))
+        * (def add_var (slotname obj) ((g ShaderVar) name slotname obj))
+        * (add_var "tex0" mytex)
+
+
+Done glh:
+--------

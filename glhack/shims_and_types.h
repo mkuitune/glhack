@@ -1,6 +1,8 @@
 /** \file shims_and_types.h Declarations not linked directly to OpenGL.
     Dependencies:
     Eigen
+
+    \author Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)
 */
 #pragma once
 
@@ -20,8 +22,8 @@
 
 /////////// Utility macros /////////////
 
-#define DeclInterface(name_param, fields_params)\
-class name_param{ public: virtual ~name_param(){};\
+#define DeclInterface(name_param, fields_params)  \
+class name_param{ public: virtual ~name_param(){} \
     fields_params}
 
 #define static_array_size(array_param) (sizeof(array_param)/sizeof(array_param[0]))

@@ -1,6 +1,7 @@
-#ifndef MASP_H
-#define MASP_H
-
+/** \file masp.h
+    \author Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)
+*/
+#pragma once
 
 #include "annotated_result.h"
 
@@ -152,10 +153,10 @@ typedef glh::AnnotatedResult<ValuePtr> evaluation_result;
 parser_result string_to_value(Masp& m, const char* str);
 
 /** Return string representation of value. */
-const std::string value_to_string(const Value* v);
+std::string value_to_string(const Value* v);
 
 /** Return string representation of value annotated with type. */
-const std::string value_to_typed_string(const Value* v);
+std::string value_to_typed_string(const Value* v);
 
 /** Return type of value as string.*/
 const char* value_type_to_string(const Value* v);
@@ -164,5 +165,3 @@ const char* value_type_to_string(const Value* v);
 evaluation_result eval(Masp& m, const Value* v);
 
 }//Namespace masp
-
-#endif

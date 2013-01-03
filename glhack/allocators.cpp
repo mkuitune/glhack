@@ -1,5 +1,6 @@
-/** \file allocator.cpp Memory allocator */
-
+/** \file allocator.cpp Memory allocator 
+    \author Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)
+*/
 #include "allocators.h"
 
 namespace {

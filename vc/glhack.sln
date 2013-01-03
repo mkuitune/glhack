@@ -9,6 +9,9 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "glhack", "glhack.vcxproj", "{44F323EF-6A0E-4F1C-989F-ED5CEE4FC70F}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hiddenlines", "hiddenlines.vcxproj", "{AF66AB6D-F6D9-4F5E-985F-E51709618104}"
+	ProjectSection(ProjectDependencies) = postProject
+		{44F323EF-6A0E-4F1C-989F-ED5CEE4FC70F} = {44F323EF-6A0E-4F1C-989F-ED5CEE4FC70F}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "masp_repl", "masp_repl.vcxproj", "{A1535E59-FBD3-4747-8535-A3DFB24F20F7}"
 	ProjectSection(ProjectDependencies) = postProject

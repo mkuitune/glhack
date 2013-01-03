@@ -1,3 +1,6 @@
+/** \file masp.cpp
+    \author Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)
+*/
 #include "masp.h"
 #include "persistent_containers.h"
 
@@ -1426,7 +1429,7 @@ static void value_to_string_helper(std::ostream& os, const Value& v, PrefixHelpe
     }
 }
 
-const std::string value_to_string(const Value& v)
+std::string value_to_string(const Value& v)
 {
     std::ostringstream stream;
     value_to_string_helper(stream, v, 0);
@@ -1435,7 +1438,7 @@ const std::string value_to_string(const Value& v)
 
 std::string value_type_to_string(const Value& v);
 
-const std::string value_to_typed_string(const Value* v)
+std::string value_to_typed_string(const Value* v)
 {
     std::ostringstream stream;
     value_to_string_helper(stream, *v, value_type_to_string);
@@ -1891,8 +1894,8 @@ Value apply(const Value& v, VRefIterator args_begin, VRefIterator args_end, Map&
             throw EvaluationException(std::string("apply: Vector: Index parameter must be integer. Was:") + value_to_string(*params.begin()));
 
         int index = params.begin()->value.number.to_int();
-
-        if(index < 0 || index >= vec->size())
+        int vec_size = vec->size();
+        if(index < 0 || index >= vec_size)
             throw EvaluationException(std::string("apply: Vector: Index parameter out of range:") + glh::to_string(index));
 
         return (*vec)[index];

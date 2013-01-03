@@ -1,6 +1,6 @@
 /** \file shims_and_types.cpp Implementation of the shims_and_types.h
- */
-
+   \author Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)
+*/
 
 #include "shims_and_types.h"
 

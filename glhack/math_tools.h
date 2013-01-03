@@ -1,4 +1,5 @@
 /** \file math_tools.h Usefull wrappers and tools for numbers.
+    \author Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)
 */
 #pragma once
 
@@ -56,6 +57,7 @@ inline bool bit_is_on(const uint32_t field, const uint32_t bit)
 {
     return  (field & 1 << bit) != 0;
 }
+
 
 ///////////// Random number generators ///////////
 
@@ -153,6 +155,7 @@ struct RandomRange<float>
     }
 };
 
+
 ////////////////// Combinatorial stuff /////////////////////
 
 /** From list of elements {a} return all the pairs generated from the sequence {a_i * a_j} */
@@ -172,7 +175,13 @@ std::list<std::pair<typename V::value_type, typename V::value_type>> all_pairs(V
     return result;
 }
 
+
+////////////// Linear algebra ////////////////
+
+
+
 } // namespace glh
+
 
 /////////////// Hash functions //////////////
 
@@ -186,5 +195,3 @@ uint32_t hash32(const T& hashable)
     int len = sizeof(T);
     return hash32((char*)&hashable, len);
 }
-
-
