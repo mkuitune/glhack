@@ -392,7 +392,8 @@ public:
     {
         if(live_count_ >= data_.size())
         {
-            size_t new_size = max(16, data_.size() * 2);
+            size_t default_buf_size = 16;
+            size_t new_size = std::max(default_buf_size, data_.size() * 2);
             data_.resize(new_size);
         }
 
@@ -465,7 +466,7 @@ public:
 
     typedef Pool<Node> ListPool;
 
-    PooledList(ListPool& pool_):tail_(nullptr), head_(nullptr){}
+    PooledList(ListPool& pool_):head_(nullptr), tail_(nullptr){}
 
     void push_back(const T& var)
     {
@@ -617,7 +618,7 @@ public:
 
     KeyInserter operator[](const Value& v)
     {
-        return KeyInserter(*this, k);
+        return KeyInserter(*this, v);
     }
 
     const ValueInserter operator[](const Key& k) const
@@ -627,7 +628,7 @@ public:
 
     const KeyInserter operator[](const Value& v) const
     {
-        return KeyInserter(*this, k);
+        return KeyInserter(*this, v);
     }
 
     iterator begin(){return keys_to_values_.begin();}
@@ -642,14 +643,24 @@ private:
 
 //////////////// Container insertion ////////////////
 
+
+
 /** Inserter1. Facilitates linked ()-calls to add for one parameter.*/
 template<class Container>
 struct Inserter1{
     Container& parent_;
     Inserter1(Container& parent):parent_(parent){}
-    Inserter1& operator()(typename const Container::value_type& v)
+
+    template<class V>
+    Inserter1 iadd(Container& c, const V& v)
     {
-        add(parent_, v);
+        c.push_back(v);
+        return Inserter1(c);
+    }
+
+    Inserter1& operator()(const typename Container::value_type& v)
+    {
+        iadd(parent_, v);
         return *this;
     }
 };
@@ -659,9 +670,16 @@ template<class Container>
 struct Inserter2{
     Container& parent_;
     Inserter2(Container& parent):parent_(parent){}
-    Inserter2& operator()(typename const Container::key_type& k, typename const Container::mapped_type& v)
+
+    Inserter2 i2add(Container& map, const typename Container::key_type& k, const typename Container::mapped_type& v)
     {
-        add(parent_, k, v);
+        map[k] = v;
+        return Inserter2(map);
+    }
+
+    Inserter2& operator()(const typename Container::key_type& k, const typename Container::mapped_type& v)
+    {
+        i2add(parent_, k, v);
         return *this;
     }
 };
@@ -689,7 +707,7 @@ Inserter1<C> add(C& c, const V& v)
 }
 
 template<class Map>
-Inserter2<Map> add(Map& map, typename const Map::key_type& k, typename const Map::mapped_type& v)
+Inserter2<Map> add(Map& map, const typename Map::key_type& k, const typename Map::mapped_type& v)
 {
     map[k] = v;
     return Inserter2<Map>(map);
@@ -783,7 +801,6 @@ std::vector<C> split_container(const C& container, size_t n)
         size_t n_pre_split = c_size / n + 1;
 
         // Insert ranges to each container.
-        size_t vi = 0;
         typename C::const_iterator iter = container.begin();
 
         for(size_t i = 0; i < n; ++i)
@@ -807,9 +824,9 @@ std::vector<C> split_container(const C& container, size_t n)
 template<class Collection, class Fun>
 Collection filter(const Collection& collection, const Fun fun)
 {
-    Collection out;
+        Collection out;
 
-    for(auto i = colllection.begin(); i != collection.end(); ++i)
+    for(auto i = collection.begin(); i != collection.end(); ++i)
     {
         if(fun(*i)) out.push_back(*i);
     }
@@ -832,7 +849,7 @@ RES fold_left(RES res, std::function<RES(const RES& r, const typename CONT::valu
 
 /** Count number of entries the iterator range holds. */
 template<class I>
-size_t iterator_range_length(I& i, I& end)
+    size_t iterator_range_length(I i, I end)
 {
     size_t length = 0;
     for(;i != end; ++i) ++length;

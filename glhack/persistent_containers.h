@@ -118,6 +118,7 @@ struct Chunk
                 result = ((T*) buffer) + array_start_index;
                 T* tmp;
                 for(size_t i = 0; i  < count; ++i) tmp = new(result + i)T;
+                (void) tmp;
                 used_elements |= mask;
                 break;
             }
@@ -258,7 +259,7 @@ public:
 
             while(chunk)
             {
-                if(result = chunk->get_new_array(element_count)) 
+                if((result = chunk->get_new_array(element_count))) 
                 {
                     // Check if chunk still has space left and if not maintain free node list
                     if(chunk->is_full())
@@ -422,7 +423,7 @@ public:
 
     public:
 
-        typedef typename T value_type;
+        typedef T value_type;
 
         List(PListPool& pool, Node* head):pool_(pool), head_(head){if(head_) pool_.add_ref(head_);}
         ~List(){if(head_) pool_.remove_ref(head_);}
@@ -558,7 +559,7 @@ public:
         {
             if(head_ && head_->next && head_->next->next)
                 return &head_->next->next->data;
-            else return 0
+            else return 0;
         }
 
         bool empty() const {return head_ == 0;}
@@ -904,7 +905,7 @@ public:
 
     /* Data structure types. */
     
-    typedef typename PListPool<const KeyValue*>       KeyValueListPool;
+    typedef          PListPool<const KeyValue*>       KeyValueListPool;
     typedef typename PListPool<const KeyValue*>::List KeyValueList;
 
     struct RefCell;
@@ -1014,9 +1015,9 @@ public:
         typename KeyValueList::iterator iter;
         typename KeyValueList::iterator end;
         
+        const KeyValue* keyvalue;
         bool      iteration_ongoing;
 
-        const KeyValue* keyvalue;
 
         NodeValueIterator():node(0), keyvalue(0), iteration_ongoing(false){}
 
@@ -1251,8 +1252,8 @@ public:
     public:
         typedef node_iterator iterator;
 
-        typedef typename K key_type;
-        typedef typename V mapped_type;
+        typedef K key_type;
+        typedef V mapped_type;
         typedef KeyValue value_type;
 
         Map(PMapPool& pool, Node* root):pool_(pool), root_(root)
@@ -1325,8 +1326,8 @@ public:
                     }
                     else if (n->type == Node::CollisionNode)
                     {
-                        KeyValueList::iterator i = n->value.collision_list->begin();
-                        KeyValueList::iterator end = n->value.collision_list->end();
+                        typename KeyValueList::iterator i = n->value.collision_list->begin();
+                        typename KeyValueList::iterator end = n->value.collision_list->end();
                         for(;i != end && (result == 0); ++i)
                         {
                             result = keyvalue_match_get(**i, key, hash);
@@ -1431,7 +1432,7 @@ public:
                     uint32_t invalid_index = (hash) & 0x1f;
                     new_root->used = set_bit_off(new_root->used, invalid_index);
 
-                    Node::Ref* new_child_array = pool_.ref_chunks_.reserve_consecutive_elements(new_size);
+                    typename Node::Ref* new_child_array = pool_.ref_chunks_.reserve_consecutive_elements(new_size);
                     new_root->child_array = new_child_array;
                     size_t i = 0;
                     size_t child_index = 0;
@@ -1487,7 +1488,7 @@ public:
             return glh::iterator_range_length(begin(), end());
         }
 
-        friend PMapPool;
+        friend class PMapPool;
 
     private:
         PMapPool& pool_;
@@ -1637,10 +1638,9 @@ public:
         size_t   old_count       = parent->size();
         size_t   new_count       = old_count + 1;
         uint32_t local_index_bit = 1 << local_index;
-        const uint32_t* newnode_hash = newnode->hash_value();
 
-        Node::Ref* child_array = ref_chunks_.reserve_consecutive_elements(new_count);
-        Node::Ref* old_children = parent->child_array;
+        typename Node::Ref* child_array = ref_chunks_.reserve_consecutive_elements(new_count);
+        typename Node::Ref* old_children = parent->child_array;
 
         // Create new child array for current node and mark new index used.
         parent->child_array = child_array;
@@ -1701,8 +1701,8 @@ public:
 
                 size_t count = current->size();
 
-                Node::Ref* child_array = ref_chunks_.reserve_consecutive_elements(count);
-                Node::Ref* old_children = current->child_array;
+                typename Node::Ref* child_array = ref_chunks_.reserve_consecutive_elements(count);
+                typename Node::Ref* old_children = current->child_array;
                 unsafe_copy(old_children, old_children + count, child_array);
 
                 current->child_array = child_array;
@@ -1738,8 +1738,8 @@ public:
                         // Otherwise append to list.
 
                         const KeyValueList* oldlist = newnode->value.collision_list;
-                        KeyValueList::iterator i    = oldlist->begin();
-                        KeyValueList::iterator end  = oldlist->end();
+                        typename KeyValueList::iterator i    = oldlist->begin();
+                        typename KeyValueList::iterator end  = oldlist->end();
 
                         bool replace = false;
                         for(;i != end; ++i)
@@ -1877,9 +1877,10 @@ public:
     }
 
     /** Allocate new node with one value.*/
+#if 0 // TODO remove?
     Node* new_node(const KeyValue& v)
     {
-        Node*       n     = node_chunks_.reserve_element();
+        Node* n = node_chunks_.reserve_element();
         *kv = v;
 
         n->type = Node::ValueNode;
@@ -1887,11 +1888,12 @@ public:
 
         return n;
     }
+#endif
 
     /** Return number of bytes used by the chunk pool in total. */
     size_t reserved_size_bytes()
     {
-        size_t ref_map_size = ref_count_.size() *  sizeof(refcount_map::value_type);
+        size_t ref_map_size = ref_count_.size() *  sizeof(typename refcount_map::value_type);
         size_t total = sizeof(*this) + ref_map_size +  keyvalue_chunks_.reserved_size_bytes() + 
                        node_chunks_.reserved_size_bytes() +  ref_chunks_.reserved_size_bytes() + collided_list_pool_.reserved_size_bytes();
         return total;
@@ -1899,7 +1901,7 @@ public:
 
     size_t live_size_bytes()
     {
-        size_t ref_map_size = ref_count_.size() * sizeof(refcount_map::value_type);
+        size_t ref_map_size = ref_count_.size() * sizeof(typename refcount_map::value_type);
         size_t total = sizeof(*this) + ref_map_size +  keyvalue_chunks_.live_size_bytes() + 
                        node_chunks_.live_size_bytes() +  ref_chunks_.live_size_bytes() + collided_list_pool_.live_size_bytes();
         return total;

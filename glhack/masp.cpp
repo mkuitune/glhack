@@ -172,7 +172,7 @@ void Value::copy(const Value& v)
 {
     type = v.type;
 
-#define COPY_PARAM_V(param_name) value.##param_name = copy_new(v.value.##param_name)
+#define COPY_PARAM_V(param_name) value. param_name = copy_new(v.value. param_name)
     if(type == NUMBER) value.number.set(v.value.number);
     else if(type == SYMBOL || type == STRING) COPY_PARAM_V(string);
     else if(type == LIST)    COPY_PARAM_V(list);
@@ -647,7 +647,7 @@ Value make_value_map(Masp& m)
     return a;
 }
 
-Value make_value_map(Map& oldmap)
+Value make_value_map(const Map& oldmap)
 {
     Value a;
     a.type = MAP;
@@ -821,9 +821,7 @@ const char* to_newline(const char* begin, const char* end)
  */
 static const char* last_quote_of_string(const char* begin, const char* end)
 {
-    const char* last = end;
     const char* c = begin;
-    size_t i = 0;
 
     while(c != end)
     {
@@ -911,10 +909,11 @@ struct ScopeError
        If scope scoped pre-emptively, return line of error and and the faulty closing symbol.
     */
     enum Result{SCOPE_LEFT_OPEN, FAULTY_SCOPE_CLOSING, OK};
-    int line;
-    int char_on_line;
-    char scope;
     Result result;
+    int line;
+    char scope;
+    int char_on_line;
+
     ScopeError():result(OK){}
     ScopeError(Result res,char c, int cn , int l):result(res), line(l), scope(c), char_on_line(cn){}
 
@@ -952,17 +951,15 @@ static ScopeError check_scope(const char* begin, const char* end, const char* co
 {
     using namespace std;
 
-    bool result = true;
-    const char* c = begin;
-    const char* line_start_c = c;
-    size_t comment_length = strlen(comment);
-    int line_number = 0;
+    const char* c              = begin;
+    const char* line_start_c   = c;
+    size_t      comment_length = strlen(comment);
+    int         line_number    = 0;
 
     std::stack<std::pair<int, std::pair<int, int>>> expected_closing; // Scope index; line number
 
     while(c < end)
     {
-
         if(*c == '\n') line_start_c = c;
 
         if(match_string(comment, comment_length, c, end))
@@ -1455,14 +1452,16 @@ std::string value_type_to_string(const Value& v)
             if(v.value.number.type == Number::INT) return std::string("NUMBER:INT");
             else                                   return std::string("NUMBER:FLOAT");
         }
-        case STRING: return std::string("STRING");
-        case BOOLEAN: return std::string("BOOLEAN");
-        case NIL: return std::string("");
-        case SYMBOL: return std::string("SYMBOL");
-        case VECTOR: return std::string("VECTOR");
-        case LIST: return std::string("LIST");
-        case MAP: return std::string("MAP");
-        case OBJECT: return std::string("OBJECT");
+        case STRING:        return std::string("STRING");
+        case BOOLEAN:       return std::string("BOOLEAN");
+        case NIL:           return std::string("");
+        case SYMBOL:        return std::string("SYMBOL");
+        case VECTOR:        return std::string("VECTOR");
+        case LIST:          return std::string("LIST");
+        case MAP:           return std::string("MAP");
+        case OBJECT:        return std::string("OBJECT");
+        case NUMBER_ARRAY:  return std::string("NUMBER ARRAY");
+        case FUNCTION:           return std::string("FUNCTION");
     }
     return "";
 }
@@ -2350,7 +2349,8 @@ namespace {
     OPDEF(op_make_map, arg_start, arg_end)
     {
         Map map = new_map(m);
-        return make_value_map(map_pool(m).add(map, arg_start, arg_end));
+        MapPool* pool = &map_pool(m);
+        return make_value_map(pool->add(map, arg_start, arg_end));
     }
 
     OPDEF(op_make_vector, arg_start, arg_end)

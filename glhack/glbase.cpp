@@ -238,7 +238,7 @@ bool App::update()
     bool running = true;
 
     // User interaction etc. 
-    if(running = config_.update(this))
+    if((running = config_.update(this)))
     {
         // Clean event buffer
         user_input_.flush_events();

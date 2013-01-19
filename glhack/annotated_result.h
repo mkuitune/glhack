@@ -64,9 +64,9 @@ public:
 private:
     AnnotatedResult& operator=(const AnnotatedResult& a);
 
+    bool valid_;
     typename std::aligned_storage <sizeof(T), std::alignment_of<T>::value>::type value_[1];
     std::string message_;
-    bool valid_;
 };
 
 }
