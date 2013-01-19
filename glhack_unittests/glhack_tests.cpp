@@ -530,7 +530,7 @@ UTEST(containers, aligned_array_test)
 UTEST(shader_utilities, shader_parse_test)
 {
     using namespace glh;
-    bool result = true;
+
     const char* shader_f = 
         "#version 150\n"
         "uniform mat4 view_matrix;\n"

@@ -1,0 +1,4 @@
+
+add_executable(glhack_unittest glhack_tests.cpp  masp_tests.cpp  unittester.cp)
+target_link_libraries(glhack_unittest libglhack)
+

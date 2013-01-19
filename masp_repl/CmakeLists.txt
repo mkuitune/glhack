@@ -1,0 +1,1 @@
+add_executable(masp_repl masp_repl.cpp)
