@@ -18,6 +18,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "masp_repl", "masp_repl.vcxp
 		{44F323EF-6A0E-4F1C-989F-ED5CEE4FC70F} = {44F323EF-6A0E-4F1C-989F-ED5CEE4FC70F}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "triangle", "triangle.vcxproj", "{4E897010-9AA6-43F0-8F81-8C86C460CE86}"
+	ProjectSection(ProjectDependencies) = postProject
+		{44F323EF-6A0E-4F1C-989F-ED5CEE4FC70F} = {44F323EF-6A0E-4F1C-989F-ED5CEE4FC70F}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -40,6 +45,10 @@ Global
 		{A1535E59-FBD3-4747-8535-A3DFB24F20F7}.Debug|Win32.Build.0 = Debug|Win32
 		{A1535E59-FBD3-4747-8535-A3DFB24F20F7}.Release|Win32.ActiveCfg = Release|Win32
 		{A1535E59-FBD3-4747-8535-A3DFB24F20F7}.Release|Win32.Build.0 = Release|Win32
+		{4E897010-9AA6-43F0-8F81-8C86C460CE86}.Debug|Win32.ActiveCfg = Debug|Win32
+		{4E897010-9AA6-43F0-8F81-8C86C460CE86}.Debug|Win32.Build.0 = Debug|Win32
+		{4E897010-9AA6-43F0-8F81-8C86C460CE86}.Release|Win32.ActiveCfg = Release|Win32
+		{4E897010-9AA6-43F0-8F81-8C86C460CE86}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

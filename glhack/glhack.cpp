@@ -10,6 +10,10 @@
 #include <regex>
 #include <memory>
 
+bool          glh_logging_active(){return true;}
+std::ostream* glh_get_log_ptr(){return &std::cout;}
+
+
 namespace glh
 {
 
@@ -142,11 +146,16 @@ public:
 
 };
 
-// TODO: Figure out proper handle usage
-ShaderProgramHandle::ShaderProgramHandle(ShaderProgram* p){program = p;}
-ShaderProgramHandle::~ShaderProgramHandle(){} 
-//ShaderProgramHandle::~ShaderProgramHandle(){if(program) delete program;} 
-bool ShaderProgramHandle::is_valid(){return program != 0;}
+const char* program_name(ProgramHandle p)
+{
+    if(p) return p->name.c_str();
+    else  return 0;
+}
+
+bool valid(ProgramHandle p)
+{
+    return p != 0;
+}
 
 namespace
 {
@@ -308,8 +317,7 @@ bool release_program(ShaderProgram& program)
 }
 
 
-
-ShaderProgram* create_program(cstring& name, cstring& geometry_shader, cstring& vertex_shader, cstring& fragment_shader)
+ShaderProgram* create_shader_program(cstring& name, cstring& geometry_shader, cstring& vertex_shader, cstring& fragment_shader)
 {
     ShaderProgram* program = new ShaderProgram(name);
     bool result = true;
@@ -348,30 +356,35 @@ public:
     {
     }
 
-    virtual ShaderProgramHandle create_shader_program(cstring& name, cstring& geometry, cstring& vertex, cstring& fragment) override
+    virtual ProgramHandle create_program(cstring& name, cstring& geometry, cstring& vertex, cstring& fragment) override
     {
 
-        ShaderProgram* p = create_program(name, geometry, vertex, fragment);
+        ShaderProgram* p = create_shader_program(name, geometry, vertex, fragment);
 
         if(p) programs_[name] = ShaderProgramPtr(p);
 
-        ShaderProgramHandle h(p);
+        ProgramHandle h(p);
 
         return h;
     }
 
-     virtual ShaderProgramHandle shader_program(cstring& name) override
+     virtual ProgramHandle program(cstring& name) override
      {
          auto pi = programs_.find(name);
          ShaderProgram* p = 0;
          if(pi != programs_.end()) p = pi->second.get();
-         return ShaderProgramHandle(p);
+         return ProgramHandle(p);
+     }
+
+     virtual void use_program(ProgramHandle h) override
+     {
+
      }
 
 };
 
 
-GraphicsManager* create_graphics_manager()
+GraphicsManager* make_graphics_manager()
 {
     GraphicsManagerInt* manager(new GraphicsManagerInt());
     return manager;
@@ -406,50 +419,18 @@ void apply(const RenderPassSettings& pass)
     }
 }
 
+///////////// OpenGL Utilities /////////////
 
-/////////////////////// Minimal app callbacks ///////////////////////
-
-/** The minimal scene callbacks setup. */
-void minimal_scene()
+bool check_gl_error()
 {
-    bool run = true;
-    glh::RenderPassSettings renderpass_settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT, 
-                                                glh::vec4(0.76f,0.71f,0.5f,1.0f), 1);
-
-    auto update = [&run](App* app) -> bool
+    bool result = true;
+    GLenum ErrorCheckValue = glGetError();
+    if (ErrorCheckValue != GL_NO_ERROR)
     {
-        // Update state
-
-        // return runstate
-        return run;
-    }; //> Update callback
-
-    auto render = [&](App* app)
-    {
-        // Render all
-        apply(renderpass_settings);
-    };//> Render callback
-
-    auto resize = [](glh::App* app, int width, int height)
-    {
-        std::cout << "Resize:" << width << " " << height << std::endl;
-    }; //> Resize callback
-
-    auto key_callback = [&run](int key, const glh::Input::ButtonState& s)
-    {
-        if(key == Input::Esc)
-        {
-            run = false;
-        }
-    };//> Input callback
-
-    glh::AppConfig config = glh::app_config_default(update, render, resize);
-    glh::App app(config);
-
-    GLH_LOG_EXPR("Logger started");
-    add_key_callback(app, key_callback);
-    glh::default_main(app);
+        result = false;
+        GLH_LOG_EXPR("GL error:" << gluErrorString(ErrorCheckValue));
+    }
+    return result;
 }
-
 
 } // namespace glh

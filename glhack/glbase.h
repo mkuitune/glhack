@@ -5,13 +5,7 @@
 #pragma once
 
 
-#ifdef WIN32
-#define NOMINMAX
-#include<windows.h>
-#endif
-
-#include<GL/glew.h>
-#include <GL/glfw.h>
+#include "glhack.h"
 
 #include<functional>
 #include<algorithm>
@@ -19,18 +13,9 @@
 #include<set>
 #include<iostream>
 
-#include "shims_and_types.h"
+
 #include "math_tools.h"
 
-//TODO: Better logging.
-bool          glh_logging_active();
-std::ostream* glh_get_log_ptr();
-
-#define GLH_LOG_EXPR(expr_param) \
-    do { if ( glh_logging_active() ){\
-    (*glh_get_log_ptr()) << __FILE__ \
-    << " [" << __LINE__ << "] : " << expr_param \
-    << ::std::endl;} }while(false)
 
 
 namespace glh {
@@ -163,9 +148,9 @@ public:
 
     EventContainer events;
 
-    ArraySet<KeyCallback, funcompare<KeyCallback>>             key_callbacks;
-    ArraySet<KeyCallback, funcompare<KeyCallback>>             mouse_button_callbacks;
-    ArraySet<MouseMoveCallback, funcompare<MouseMoveCallback>> mouse_move_callbacks;
+    ArraySet<KeyCallback, funcompare<KeyCallback>>               key_callbacks;
+    ArraySet<KeyCallback, funcompare<KeyCallback>>               mouse_button_callbacks;
+    ArraySet<MouseMoveCallback, funcompare<MouseMoveCallback>>   mouse_move_callbacks;
     ArraySet<MouseWheelCallback, funcompare<MouseWheelCallback>> mouse_wheel_callbacks;
 
     vec2i          mouse;
@@ -178,6 +163,7 @@ class App;
 void default_main(App& app);
 
 /* Introductions for application functions. Implement these in your code.*/
+typedef std::function<bool(App*)> AppInit;
 typedef std::function<bool(App*)> AppUpdate;
 typedef std::function<void(App*)> AppRender;
 typedef std::function<void(App*, int, int)> AppResize;
@@ -189,13 +175,14 @@ struct AppConfig
     int height;
     bool fullscreen;
 
+    AppInit   init;
     AppUpdate update;
     AppRender render;
     AppResize resize;
 };
 
 /** Return a default config.*/
-AppConfig app_config_default(AppUpdate update, AppRender render, AppResize resize);
+AppConfig app_config_default(AppInit init, AppUpdate update, AppRender render, AppResize resize);
 
 /** Contains the application state. Note: There can be only one App alive per
  * program, so this should be used as a singleton.*/
@@ -216,13 +203,16 @@ public:
 
     /** Return reference to user input manager. */
     UserInput& user_input();
-   
+
+    GraphicsManager* graphics_manager();
+
     /** Signal window resize for app.*/
     void resize(int width, int height);
 private:
-    AppConfig config_;
-    UserInput user_input_;
-    bool      running_;
+    AppConfig                        config_;
+    UserInput                        user_input_;
+    bool                             running_;
+    std::shared_ptr<GraphicsManager> manager_;
 };
 
 void add_key_callback(App& app, const UserInput::KeyCallback& cb);
@@ -230,9 +220,10 @@ void add_mouse_button_callback(App& app, const UserInput::KeyCallback& cb);
 void add_mouse_move_callback(App& app, const UserInput::MouseMoveCallback& cb);
 void add_mouse_wheel_callback(App& app, const UserInput::MouseWheelCallback& cb);
 
-///////////// OpenGL Utilities /////////////
 
-/** Check GL error. @return true if no error found. */
-bool check_gl_error();
+///////////// Misc ///////////////
+
+/** Execute a minimal scene. Test that everything builds and runs etc.*/
+void minimal_scene();
 
 } // namespace glh

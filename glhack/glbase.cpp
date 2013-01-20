@@ -58,8 +58,6 @@ int main(int argc, char* argv[])
 
 glh::App*      g_app = 0;
 
-bool          glh_logging_active(){return true;}
-std::ostream* glh_get_log_ptr(){return &std::cout;}
 
 
 namespace {
@@ -152,7 +150,6 @@ void default_main(App& app)
     app.end();
 }
 
-#if 1
 ///////// UserInput //////////
 
 void UserInput::push_event(const InputEvent& e)
@@ -182,7 +179,7 @@ void UserInput::flush_events()
 }
 
 ///////// App Config //////////
-AppConfig app_config_default(AppUpdate update, AppRender render, AppResize resize)
+AppConfig app_config_default(AppInit init, AppUpdate update, AppRender render, AppResize resize)
 {
     assert(update != nullptr && render != nullptr);
 
@@ -190,6 +187,7 @@ AppConfig app_config_default(AppUpdate update, AppRender render, AppResize resiz
     config.width = 640;
     config.height = 480;
     config.fullscreen = false;
+    config.init   = init;
     config.update = update;
     config.render = render;
     config.resize = resize;
@@ -203,6 +201,8 @@ App::App(AppConfig config):config_(config)
     
     // Set global hooks 
     g_app = this;
+
+    manager_.reset(make_graphics_manager());
 }
 
 bool App::start()
@@ -219,16 +219,29 @@ bool App::start()
 
         if(glfwOpenWindow(width, height, 0,0,0,0,0,0, GLFW_WINDOW))
         {
-            initialized = true;
-
             // Bind event callbacks
             glfwSetKeyCallback(local_key_callback);
             glfwSetMouseWheelCallback(local_mousewheel_callback);
             glfwSetMousePosCallback(local_mouseposition_callback);
             glfwSetMouseButtonCallback(local_mousebutton_callback);
             glfwSetWindowSizeCallback(local_windows_resize_callback);
+
+
+            // Init glew
+            GLint GlewInitResult = glewInit();
+
+            if (GLEW_OK != GlewInitResult) 
+            {
+                printf("ERROR: %s\n",glewGetErrorString(GlewInitResult));
+            }
+            else
+            {
+                initialized = true;
+            }
         }
     }
+
+    if(initialized && config_.init) initialized = config_.init(this);
 
     return initialized;
 }
@@ -272,6 +285,8 @@ void App::resize(int width, int height)
     if(config_.resize) config_.resize(this, width, height);
 }
 
+GraphicsManager* App::graphics_manager(){return manager_.get();}
+
 
 void add_key_callback(App& app, const UserInput::KeyCallback& cb){
     add(app.user_input().key_callbacks, cb);
@@ -287,20 +302,53 @@ void add_mouse_wheel_callback(App& app, const UserInput::MouseWheelCallback& cb)
     add(app.user_input().mouse_wheel_callbacks, cb);
 }
 
-///////////// OpenGL Utilities /////////////
+/////////////////////// Minimal app callbacks ///////////////////////
 
-bool check_gl_error()
+/** The minimal scene callbacks setup. */
+void minimal_scene()
 {
-    bool result = true;
-    GLenum ErrorCheckValue = glGetError();
-    if (ErrorCheckValue != GL_NO_ERROR)
+    bool run = true;
+    glh::RenderPassSettings renderpass_settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT, 
+                                                glh::vec4(0.76f,0.71f,0.5f,1.0f), 1);
+
+    auto init = [&run](App* app) -> bool
     {
-        result = false;
-        GLH_LOG_EXPR("GL error:" << gluErrorString(ErrorCheckValue));
-    }
-    return result;
+        return true;
+    };//> Init callback
+
+    auto update = [&run](App* app) -> bool
+    {
+        // Update state
+
+        // return runstate
+        return run;
+    }; //> Update callback
+
+    auto render = [&](App* app)
+    {
+        // Render all
+        apply(renderpass_settings);
+    };//> Render callback
+
+    auto resize = [](glh::App* app, int width, int height)
+    {
+        std::cout << "Resize:" << width << " " << height << std::endl;
+    }; //> Resize callback
+
+    auto key_callback = [&run](int key, const glh::Input::ButtonState& s)
+    {
+        if(key == Input::Esc)
+        {
+            run = false;
+        }
+    };//> Input callback
+
+    glh::AppConfig config = glh::app_config_default(init, update, render, resize);
+    glh::App app(config);
+
+    GLH_LOG_EXPR("Logger started");
+    add_key_callback(app, key_callback);
+    glh::default_main(app);
 }
 
-
-#endif
 } // namespace glh

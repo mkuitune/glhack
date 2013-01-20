@@ -32,9 +32,6 @@ class SceneGraph
 public:
 
 };
-
-// Shaders
-
 // Screen quad shader
 const char* sqs_name     = "screen";
 const char* sqs_fragment = "";

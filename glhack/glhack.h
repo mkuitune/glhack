@@ -6,17 +6,37 @@ Targeted OpenGL version: 3.2. Targeted GLSL version: 1.5.
 
 #pragma once
 
-#include "glbase.h"
+#ifdef WIN32
+#define NOMINMAX
+#include<windows.h>
+#endif
+
+#include<GL/glew.h>
+#include <GL/glfw.h>
+
 #include "glh_typedefs.h"
+#include "shims_and_types.h"
 
 #include <list>
 #include <string>
 #include <vector>
 #include <memory>
 
+
+//TODO: Better logging.
+bool          glh_logging_active();
+std::ostream* glh_get_log_ptr();
+
+#define GLH_LOG_EXPR(expr_param) \
+    do { if ( glh_logging_active() ){\
+    (*glh_get_log_ptr()) << __FILE__ \
+    << " [" << __LINE__ << "] : " << expr_param \
+    << ::std::endl;} }while(false)
+
+
+
 namespace glh
 {
-
 
 ///////////// Typedefs ////////////
 
@@ -55,28 +75,25 @@ std::list<ShaderVar> parse_shader_vars(cstring& shader);
 class ShaderProgram;
 
 /** A handle to a ShaderProgram.*/
-class ShaderProgramHandle
-{
-public:
+typedef ShaderProgram* ProgramHandle;
 
-    ShaderProgramHandle(ShaderProgram* program_param);
-    ~ShaderProgramHandle();
+/////////// Shader program functions ///////////
 
-    bool is_valid();
-private:
-     ShaderProgram* program; 
-};
+const char* program_name(ProgramHandle p);
+bool        valid(ProgramHandle p);
 
 //////////// Graphics context /////////////
 
 DeclInterface(GraphicsManager,
     /** This function will create a shader program based on the source files passed to it*/
-    virtual ShaderProgramHandle create_shader_program(cstring& name, cstring& geometry, cstring& vertex, cstring& fragment) = 0;
+    virtual ProgramHandle create_program(cstring& name, cstring& geometry, cstring& vertex, cstring& fragment) = 0;
     /** Find shader by name. If not found return empty handle. */
-    virtual ShaderProgramHandle shader_program(cstring& name) = 0;
+    virtual ProgramHandle program(cstring& name) = 0;
+    virtual void          use_program(ProgramHandle h) = 0;
 );
 
-GraphicsManager* create_graphics_manager();
+GraphicsManager* make_graphics_manager();
+
 
 // TODO: Functions to map vars to shaders through ShaderProgramHandle
 
@@ -99,11 +116,9 @@ public:
 
 void apply(const RenderPassSettings& pass);
 
+///////////// OpenGL Utilities /////////////
 
-///////////// Misc ///////////////
-
-/** Execute a minimal scene. Test that everything builds and runs etc.*/
-void minimal_scene();
-
+/** Check GL error. @return true if no error found. */
+bool check_gl_error();
 
 } // namespace glh
