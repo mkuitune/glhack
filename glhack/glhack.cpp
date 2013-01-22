@@ -122,10 +122,12 @@ bool release_program(ShaderProgram& program);
 class ShaderProgram 
 {
 public:
+    typedef std::list<ShaderVar>                  varlist;
+    typedef std::map<ShaderVar::Mapping, varlist> varmap;
+
     std::string name;
 
-    std::list<ShaderVar> input_vars;
-    std::list<ShaderVar> output_vars;
+    varmap vars;
 
     // TODO: ShaderVar -> program handle map?
 
@@ -144,6 +146,10 @@ public:
 
     ~ShaderProgram(){release_program(*this);}
 
+    void reset_vars()
+    {
+        ShaderVar::for_Mapping([this](ShaderVar::Mapping m){this->vars[m] = varlist();});
+    }
 };
 
 const char* program_name(ProgramHandle p)
@@ -162,6 +168,12 @@ namespace
     ///////////////// Shader program utilities //////////////////////
     enum Compilable {Shader = 0, Program = 1};
 
+    void assign_varlist_locations(ShaderProgram::varlist& vars)
+    {
+        int i = 0;
+        for(auto v = vars.begin(); v != vars.end(); v++) v->program_location = i++;
+    }
+
     /** Parse variables from shaders to lists. */
     void init_var_lists(ShaderProgram& program)
     {
@@ -169,13 +181,15 @@ namespace
                              parse_shader_vars(program.vertex_shader),
                              parse_shader_vars(program.fragment_shader));
 
-        auto is_input_var = [](const ShaderVar& v) -> bool{return v.mapping != ShaderVar::StreamOut;};
-        auto out_start = std::partition(var_list.begin(), var_list.end(), is_input_var);
+        program.reset_vars();
 
-        program.input_vars = std::list<ShaderVar>(var_list.begin(), out_start);
-        program.output_vars = std::list<ShaderVar>(out_start, var_list.end());
+        for(auto v = var_list.begin(); v != var_list.end(); v++) program.vars[v->mapping].push_back(*v);
+
+        // Init variable locations based on order of listing
+        ShaderVar::for_Mapping([&program](ShaderVar::Mapping m){
+            assign_varlist_locations(program.vars[m]);
+        });
     }
-
 
     void log_shader_program_error(cstring& name, GLuint handle, Compilable comp)
     {
@@ -244,9 +258,11 @@ namespace
         return result;
     }
 
-    void locate_program_variable_handles(ShaderProgram& program)
+    void bind_program_input_locations(ShaderProgram& program)
     {
-        // TODO?
+        const ShaderProgram::varlist& vars(program.vars[ShaderVar::StreamIn]);
+        for(auto v = vars.begin(); v != vars.end(); ++v)
+            glBindAttribLocation(program.program_handle, v->program_location, v->name.c_str());
     }
 
     bool compile_program(ShaderProgram& program)
@@ -261,6 +277,10 @@ namespace
 
             if(shader_result)
             {
+                init_var_lists(program);
+
+                bind_program_input_locations(program);
+
                 glLinkProgram(program.program_handle);
 
                 // Verify link status
@@ -270,8 +290,6 @@ namespace
                 if(status != GL_FALSE)
                 {
                     glUseProgram(program.program_handle);
-                    init_var_lists(program);
-                    locate_program_variable_handles(program);
                     result = true;
                 }
                 else
@@ -312,6 +330,8 @@ bool release_program(ShaderProgram& program)
     {
         GLH_LOG_EXPR("Shader program finalization failed");
     }
+
+    program.program_handle = 0;
 
     return result;
 }
@@ -411,7 +431,7 @@ void RenderPassSettings::set_buffer_clear(Buffer buffer)
 void apply(const RenderPassSettings& pass)
 {
     const vec4& cc(pass.clear_color); 
-    glClearColor(cc[0], cc[1], cc[2], cc[3]);    
+    glClearColor(cc[0], cc[1], cc[2], cc[3]);
     glClearDepth(pass.clear_depth);
     if(pass.clear_mask)
     {

@@ -217,7 +217,12 @@ bool App::start()
     {
         // TODO: window size etc
 
-        if(glfwOpenWindow(width, height, 0,0,0,0,0,0, GLFW_WINDOW))
+        bool use_fullscreen = false;
+        int mode = use_fullscreen ? GLFW_FULLSCREEN : GLFW_WINDOW;
+
+        if(use_fullscreen) {width = 10000; height = 10000;}
+
+        if(glfwOpenWindow(width, height, 0,0,0,0,0,0, mode))
         {
             // Bind event callbacks
             glfwSetKeyCallback(local_key_callback);
@@ -237,6 +242,21 @@ bool App::start()
             else
             {
                 initialized = true;
+
+                const GLubyte *renderer    = glGetString( GL_RENDERER );
+                const GLubyte *vendor      = glGetString( GL_VENDOR );
+                const GLubyte *version     = glGetString( GL_VERSION );
+                const GLubyte *glslVersion = glGetString( GL_SHADING_LANGUAGE_VERSION );
+
+                GLint major, minor;
+                glGetIntegerv(GL_MAJOR_VERSION, &major);
+                glGetIntegerv(GL_MINOR_VERSION, &minor);
+
+                printf("GL Vendor : %s\n", vendor);
+                printf("GL Renderer : %s\n", renderer);
+                printf("GL Version (string) : %s\n", version);
+                printf("GL Version (integer) : %d.%d\n", major, minor);
+                printf("GLSL Version : %s\n", glslVersion);
             }
         }
     }
@@ -282,6 +302,7 @@ UserInput& App::user_input()
 
 void App::resize(int width, int height)
 {
+    glViewport(0, 0, width, height);
     if(config_.resize) config_.resize(this, width, height);
 }
 

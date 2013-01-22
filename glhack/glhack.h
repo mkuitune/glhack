@@ -64,6 +64,15 @@ public:
     GLuint program_location;
 
     ShaderVar(Mapping m, Type t, cstring& varname):mapping(m), type(t), name(varname), program_location(0){}
+
+    template<class FUN>
+    static void for_Mapping(FUN f)
+    {
+        f(Uniform);
+        f(StreamIn);
+        f(StreamOut);
+    }
+
 };
 
 std::ostream& operator<<(std::ostream& os, const ShaderVar& v);
