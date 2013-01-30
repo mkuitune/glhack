@@ -295,6 +295,11 @@ bool App::end()
     return true;
 }
 
+double App::time()
+{
+    return glfwGetTime();
+}
+
 UserInput& App::user_input()
 {
     return user_input_;

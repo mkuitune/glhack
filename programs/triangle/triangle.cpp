@@ -5,6 +5,23 @@ Todo:
 - hiddenlines rendering
 - mesh edgelines rendering
 
+
+
+class Texture
+{
+public:
+    std::vector<uint8_t> data_;
+};
+
+
+class SamplerHandle
+{
+public:
+    union{
+    }
+};
+
+
 */
 
 #include "glbase.h"
@@ -75,6 +92,11 @@ glh::VertexChunk colchunk(glh::BufferSignature(glh::TypeId::Float32, 3));
 
 glh::BufferSet bufs;
 
+glh::VarMap vars;
+
+float angle = 0.f;
+float radial_speed = 1.0 * M_PI;
+
 bool init(glh::App* app)
 {
     glh::GraphicsManager* gm = app->graphics_manager();
@@ -103,9 +125,16 @@ void render(glh::App* app)
 {
     apply(g_renderpass_settings);
 
-    auto active = glh::make_active(*sp_vcolor_handle);
+    float t = app->time();
+    float angle = t * radial_speed;
+    Eigen::Affine3f transform;
+    transform = Eigen::AngleAxis<float>(angle, glh::vec3(0.f, 0.f, 1.f));
+    vars["ObjectToWorld"] = glh::Var_t::make_mat4(transform.matrix());
+
+    auto active = glh::make_active(*sp_vcolor_rot_handle);
 
     active.bind_vertex_input(bufs.buffers_);
+    active.bind_uniforms(vars);
     active.draw();
 }
 

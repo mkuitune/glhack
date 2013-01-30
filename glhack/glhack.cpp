@@ -192,6 +192,12 @@ public:
         }
     }
 
+    void bind_uniform(const std::string& name, const Var_t& var){
+        for(auto &u: uniform_vars){
+            if(var.type_ == u.type && u.name == name) assign(program_handle, u.name.c_str(), var);
+        }
+    }
+
 };
 
 //////////////////// ActiveProgram ///////////////////
@@ -213,6 +219,12 @@ void ActiveProgram::bind_uniforms(VarMap& vmap){
     ShaderProgram* sp = shader_program(handle_);
     sp->bind_uniforms(vmap);
 }
+
+void ActiveProgram::bind_uniform(const std::string& name, const Var_t& var){
+    ShaderProgram* sp = shader_program(handle_);
+    sp->bind_uniform(name, var);
+}
+
 void ActiveProgram::draw(){
     if(component_count_ != g_component_max_count) glDrawArrays(GL_TRIANGLES, 0, component_count_);
 }

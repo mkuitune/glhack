@@ -14,6 +14,7 @@ Targeted OpenGL version: 3.2. Targeted GLSL version: 1.5.
 #include <vector>
 #include <memory>
 #include <cstring>
+#include <type_traits>
 
 namespace glh {
 
@@ -50,17 +51,26 @@ typedef std::list<ShaderVar> ShaderVarList;
 
 /** User space storage of shader program variables. */
 struct Var_t {
+    mat4            mat4_;
+    vec4            vec4_;
+    vec3            vec3_;
     ShaderVar::Type type_;
-    float           data_[16];
-    Var_t():type_(ShaderVar::Vec3){clear();}
-    Var_t(ShaderVar::Type type):type_(type){clear();}
-    Var_t(ShaderVar::Type type, float* data){set(type, data);}
 
-    void clear(){for(auto &d : data_) d = 0.f;}
-    void set(ShaderVar::Type type, float* data);
+    Var_t():type_(ShaderVar::Vec3){clear();}
+
+    Var_t(const vec3& vec){set_vec3(vec);}
+    Var_t(const vec4& vec){set_vec4(vec);}
+    Var_t(const mat4& mat){set_mat4(mat);}
+
+    void clear(){vec3_ = vec3::Zero(); vec4_ = vec4::Zero(); mat4_ = mat4::Zero(); }
+    void set_vec3(const vec3& vec){type_ = ShaderVar::Vec3; vec3_ = vec;}
+    void set_vec4(const vec4& vec){type_ = ShaderVar::Vec4; vec4_ = vec;}
+    void set_mat4(const mat4& mat){type_ = ShaderVar::Mat4; mat4_ = mat;}
     void assign(GLint location) const;
 
-    static Var_t make_var(ShaderVar::Type type, float* data){return Var_t(type, data);}
+    static Var_t make_vec3(const vec3& vec){return Var_t(vec);}
+    static Var_t make_vec4(const vec4& vec){return Var_t(vec);}
+    static Var_t make_mat4(const mat4& mat){return Var_t(mat);}
 };
 
 void assign(const GLuint program, const char* name, const Var_t& var);
@@ -69,9 +79,7 @@ typedef std::map<std::string, Var_t> VarMap;
 
 inline const std::string& iname(const VarMap::iterator& i){return i->first;};
 inline const Var_t&       ivar(const VarMap::iterator& i){return i->second;};
-
-void set(VarMap& m, const char* var, ShaderVar::Type t, float* data);
-VarMap::iterator find_var(VarMap& m, const std::string& name, ShaderVar::Type type);
+VarMap::iterator          find_var(VarMap& m, const std::string& name, ShaderVar::Type type);
 
 
 } // namespace glh

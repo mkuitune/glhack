@@ -7,7 +7,7 @@
 
 #include "tinymt32.h"
 //#include "tinymt64.h"
-
+#define _USE_MATH_DEFINES
 #include <cmath>
 #include <cstdint>
 #include <list>
@@ -16,9 +16,11 @@ namespace glh{
 
 typedef Eigen::Vector4f vec4;
 typedef Eigen::Vector3f vec3;
+typedef Eigen::Vector2f vec2;
 typedef Eigen::Vector2i vec2i;
 
 typedef Eigen::Matrix4f mat4;
+
 
 /////////////// Bit operations //////////////
 

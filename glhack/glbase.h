@@ -195,6 +195,9 @@ public:
     /** Finalize resources. */
     bool end();
 
+    /** If app initialization succeeded return seconds elapsed since App::start was called */
+    double time();
+
     /** Return config. */
     AppConfig& config(){return config_;}
 

@@ -41,6 +41,7 @@ public:
     ActiveProgram();
     void bind_vertex_input(NamedBufferHandles& buffers);
     void bind_uniforms(VarMap& vmap);
+    void bind_uniform(const std::string& name, const Var_t& var);
     void draw();
 
     ProgramHandle* handle_;
