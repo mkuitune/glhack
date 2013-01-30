@@ -94,6 +94,7 @@ glh::BufferSet bufs;
 
 glh::VarMap vars;
 
+float tprev = 0;
 float angle = 0.f;
 float radial_speed = 1.0 * M_PI;
 
@@ -118,6 +119,12 @@ bool init(glh::App* app)
 
 bool update(glh::App* app)
 {
+    float t = app->time();
+    angle += (t - tprev) * radial_speed;
+    tprev = t;
+    Eigen::Affine3f transform;
+    transform = Eigen::AngleAxis<float>(angle, glh::vec3(0.f, 0.f, 1.f));
+    vars["ObjectToWorld"] = transform.matrix();
     return g_run;
 }
 
@@ -125,11 +132,6 @@ void render(glh::App* app)
 {
     apply(g_renderpass_settings);
 
-    float t = app->time();
-    float angle = t * radial_speed;
-    Eigen::Affine3f transform;
-    transform = Eigen::AngleAxis<float>(angle, glh::vec3(0.f, 0.f, 1.f));
-    vars["ObjectToWorld"] = glh::Var_t::make_mat4(transform.matrix());
 
     auto active = glh::make_active(*sp_vcolor_rot_handle);
 
@@ -146,10 +148,9 @@ void resize(glh::App* app, int width, int height)
 void key_callback(int key, const glh::Input::ButtonState& s)
 {
     using namespace glh;
-    if(key == Input::Esc)
-    {
-        g_run = false;
-    }
+         if(key == Input::Esc) { g_run = false;}
+    else if(key == Input::Left){ radial_speed -= 0.1 * M_PI;}
+    else if(key == Input::Right){ radial_speed += 0.1 * M_PI;}
 }
 
 int main(int arch, char* argv)

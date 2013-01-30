@@ -68,6 +68,10 @@ struct Var_t {
     void set_mat4(const mat4& mat){type_ = ShaderVar::Mat4; mat4_ = mat;}
     void assign(GLint location) const;
 
+    Var_t& operator=(const vec3& vec){set_vec3(vec); return *this;}
+    Var_t& operator=(const vec4& vec){set_vec4(vec); return *this;}
+    Var_t& operator=(const mat4& mat){set_mat4(mat); return *this;}
+
     static Var_t make_vec3(const vec3& vec){return Var_t(vec);}
     static Var_t make_vec4(const vec4& vec){return Var_t(vec);}
     static Var_t make_mat4(const mat4& mat){return Var_t(mat);}
@@ -75,7 +79,7 @@ struct Var_t {
 
 void assign(const GLuint program, const char* name, const Var_t& var);
 
-typedef std::map<std::string, Var_t> VarMap;
+typedef std::map<std::string, Var_t, std::less<std::string>, Eigen::aligned_allocator<std::pair<std::string, Eigen::Vector4f> >> VarMap;
 
 inline const std::string& iname(const VarMap::iterator& i){return i->first;};
 inline const Var_t&       ivar(const VarMap::iterator& i){return i->second;};
