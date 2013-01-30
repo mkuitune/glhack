@@ -12,6 +12,10 @@
     <ClCompile Include="..\glhack\tinymt32.c" />
     <ClCompile Include="..\glhack\tinymt64.c" />
     <ClCompile Include="..\glhack\masp.cpp" />
+    <ClCompile Include="..\glhack\glbuffers.cpp" />
+    <ClCompile Include="..\glhack\glsystem.cpp" />
+    <ClCompile Include="..\glhack\glh_index.cpp" />
+    <ClCompile Include="..\glhack\glprogramvars.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\glhack\glbase.h" />
@@ -27,5 +31,9 @@
     <ClInclude Include="..\glhack\tinymt64.h" />
     <ClInclude Include="..\glhack\masp.h" />
     <ClInclude Include="..\glhack\annotated_result.h" />
+    <ClInclude Include="..\glhack\glbuffers.h" />
+    <ClInclude Include="..\glhack\glsystem.h" />
+    <ClInclude Include="..\glhack\glh_index.h" />
+    <ClInclude Include="..\glhack\glprogramvars.h" />
   </ItemGroup>
 </Project>

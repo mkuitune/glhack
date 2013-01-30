@@ -1,4 +1,5 @@
 /** 
+Todo:
 - rendertarget onscreen rendering
 - mesh rendering
 - hiddenlines rendering
@@ -8,34 +9,11 @@
 
 #include "glbase.h"
 
-
-/*
-scenegraph:
-
-node 
-transform
-bounding-box
-
-node tra
-*/
-
-
-class SCNode
-{
-public:
-
-};
-
-
-class SceneGraph
-{
-public:
-
-};
 // Screen quad shader
-const char* sqs_name     = "screen";
+const char* sp_vcolors = "screen";
+const char* sp_obj     = "screen_obj";
 
-const char* sqs_vertex   = 
+const char* sh_vertex   = 
 "#version 150               \n"
 "in vec3 VertexPosition;    "
 "in vec3 VertexColor;       "
@@ -46,17 +24,30 @@ const char* sqs_vertex   =
 "    gl_Position = vec4( VertexPosition, 1.0 );"
 "}";
 
-const char* sqs_fragment = 
-"#version 150                 \n"
+const char* sh_vertex_obj   = 
+"#version 150               \n"
+"uniform mat4 ObjectToWorld;"
+"in vec3      VertexPosition;    "
+"in vec3      VertexColor;       "
+"out vec3 Color;            "
+"void main()                "
+"{                          "
+"    Color = VertexColor;   "
+"    gl_Position = ObjectToWorld * vec4( VertexPosition, 1.0 );"
+"}";
+
+const char* sh_fragment = 
+"#version 150                  \n"
 "in vec3 Color;                "
 "out vec4 FragColor;           "
 "void main() {                 "
 "    FragColor = vec4(Color, 1.0); "
 "}";
 
-const char* sqs_geometry = "";
+const char* sh_geometry = "";
 
-glh::ProgramHandle sqs_handle;
+glh::ProgramHandle* sp_vcolor_handle;
+glh::ProgramHandle* sp_vcolor_rot_handle;
 
 // App state
 
@@ -65,52 +56,40 @@ glh::RenderPassSettings g_renderpass_settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFE
 
 bool g_run = true;
 
-float pos[] = {
+float posdata[] = {
     -0.8f, -0.8f, 0.0f,
     0.8f, -0.8f, 0.0f,
     0.0f, 0.8f, 0.0f
 };
+size_t posdatasize = sizeof(posdata) / sizeof(*posdata);
 
-float color[] = {
+float coldata[] = {
     1.0f, 0.0f, 0.0f,
     0.0f, 1.0f, 0.0f,
     0.0f, 0.0f, 1.0f
 };
+size_t coldatasize = sizeof(posdata) / sizeof(*posdata);
 
-GLuint vboHandles[2];
-GLuint posHandle;
-GLuint colHandle;
+glh::VertexChunk poschunk(glh::BufferSignature(glh::TypeId::Float32, 3));
+glh::VertexChunk colchunk(glh::BufferSignature(glh::TypeId::Float32, 3));
 
-GLuint vaoHandle;
+glh::BufferSet bufs;
 
 bool init(glh::App* app)
 {
     glh::GraphicsManager* gm = app->graphics_manager();
-    sqs_handle = gm->create_program(sqs_name, sqs_geometry, sqs_vertex, sqs_fragment);
+    sp_vcolor_handle     = gm->create_program(sp_vcolors, sh_geometry, sh_vertex, sh_fragment);
+    sp_vcolor_rot_handle = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment);
 
-    glGenBuffers(2, vboHandles);
+    // Todo create each bufferhandle automatically
+    poschunk.set(posdata, posdatasize);
+    colchunk.set(coldata, coldatasize);
 
-    posHandle = vboHandles[0];
-    colHandle = vboHandles[1];
+    bufs.create_handle("VertexPosition", glh::BufferSignature(glh::TypeId::Float32, 3));
+    bufs.create_handle("VertexColor",    glh::BufferSignature(glh::TypeId::Float32, 3));
 
-    glBindBuffer(GL_ARRAY_BUFFER, posHandle);
-    glBufferData(GL_ARRAY_BUFFER, 9 * sizeof(float), pos, GL_STATIC_DRAW);
-    
-    glBindBuffer(GL_ARRAY_BUFFER, colHandle);
-    glBufferData(GL_ARRAY_BUFFER, 9 * sizeof(float), color, GL_STATIC_DRAW);
-
-    glGenVertexArrays(1, &vaoHandle);
-    glBindVertexArray(vaoHandle);
-
-    // map these to sharedprogram assigned indices
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-
-    glBindBuffer(GL_ARRAY_BUFFER, posHandle);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (GLubyte*) 0);
-   
-    glBindBuffer(GL_ARRAY_BUFFER, colHandle);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (GLubyte*) 0);
+    bufs.assign("VertexPosition", poschunk);
+    bufs.assign("VertexColor", colchunk);
 
     return true;
 }
@@ -124,8 +103,10 @@ void render(glh::App* app)
 {
     apply(g_renderpass_settings);
 
-    glBindVertexArray(vaoHandle);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    auto active = glh::make_active(*sp_vcolor_handle);
+
+    active.bind_vertex_input(bufs.buffers_);
+    active.draw();
 }
 
 void resize(glh::App* app, int width, int height)

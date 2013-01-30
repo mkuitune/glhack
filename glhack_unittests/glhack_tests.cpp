@@ -526,7 +526,7 @@ UTEST(containers, aligned_array_test)
 
 
 ////////// Shader utilities etc. ///////////
-
+#if 0
 UTEST(shader_utilities, shader_parse_test)
 {
     using namespace glh;
@@ -548,7 +548,7 @@ UTEST(shader_utilities, shader_parse_test)
     for(auto i = vars.begin(); i != vars.end();i++) ut_test_out() << "  " << *i << std::endl;
 }
 
-
+#endif
 
 
 

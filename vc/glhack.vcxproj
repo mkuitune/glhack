@@ -14,7 +14,11 @@
     <ClCompile Include="..\glhack\allocators.cpp" />
     <ClCompile Include="..\glhack\geometry.cpp" />
     <ClCompile Include="..\glhack\glbase.cpp" />
+    <ClCompile Include="..\glhack\glbuffers.cpp" />
     <ClCompile Include="..\glhack\glhack.cpp" />
+    <ClCompile Include="..\glhack\glh_index.cpp" />
+    <ClCompile Include="..\glhack\glprogramvars.cpp" />
+    <ClCompile Include="..\glhack\glsystem.cpp" />
     <ClCompile Include="..\glhack\managed_structures.cpp" />
     <ClCompile Include="..\glhack\masp.cpp" />
     <ClCompile Include="..\glhack\math_tools.cpp" />
@@ -34,8 +38,12 @@
     <ClInclude Include="..\glhack\annotated_result.h" />
     <ClInclude Include="..\glhack\geometry.h" />
     <ClInclude Include="..\glhack\glbase.h" />
+    <ClInclude Include="..\glhack\glbuffers.h" />
     <ClInclude Include="..\glhack\glhack.h" />
+    <ClInclude Include="..\glhack\glh_index.h" />
     <ClInclude Include="..\glhack\glh_typedefs.h" />
+    <ClInclude Include="..\glhack\glprogramvars.h" />
+    <ClInclude Include="..\glhack\glsystem.h" />
     <ClInclude Include="..\glhack\managed_structures.h" />
     <ClInclude Include="..\glhack\masp.h" />
     <ClInclude Include="..\glhack\math_tools.h" />

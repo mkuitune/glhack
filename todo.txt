@@ -96,6 +96,9 @@ Todo glh:
 - masp command line
 - inteface to masp through commandlets?
 - texture loading
+- gpu resource monitoring - record texture and geometry data upper limits and monitor them
+    - take into record which assets are / are to be rendered. Note those that will not be rendered this
+        round and if running out of gpu memory finalize their GPU instance
 - masp interface objects for types passable to shader parameters
     - can. eg. configure shaders through repl:
         * (def g (graphicscontext))

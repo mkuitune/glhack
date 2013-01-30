@@ -41,7 +41,7 @@ const char* sqs_fragment = "";
 const char* sqs_vertex   = "";
 const char* sqs_geometry = "";
 
-glh::ProgramHandle sqs_handle;
+glh::ProgramHandle* sqs_handle;
 
 // App state
 
@@ -54,6 +54,10 @@ bool init(glh::App* app)
 {
     glh::GraphicsManager* gm = app->graphics_manager();
     sqs_handle = gm->create_program(sqs_name, sqs_geometry, sqs_vertex, sqs_fragment);
+
+    std::vector<int> iv;
+    iv.push_back(1);
+
     return true;
 }
 

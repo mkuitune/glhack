@@ -3,33 +3,22 @@
 
 #include "glhack.h"
 #include "shims_and_types.h"
+#include "glbase.h"
 
 #include <list>
 #include <sstream>
 #include <iostream>
 #include <regex>
 #include <memory>
-
-bool          glh_logging_active(){return true;}
-std::ostream* glh_get_log_ptr(){return &std::cout;}
-
+#include <algorithm>
 
 namespace glh
 {
+/////////////// Forward declaration ///////////////
 
-///////////// OpenGL State management ////////////
 
-bool check_gl_error(const char* msg)
-{
-    bool result = true;
-    GLenum gl_error = glGetError();
-    if (gl_error != GL_NO_ERROR)
-    {
-        result = false;
-        GLH_LOG_EXPR("Gl error" << gluErrorString(gl_error) << " at:" << msg);
-    }
-    return result;
-}
+ShaderVarList parse_shader_vars(cstring& shader);
+
 
 
 ///////////// Shaders ///////////////
@@ -61,8 +50,7 @@ ShaderMappingTokens shader_mapping_tokens()
 const ShaderMappingTokens g_shader_mappings = shader_mapping_tokens();
 const ShaderTypeTokens g_shader_types = shader_type_tokens();
 
-std::ostream& operator<<(std::ostream& os, const ShaderVar& v)
-{
+std::ostream& operator<<(std::ostream& os, const ShaderVar& v){
     cstring& mapstr(g_shader_mappings.map().find(v.mapping)->second);
     cstring& typestr(g_shader_types.map().find(v.type)->second);
     // TODO: shorter key/value accessor for BiMap
@@ -97,12 +85,12 @@ std::list<ShaderVar> parse_shader_vars(cstring& shader)
 {
     std::list<ShaderVar> vars;
     std::regex var_regex      = get_shader_variable_regex(g_shader_mappings, g_shader_types);
-    std::list<TextLine> lines = string_split(shader.c_str(), "\n");
+    std::list<TextLine> lines = string_split(shader.c_str(), "\n;");
 
-    for(auto line = lines.begin(); line != lines.end(); line++)
+    for(auto& line : lines)
     {
         std::cmatch match;
-        if(std::regex_search(line->begin(), line->end(), match, var_regex))
+        if(std::regex_search(line.begin(), line.end(), match, var_regex))
         {
             auto        mapping = g_shader_mappings.inverse_map().find(match[1]);
             auto        type    = g_shader_types.inverse_map().find(match[2]);
@@ -114,22 +102,35 @@ std::list<ShaderVar> parse_shader_vars(cstring& shader)
     return vars;
 }
 
+class ShaderProgram;
+
 bool release_program(ShaderProgram& program);
+
+bool verify_matching_types(ShaderVar::Type stype, TypeId::t t, int32_t components){
+    bool result = false;
+    if     (stype == ShaderVar::Vec3 && t == TypeId::Float32 && components == 3)  result = true;
+    else if(stype == ShaderVar::Vec4 && t == TypeId::Float32 && components == 4)  result = true;
+    return result;
+}
+
+GLenum bufferttype_to_gltype(TypeId::t t){
+    switch(t)
+    {
+        case TypeId::Float32: return GL_FLOAT;
+        default:                  return 0;
+    }
+}
+
 /** At this point an unholy mess containing all data relevant to a shader program management. '
     The lifetime of the wrapped program object is tied to the lifetime of this object: 
     do not allocate from stack (usually).
 */
-class ShaderProgram 
-{
+class ShaderProgram : public ProgramHandle{
 public:
-    typedef std::list<ShaderVar>                  varlist;
-    typedef std::map<ShaderVar::Mapping, varlist> varmap;
+    std::string name_;
 
-    std::string name;
-
-    varmap vars;
-
-    // TODO: ShaderVar -> program handle map?
+    ShaderVarList vertex_input_vars;
+    ShaderVarList uniform_vars;
 
     std::string geometry_shader;
     std::string vertex_shader;
@@ -140,55 +141,120 @@ public:
     GLuint vertex_handle;
     GLuint geometry_handle;
 
-    ShaderProgram(cstring& program_name):name(program_name), program_handle(0),
+    ShaderProgram(cstring& program_name):name_(program_name), program_handle(0),
         fragment_handle(0), vertex_handle(0), geometry_handle(0)
     {}
 
     ~ShaderProgram(){release_program(*this);}
 
-    void reset_vars()
-    {
-        ShaderVar::for_Mapping([this](ShaderVar::Mapping m){this->vars[m] = varlist();});
+    void reset_vars(){
+        vertex_input_vars  = ShaderVarList();
+        uniform_vars       = ShaderVarList();
     }
+
+    virtual const char* name() override {return name_.c_str();}
+
+    void use() {glUseProgram(program_handle);}
+
+    void bind_vertex_input(NamedBufferHandles& buffers)
+    {
+        ShaderVarList& input_variables(vertex_input_vars);
+
+        for(auto& bi : buffers)
+        {
+            auto ivar = std::find_if(input_variables.begin(), input_variables.end(),
+                                  [&bi](const ShaderVar& v)->bool{return (v.name == bi.first);});
+
+            if(ivar == input_variables.end()) continue;
+
+            BufferHandle& bufferhandle(*bi.second);
+
+            int32_t       components = bufferhandle.components();
+            TypeId::t     btype      = bufferhandle.mapped_sig_.type_;
+            auto          gltype     = bufferttype_to_gltype(btype);
+            GLsizei       stride     = 0;
+            const GLvoid* offset     = 0;
+
+            assert(verify_matching_types(ivar->type, btype, components));
+
+            glEnableVertexAttribArray(ivar->program_location);
+            bufferhandle.bind(GL_ARRAY_BUFFER);
+            glVertexAttribPointer(ivar->program_location, components, gltype, GL_FALSE, stride, offset);
+        }
+    }
+
+    void bind_uniforms(VarMap& vmap)
+    {
+        for(auto &u: uniform_vars)
+        {
+            auto var = find_var(vmap, u.name, u.type);
+            if(var != vmap.end()) assign(program_handle, u.name.c_str(), var->second);
+        }
+    }
+
 };
 
-const char* program_name(ProgramHandle p)
-{
-    if(p) return p->name.c_str();
-    else  return 0;
+//////////////////// ActiveProgram ///////////////////
+
+ShaderProgram* shader_program(ProgramHandle* handle){return static_cast<ShaderProgram*>(handle);}
+
+const int g_component_max_count = INT32_MAX;
+
+ActiveProgram::ActiveProgram():component_count_(g_component_max_count){}
+
+void ActiveProgram::bind_vertex_input(NamedBufferHandles& buffers){
+    ShaderProgram* sp = shader_program(handle_);
+    sp->bind_vertex_input(buffers);
+
+    for(auto &b: buffers) component_count_ = std::min(component_count_, b.second->component_count());
 }
 
-bool valid(ProgramHandle p)
-{
-    return p != 0;
+void ActiveProgram::bind_uniforms(VarMap& vmap){
+    ShaderProgram* sp = shader_program(handle_);
+    sp->bind_uniforms(vmap);
 }
+void ActiveProgram::draw(){
+    if(component_count_ != g_component_max_count) glDrawArrays(GL_TRIANGLES, 0, component_count_);
+}
+
+ActiveProgram make_active(ProgramHandle& handle){
+    ActiveProgram a;
+    ShaderProgram* sp = shader_program(&handle);
+    sp->use();
+    a.handle_ = &handle;
+    return a;
+}
+
 
 namespace
 {
     ///////////////// Shader program utilities //////////////////////
     enum Compilable {Shader = 0, Program = 1};
 
-    void assign_varlist_locations(ShaderProgram::varlist& vars)
-    {
-        int i = 0;
-        for(auto v = vars.begin(); v != vars.end(); v++) v->program_location = i++;
-    }
-
     /** Parse variables from shaders to lists. */
     void init_var_lists(ShaderProgram& program)
     {
-        auto var_list = join(parse_shader_vars(program.geometry_shader),
-                             parse_shader_vars(program.vertex_shader),
-                             parse_shader_vars(program.fragment_shader));
+        ShaderVarList geometry_list = parse_shader_vars(program.geometry_shader);
+        ShaderVarList vertex_list   = parse_shader_vars(program.vertex_shader);
+        ShaderVarList fragment_list = parse_shader_vars(program.fragment_shader);
+
+        auto to_uniforms = [&](ShaderVarList& cont){
+            for(auto &v : cont) if(v.mapping == ShaderVar::Uniform) program.uniform_vars.push_back(v);
+        };
 
         program.reset_vars();
 
-        for(auto v = var_list.begin(); v != var_list.end(); v++) program.vars[v->mapping].push_back(*v);
+        int input_index = 0;
+        for(auto& v : vertex_list){
+            if(v.mapping == ShaderVar::StreamIn){
+                v.program_location = input_index++;
+                program.vertex_input_vars.push_back(v);
+            }
+        }
 
-        // Init variable locations based on order of listing
-        ShaderVar::for_Mapping([&program](ShaderVar::Mapping m){
-            assign_varlist_locations(program.vars[m]);
-        });
+        to_uniforms(geometry_list );
+        to_uniforms(vertex_list );
+        to_uniforms(fragment_list );
     }
 
     void log_shader_program_error(cstring& name, GLuint handle, Compilable comp)
@@ -260,9 +326,12 @@ namespace
 
     void bind_program_input_locations(ShaderProgram& program)
     {
-        const ShaderProgram::varlist& vars(program.vars[ShaderVar::StreamIn]);
-        for(auto v = vars.begin(); v != vars.end(); ++v)
-            glBindAttribLocation(program.program_handle, v->program_location, v->name.c_str());
+        const ShaderVarList& vars(program.vertex_input_vars);
+
+        for(auto &v : vars)
+        {
+            glBindAttribLocation(program.program_handle, v.program_location, v.name.c_str());
+        }
     }
 
     bool compile_program(ShaderProgram& program)
@@ -294,7 +363,7 @@ namespace
                 }
                 else
                 {
-                    log_program_error(program.name, program.program_handle);
+                    log_program_error(program.name(), program.program_handle);
                 }
             }
         }
@@ -324,7 +393,8 @@ bool release_program(ShaderProgram& program)
 
     if(program.program_handle != 0) glDeleteProgram(program.program_handle);
 
-    result = check_gl_error();
+    result = true;
+    //result = check_gl_error(); // TODO enable
 
     if(!result)
     {
@@ -335,7 +405,6 @@ bool release_program(ShaderProgram& program)
 
     return result;
 }
-
 
 ShaderProgram* create_shader_program(cstring& name, cstring& geometry_shader, cstring& vertex_shader, cstring& fragment_shader)
 {
@@ -359,57 +428,50 @@ ShaderProgram* create_shader_program(cstring& name, cstring& geometry_shader, cs
     return program;
 }
 
-
 //////////// Graphics context /////////////
+
 
 class GraphicsManagerInt : public GraphicsManager
 {
 public:
 
     typedef std::shared_ptr<ShaderProgram> ShaderProgramPtr;
+    typedef std::shared_ptr<BufferHandle>  BufferHandlePtr;
 
+
+    // TODO: Bind entities to obj_id and name, boost::multi-index
 
     std::map<std::string, ShaderProgramPtr> programs_;
+    std::list<BufferHandlePtr>              bufferhandles_;
 
+    ~GraphicsManagerInt(){}
 
-    ~GraphicsManagerInt()
+    virtual ProgramHandle* create_program(cstring& name, cstring& geometry, cstring& vertex, cstring& fragment) override
     {
-    }
-
-    virtual ProgramHandle create_program(cstring& name, cstring& geometry, cstring& vertex, cstring& fragment) override
-    {
-
         ShaderProgram* p = create_shader_program(name, geometry, vertex, fragment);
 
         if(p) programs_[name] = ShaderProgramPtr(p);
+        else throw GraphicsException("Program creation failed.");
 
-        ProgramHandle h(p);
-
+        ProgramHandle* h = p;
         return h;
     }
 
-     virtual ProgramHandle program(cstring& name) override
+     virtual ProgramHandle* program(cstring& name) override
      {
          auto pi = programs_.find(name);
-         ShaderProgram* p = 0;
+         ProgramHandle* p = 0;
          if(pi != programs_.end()) p = pi->second.get();
-         return ProgramHandle(p);
-     }
-
-     virtual void use_program(ProgramHandle h) override
-     {
-
+         return p;
      }
 
 };
-
 
 GraphicsManager* make_graphics_manager()
 {
     GraphicsManagerInt* manager(new GraphicsManagerInt());
     return manager;
 }
-
 
 ///////////// RenderPassSettings ///////////////
 
@@ -437,20 +499,6 @@ void apply(const RenderPassSettings& pass)
     {
         glClear(pass.clear_mask);
     }
-}
-
-///////////// OpenGL Utilities /////////////
-
-bool check_gl_error()
-{
-    bool result = true;
-    GLenum ErrorCheckValue = glGetError();
-    if (ErrorCheckValue != GL_NO_ERROR)
-    {
-        result = false;
-        GLH_LOG_EXPR("GL error:" << gluErrorString(ErrorCheckValue));
-    }
-    return result;
 }
 
 } // namespace glh

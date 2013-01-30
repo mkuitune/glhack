@@ -17,8 +17,9 @@
 #include<functional>
 
 #include "allocators.h"
-#include "glh_typedefs.h"
+
 #include "math_tools.h"
+
 
 /////////// Utility macros /////////////
 
@@ -39,6 +40,9 @@ std::ostream & operator<< ( std::ostream & os, std::pair < T, U > const & p )
 
 
 namespace glh {
+/////////// Typedefs ///////////
+
+typedef const std::string cstring;
 
 /////////// Conditional utilities /////////////
 
@@ -728,7 +732,7 @@ bool has_key(M& map, KEY key)
 
 /** Try to find value matching key. */ 
 template<class M>
-typename M::mapped_type* try_get_value(M& map, typename M::key_type& key)
+typename M::mapped_type* try_get_value(M& map, typename const M::key_type& key)
 {
     typename M::mapped_type* result = nullptr;
     if(map.find(key) != map.end())

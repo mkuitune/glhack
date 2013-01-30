@@ -8,8 +8,8 @@
 #include "tinymt32.h"
 //#include "tinymt64.h"
 
-#include <math.h>
-#include <stdint.h>
+#include <cmath>
+#include <cstdint>
 #include <list>
 
 namespace glh{
@@ -18,6 +18,7 @@ typedef Eigen::Vector4f vec4;
 typedef Eigen::Vector3f vec3;
 typedef Eigen::Vector2i vec2i;
 
+typedef Eigen::Matrix4f mat4;
 
 /////////////// Bit operations //////////////
 
@@ -58,8 +59,32 @@ inline bool bit_is_on(const uint32_t field, const uint32_t bit)
     return  (field & 1 << bit) != 0;
 }
 
+//////////////////// Generators ///////////////////////////
 
-///////////// Random number generators ///////////
+template<class T> class Range {
+public:
+    struct iterator {
+
+        T current_;
+        bool operator!=(const iterator& i){return current_ !=  i.current_;}
+        const T& operator*(){return current_;}
+        void operator++(){++current_;}
+
+        iterator(T start):current_(start){}
+    };
+
+    T range_start_;
+    T range_end_;
+    Range(T range_start, T range_end):range_start_(range_start), range_end_(range_end){}
+
+    iterator begin() const {return iterator(range_start_);}
+    iterator end() const {return iterator(range_end_);}
+};
+
+template<class T>
+Range<T> make_range(T begin, T end){return Range<T>(begin, end);}
+
+///////////// Generators: Random number ///////////
 
 #define GLH_RAND_SEED 7894321
 

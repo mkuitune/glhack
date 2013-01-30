@@ -3,108 +3,66 @@ Targeted OpenGL version: 3.2. Targeted GLSL version: 1.5.
  
  \author Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)
 */
-
 #pragma once
 
-#ifdef WIN32
-#define NOMINMAX
-#include<windows.h>
-#endif
 
-#include<GL/glew.h>
-#include <GL/glfw.h>
-
-#include "glh_typedefs.h"
+#include "glbuffers.h"
+#include "glprogramvars.h"
 #include "shims_and_types.h"
+
 
 #include <list>
 #include <string>
 #include <vector>
 #include <memory>
+#include <cstring>
 
+namespace glh {
 
-//TODO: Better logging.
-bool          glh_logging_active();
-std::ostream* glh_get_log_ptr();
-
-#define GLH_LOG_EXPR(expr_param) \
-    do { if ( glh_logging_active() ){\
-    (*glh_get_log_ptr()) << __FILE__ \
-    << " [" << __LINE__ << "] : " << expr_param \
-    << ::std::endl;} }while(false)
-
-
-
-namespace glh
-{
-
-///////////// Typedefs ////////////
-
-typedef GLuint          bitfield_int;
-
-
-///////////// OpenGL State management ////////////
-
-bool check_gl_error(const char* msg);
-
-
-////////////// Shaders //////////////////////
-
-/** Typings and a definition for one external shader parameter. */
-class ShaderVar
-{
-public:
-    enum Mapping{Uniform, StreamIn, StreamOut};
-    enum Type{Vec3, Vec4, Mat4};
-
-    Mapping     mapping;
-    Type        type;
-    std::string name;
-
-    GLuint program_location;
-
-    ShaderVar(Mapping m, Type t, cstring& varname):mapping(m), type(t), name(varname), program_location(0){}
-
-    template<class FUN>
-    static void for_Mapping(FUN f)
-    {
-        f(Uniform);
-        f(StreamIn);
-        f(StreamOut);
-    }
-
-};
 
 std::ostream& operator<<(std::ostream& os, const ShaderVar& v);
 
-/** Generate the listing of the input and output variables for the particular shader. */
-std::list<ShaderVar> parse_shader_vars(cstring& shader);
+
+typedef std::list<ShaderVar> ShaderVarList;
 
 /** Opaque pointer to a shader program */
-class ShaderProgram;
+DeclInterface(ProgramHandle,
+    virtual const char* name() = 0;
+    //virtual void use() = 0;
+    //virtual void bind_vertex_input(NamedBufferHandles& buffers) = 0;
+    //virtual void bind_uniforms(VarMap& vmap) = 0;
+    //virtual void draw() = 0;
+);
 
-/** A handle to a ShaderProgram.*/
-typedef ShaderProgram* ProgramHandle;
+/** Reference to a bound program.
+    The lifetime of ActiveProgram may not exceed that of the bound program handle. */
+class ActiveProgram {
+public:
+    ActiveProgram();
+    void bind_vertex_input(NamedBufferHandles& buffers);
+    void bind_uniforms(VarMap& vmap);
+    void draw();
 
-/////////// Shader program functions ///////////
+    ProgramHandle* handle_;
+private:
+    int32_t        component_count_; 
+};
 
-const char* program_name(ProgramHandle p);
-bool        valid(ProgramHandle p);
+ActiveProgram make_active(ProgramHandle& h);
 
 //////////// Graphics context /////////////
 
 DeclInterface(GraphicsManager,
     /** This function will create a shader program based on the source files passed to it*/
-    virtual ProgramHandle create_program(cstring& name, cstring& geometry, cstring& vertex, cstring& fragment) = 0;
-    /** Find shader by name. If not found return empty handle. */
-    virtual ProgramHandle program(cstring& name) = 0;
-    virtual void          use_program(ProgramHandle h) = 0;
+    virtual ProgramHandle* create_program(cstring& name, cstring& geometry, cstring& vertex, cstring& fragment) = 0;
+    /** Find shader program by name. If not found return empty handle. */
+    virtual ProgramHandle* program(cstring& name) = 0;
+    // TODO: Add create buffer handle (so gl functions are not used before possible)
+
 );
 
 GraphicsManager* make_graphics_manager();
 
-
-// TODO: Functions to map vars to shaders through ShaderProgramHandle
 
 ///////////// RenderPassSettings ///////////////
 
@@ -124,10 +82,5 @@ public:
 };
 
 void apply(const RenderPassSettings& pass);
-
-///////////// OpenGL Utilities /////////////
-
-/** Check GL error. @return true if no error found. */
-bool check_gl_error();
 
 } // namespace glh

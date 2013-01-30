@@ -15,6 +15,7 @@ TextLine make_text_line(const char* buffer, int begin, int end, int line)
     return t;
 }
 
+/** Split string to lines according to one or more delimiter characters in delim */
 std::list<TextLine> string_split(const char* str, const char* delim)
 {
     std::list<TextLine> lines_out;
@@ -33,10 +34,12 @@ std::list<TextLine> string_split(const char* str, const char* delim)
     int i = 0;
     while(i < buffer_size)
     {
-        if(strncmp(buffer + i, delim, delim_size) == 0)
+        bool is_delim = strchr(delim, *(buffer + i)) != 0;
+
+        if(is_delim)
         {
             addLine(buffer, line_start, i , lines);
-            i += delim_size;
+            i += 1;
             line_start = i;
         }
         else
