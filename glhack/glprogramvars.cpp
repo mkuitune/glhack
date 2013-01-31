@@ -10,6 +10,7 @@ namespace glh {
 /////////////////// ShaderVar ///////////////////
 size_t ShaderVar::type_count(Type t){
     switch(t){
+        case Vec2: return 2;
         case Vec3: return 3;
         case Vec4: return 4;
         case Mat4: return 16;
@@ -18,24 +19,36 @@ size_t ShaderVar::type_count(Type t){
     }
 }
 
-/////////////////// Var_t ///////////////////
+ShaderTypeTokens shader_type_tokens()
+{
+    ShaderTypeTokens map;
+    add(map, ShaderVar::Vec2, "vec2")
+            (ShaderVar::Vec3, "vec3")
+            (ShaderVar::Vec4, "vec4")
+            (ShaderVar::Mat4, "mat4");
 
-void Var_t::assign(GLint location) const{
-         if(type_ == ShaderVar::Vec3) glUniform3fv(location, 1, vec3_.data());
-    else if(type_ == ShaderVar::Vec4) glUniform4fv(location, 1, vec4_.data());
-    else if(type_ == ShaderVar::Mat4) glUniformMatrix4fv(location, 1, GL_FALSE, mat4_.data());
+    return map;
 }
 
-void assign(const GLuint program, const char* name, const Var_t& var){
+ShaderMappingTokens shader_mapping_tokens()
+{
+    ShaderMappingTokens map;
+    add(map, ShaderVar::Uniform, "uniform")
+            (ShaderVar::StreamIn, "in")
+            (ShaderVar::StreamOut, "out");
+
+    return map;
+}
+
+void assign(const GLuint program, const char* name, const vec4& vec){
     GLint location = glGetUniformLocation(program, name);
-    if(location != -1) var.assign(location);
-    else               assert("Applying to non-existing location");
+    if(location != -1) glUniform4fv(location, 1, vec.data());
+    //else               assert("Applying to non-existing location");
 }
-
-VarMap::iterator find_var(VarMap& m, const std::string& name, ShaderVar::Type type){
-    auto i = m.find(name);
-    if(i != m.end() && ivar(i).type_ == type) return i;
-    else                                      return m.end();
+void assign(const GLuint program, const char* name, const mat4& mat){
+    GLint location = glGetUniformLocation(program, name);
+    if(location != -1) glUniformMatrix4fv(location, 1, GL_FALSE, mat.data());
+    //else               assert("Applying to non-existing location");
 }
 
 } // namespace glh

@@ -40,9 +40,11 @@ class ActiveProgram {
 public:
     ActiveProgram();
     void bind_vertex_input(NamedBufferHandles& buffers);
-    void bind_uniforms(VarMap& vmap);
-    void bind_uniform(const std::string& name, const Var_t& var);
     void draw();
+    void bind_uniform(const std::string& name, const mat4& mat);
+    void bind_uniform(const std::string& name, const vec4& vec);
+
+    template<class T> void bind_uniform(const NamedVar<T>& named_var){bind_uniform(named_var.name_, named_var.var_);}
 
     ProgramHandle* handle_;
 private:

@@ -23,30 +23,6 @@ ShaderVarList parse_shader_vars(cstring& shader);
 
 ///////////// Shaders ///////////////
 
-
-typedef BiMap<ShaderVar::Type, std::string> ShaderTypeTokens;
-typedef BiMap<ShaderVar::Mapping, std::string> ShaderMappingTokens;
-
-ShaderTypeTokens shader_type_tokens()
-{
-    ShaderTypeTokens map;
-    add(map, ShaderVar::Vec3, "vec3")
-            (ShaderVar::Vec4, "vec4")
-            (ShaderVar::Mat4, "mat4");
-
-    return map;
-}
-
-ShaderMappingTokens shader_mapping_tokens()
-{
-    ShaderMappingTokens map;
-    add(map, ShaderVar::Uniform, "uniform")
-            (ShaderVar::StreamIn, "in")
-            (ShaderVar::StreamOut, "out");
-
-    return map;
-}
-
 const ShaderMappingTokens g_shader_mappings = shader_mapping_tokens();
 const ShaderTypeTokens g_shader_types = shader_type_tokens();
 
@@ -183,6 +159,13 @@ public:
         }
     }
 
+    bool has_uniform(const std::string& name, const ShaderVar::Type t){
+         for(auto &u: uniform_vars) if(t == u.type && u.name == name) return true;
+         return false;
+    }
+
+
+#if 0
     void bind_uniforms(VarMap& vmap)
     {
         for(auto &u: uniform_vars)
@@ -192,12 +175,17 @@ public:
         }
     }
 
+    bool has_uniform(const std::string& name, const Var_t& var){
+         for(auto &u: uniform_vars) if(var.type_ == u.type && u.name == name) return true;
+         return false;
+    }
+
     void bind_uniform(const std::string& name, const Var_t& var){
         for(auto &u: uniform_vars){
             if(var.type_ == u.type && u.name == name) assign(program_handle, u.name.c_str(), var);
         }
     }
-
+#endif
 };
 
 //////////////////// ActiveProgram ///////////////////
@@ -215,14 +203,14 @@ void ActiveProgram::bind_vertex_input(NamedBufferHandles& buffers){
     for(auto &b: buffers) component_count_ = std::min(component_count_, b.second->component_count());
 }
 
-void ActiveProgram::bind_uniforms(VarMap& vmap){
+void ActiveProgram::bind_uniform(const std::string& name, const mat4& mat){
     ShaderProgram* sp = shader_program(handle_);
-    sp->bind_uniforms(vmap);
+    if(sp->has_uniform(name, ShaderVar::Mat4)) assign(sp->program_handle, name.c_str(), mat);
 }
 
-void ActiveProgram::bind_uniform(const std::string& name, const Var_t& var){
+void ActiveProgram::bind_uniform(const std::string& name, const vec4& vec){
     ShaderProgram* sp = shader_program(handle_);
-    sp->bind_uniform(name, var);
+    if(sp->has_uniform(name, ShaderVar::Vec4)) assign(sp->program_handle, name.c_str(), vec);
 }
 
 void ActiveProgram::draw(){

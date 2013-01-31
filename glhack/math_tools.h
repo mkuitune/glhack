@@ -12,6 +12,9 @@
 #include <cstdint>
 #include <list>
 
+
+#define PIf 3.141592846f
+
 namespace glh{
 
 typedef Eigen::Vector4f vec4;

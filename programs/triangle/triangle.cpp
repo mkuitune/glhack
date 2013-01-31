@@ -41,6 +41,8 @@ const char* sh_vertex   =
 "    gl_Position = vec4( VertexPosition, 1.0 );"
 "}";
 
+#define OBJ2WORLD "ObjectToWorld"
+
 const char* sh_vertex_obj   = 
 "#version 150               \n"
 "uniform mat4 ObjectToWorld;"
@@ -73,30 +75,56 @@ glh::RenderPassSettings g_renderpass_settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFE
 
 bool g_run = true;
 
-float posdata[] = {
-    -0.8f, -0.8f, 0.0f,
-    0.8f, -0.8f, 0.0f,
-    0.0f, 0.8f, 0.0f
-};
-size_t posdatasize = sizeof(posdata) / sizeof(*posdata);
-
-float coldata[] = {
-    1.0f, 0.0f, 0.0f,
-    0.0f, 1.0f, 0.0f,
-    0.0f, 0.0f, 1.0f
-};
-size_t coldatasize = sizeof(posdata) / sizeof(*posdata);
-
 glh::VertexChunk poschunk(glh::BufferSignature(glh::TypeId::Float32, 3));
+glh::VertexChunk normalchunk(glh::BufferSignature(glh::TypeId::Float32, 3));
 glh::VertexChunk colchunk(glh::BufferSignature(glh::TypeId::Float32, 3));
+glh::VertexChunk texchunk(glh::BufferSignature(glh::TypeId::Float32, 2));
 
 glh::BufferSet bufs;
 
-glh::VarMap vars;
 
 float tprev = 0;
 float angle = 0.f;
-float radial_speed = 1.0 * M_PI;
+float radial_speed = 1.0f * PIf;
+
+glh::NamedVar<glh::mat4> obj2world(OBJ2WORLD);
+
+void init_vertex_data()
+{
+    float posdata[] = {
+        -0.8f, -0.8f, 0.0f,
+        0.8f, -0.8f, 0.0f,
+        0.0f, 0.8f, 0.0f
+    };
+    size_t posdatasize = sizeof(posdata) / sizeof(*posdata);
+
+    float normaldata[] = {
+        0.0f, 0.0f, 1.0f,
+        0.0f, 0.0f, 1.0f,
+        0.0f, 0.0f, 1.0f
+    };
+    size_t normaldatasize = sizeof(normaldata) / sizeof(*normaldata);
+
+    float coldata[] = {
+        1.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 1.0f
+    };
+    size_t coldatasize = sizeof(posdata) / sizeof(*posdata);
+
+    float texdata[] = {
+        0.0f, 0.0f,
+        1.0f, 0.0f,
+        0.5f, 1.0f
+    };
+    size_t texdatasize = sizeof(texdata) / sizeof(*texdata);
+
+    // Todo create each bufferhandle automatically
+    poschunk.set(posdata, posdatasize);
+    colchunk.set(coldata, coldatasize);
+    texchunk.set(texdata, texdatasize);
+    normalchunk.set(normaldata, normaldatasize);
+}
 
 bool init(glh::App* app)
 {
@@ -104,9 +132,7 @@ bool init(glh::App* app)
     sp_vcolor_handle     = gm->create_program(sp_vcolors, sh_geometry, sh_vertex, sh_fragment);
     sp_vcolor_rot_handle = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment);
 
-    // Todo create each bufferhandle automatically
-    poschunk.set(posdata, posdatasize);
-    colchunk.set(coldata, coldatasize);
+    init_vertex_data();
 
     bufs.create_handle("VertexPosition", glh::BufferSignature(glh::TypeId::Float32, 3));
     bufs.create_handle("VertexColor",    glh::BufferSignature(glh::TypeId::Float32, 3));
@@ -119,12 +145,12 @@ bool init(glh::App* app)
 
 bool update(glh::App* app)
 {
-    float t = app->time();
+    float t = (float) app->time();
     angle += (t - tprev) * radial_speed;
     tprev = t;
     Eigen::Affine3f transform;
     transform = Eigen::AngleAxis<float>(angle, glh::vec3(0.f, 0.f, 1.f));
-    vars["ObjectToWorld"] = transform.matrix();
+    obj2world = transform.matrix();
     return g_run;
 }
 
@@ -136,7 +162,7 @@ void render(glh::App* app)
     auto active = glh::make_active(*sp_vcolor_rot_handle);
 
     active.bind_vertex_input(bufs.buffers_);
-    active.bind_uniforms(vars);
+    active.bind_uniform(obj2world);
     active.draw();
 }
 
@@ -149,8 +175,8 @@ void key_callback(int key, const glh::Input::ButtonState& s)
 {
     using namespace glh;
          if(key == Input::Esc) { g_run = false;}
-    else if(key == Input::Left){ radial_speed -= 0.1 * M_PI;}
-    else if(key == Input::Right){ radial_speed += 0.1 * M_PI;}
+    else if(key == Input::Left){ radial_speed -= 0.1f * PIf;}
+    else if(key == Input::Right){ radial_speed += 0.1f * PIf;}
 }
 
 int main(int arch, char* argv)
