@@ -33,6 +33,7 @@ class GraphicsException{
 public:
 
     GraphicsException(const char* msg):msg_(msg){}
+    GraphicsException(const std::string& msg):msg_(msg){}
     ~GraphicsException(){}
 
     std::string get_message(){return msg_;}

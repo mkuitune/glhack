@@ -89,6 +89,15 @@ float radial_speed = 1.0f * PIf;
 
 glh::NamedVar<glh::mat4> obj2world(OBJ2WORLD);
 
+glh::Image8 image;
+
+void load_image()
+{
+    const char* image_path = "test_512.png";
+    image = glh::load_image(image_path);
+    write_image_png(image, "out.png");
+}
+
 void init_vertex_data()
 {
     float posdata[] = {
@@ -139,6 +148,8 @@ bool init(glh::App* app)
 
     bufs.assign("VertexPosition", poschunk);
     bufs.assign("VertexColor", colchunk);
+
+    load_image();
 
     return true;
 }

@@ -475,8 +475,9 @@ GraphicsManager* make_graphics_manager()
 
 ///////////// RenderPassSettings ///////////////
 
-RenderPassSettings::RenderPassSettings(const GLuint mask, const vec4& color, const GLclampd depth)
-:clear_mask(mask), clear_color(color), clear_depth(depth)
+// TODO: writemask and glStencilMask, glDepthMask and glColorMask
+RenderPassSettings::RenderPassSettings(const GLuint clear_mask, const vec4& color, const GLclampd depth)
+:clear_mask(clear_mask), clear_color(color), clear_depth(depth)
 {}
 
 void RenderPassSettings::set_buffer_clear(Buffer buffer)

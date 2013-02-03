@@ -328,6 +328,77 @@ void add_mouse_wheel_callback(App& app, const UserInput::MouseWheelCallback& cb)
     add(app.user_input().mouse_wheel_callbacks, cb);
 }
 
+
+//////////////////// Images ////////////////////
+
+namespace {
+    void      free_uint8tarray(uint8_t* ptr){if(ptr) delete [] ptr;}
+    uint8_t*  alloc_uint8t_array(int size){return new uint8_t[size];}
+    void      stb_free_data(uint8_t* ptr){stbi_image_free(ptr);}
+} // End anonymous namespace
+
+Image8::Image8():width_(0), height_(0), channels_(0), data_(0), dealloc_(free_uint8tarray){}
+
+Image8::Image8(const int w, const int h, const int chan):
+    width_(w), height_(h), channels_(chan), dealloc_(free_uint8tarray)
+{
+    int datasize = size();
+    data_ = alloc_uint8t_array(datasize);
+}
+
+/** Takes ownership of data pointer passed to it. */
+Image8::Image8(const int w, const int h, const int chan, uint8_t* data, Deallocator dealloc):
+     width_(w), height_(h), channels_(chan), data_(data), dealloc_(dealloc){}
+
+Image8::Image8(Image8&& rhs):width_(rhs.width_), height_(rhs.height_), 
+    channels_(rhs.channels_), data_(rhs.data_), dealloc_(rhs.dealloc_){
+        rhs.data_ = 0;
+}
+
+Image8::~Image8(){if(data_) dealloc_(data_);}
+
+Image8& Image8::operator=(Image8&& rhs){
+    if(&rhs != this)
+    {
+
+        if(data_) dealloc_(data_);
+
+        width_    = rhs.width_;
+        height_   = rhs.height_;
+        channels_ = rhs.channels_;
+        data_     = rhs.data_;
+        dealloc_  = rhs.dealloc_;
+
+        rhs.data_ = 0;
+    }
+    return *this;
+}
+
+Image8 load_image(const char* path)
+{
+    int width     = 0;
+    int height    = 0;
+    int channels  = 0;
+
+    Image8::Deallocator dealloc = stb_free_data;
+
+    uint8_t* data = stbi_load(path, &width, &height, &channels, 0);
+
+    if(data == 0){
+        std::string msg = "Could not open image:" + std::string(path);
+        throw GraphicsException(msg);
+    }
+
+    return Image8(width, height, channels, data, dealloc);
+}
+
+bool write_image_png(const Image8& image, const char* path)
+{
+    int stride = image.stride();
+    int success = stbi_write_png(path, image.width_, image.height_, image.channels_, image.data_, stride);
+    return (success == 0);
+}
+
 /////////////////////// Minimal app callbacks ///////////////////////
 
 /** The minimal scene callbacks setup. */
