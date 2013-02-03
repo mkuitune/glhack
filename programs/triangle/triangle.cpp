@@ -26,9 +26,6 @@ public:
 
 #include "glbase.h"
 
-// Screen quad shader
-const char* sp_vcolors = "screen";
-const char* sp_obj     = "screen_obj";
 
 const char* sh_vertex   = 
 "#version 150               \n"
@@ -55,6 +52,22 @@ const char* sh_vertex_obj   =
 "    gl_Position = ObjectToWorld * vec4( VertexPosition, 1.0 );"
 "}";
 
+const char* sh_vertex_obj_tex   = 
+"#version 150               \n"
+"uniform mat4 ObjectToWorld;"
+"in vec3      VertexPosition;    "
+"in vec3      VertexColor;       "
+"in vec2      TexCoord;"
+"out vec3 v_color;            "
+"out vec2 v_texcoord;"
+"void main()                "
+"{                          "
+"    v_color = VertexColor;   "
+"    v_texcoord = TexCoord;"
+"    gl_Position = ObjectToWorld * vec4( VertexPosition, 1.0 );"
+"}";
+
+
 const char* sh_fragment = 
 "#version 150                  \n"
 "in vec3 Color;                "
@@ -63,10 +76,23 @@ const char* sh_fragment =
 "    FragColor = vec4(Color, 1.0); "
 "}";
 
+const char* sh_fragment_tex = 
+"#version 150                  \n"
+"uniform sampler2D Sampler;    "
+"in vec3 Color;                "
+"in vec2 v_texcoord;           "
+"out vec4 FragColor;           "
+"void main() {                 "
+"    vec4 texColor = texture( Sampler, v_texcoord );"
+"    FragColor = texColor;"
+//"    FragColor = vec4(Color, 1.0); "
+"}";
+
 const char* sh_geometry = "";
 
 glh::ProgramHandle* sp_vcolor_handle;
 glh::ProgramHandle* sp_vcolor_rot_handle;
+glh::ProgramHandle* sp_tex_handle;
 
 // App state
 
@@ -82,6 +108,10 @@ glh::VertexChunk texchunk(glh::BufferSignature(glh::TypeId::Float32, 2));
 
 glh::BufferSet bufs;
 
+// Screen quad shader
+const char* sp_vcolors = "screen";
+const char* sp_obj     = "screen_obj";
+const char* sp_obj_tex = "screen_obj_tex";
 
 float tprev = 0;
 float angle = 0.f;
@@ -95,7 +125,45 @@ void load_image()
 {
     const char* image_path = "test_512.png";
     image = glh::load_image(image_path);
+    glh::flip_vertical(image);
     write_image_png(image, "out.png");
+
+
+
+    glActiveTexture(GL_TEXTURE0);
+
+    GLuint tid;
+
+    glGenTextures(1, &tid);
+
+    // TODO: image.channels_ -> decide which format to use GL_RGBA etc.
+
+    glBindTexture(GL_TEXTURE_2D, tid);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width_, image.height_, 0, GL_RGB, GL_UNSIGNED_BYTE, image.data_);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+    GLuint tex_prog_handle = program_handle(sp_tex_handle);
+
+        // Set the Tex1 sampler uniform to refer to texture unit 0
+    int sampler_loc = glGetUniformLocation(tex_prog_handle, "Sampler");
+    if( sampler_loc >= 0 )
+        glUniform1i(sampler_loc, 0);
+    else
+        fprintf(stderr, "Uniform variable not found");
+
+}
+
+void bind_texture_uniform()
+{
+     GLuint tex_prog_handle = program_handle(sp_tex_handle);
+
+        // Set the Tex1 sampler uniform to refer to texture unit 0
+    int sampler_loc = glGetUniformLocation(tex_prog_handle, "Sampler");
+    if( sampler_loc >= 0 )
+        glUniform1i(sampler_loc, 0);
+    else
+        fprintf(stderr, "Uniform variable not found");
 }
 
 void init_vertex_data()
@@ -140,14 +208,17 @@ bool init(glh::App* app)
     glh::GraphicsManager* gm = app->graphics_manager();
     sp_vcolor_handle     = gm->create_program(sp_vcolors, sh_geometry, sh_vertex, sh_fragment);
     sp_vcolor_rot_handle = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment);
+    sp_tex_handle = gm->create_program(sp_obj_tex, sh_geometry, sh_vertex_obj_tex, sh_fragment_tex);
 
     init_vertex_data();
 
     bufs.create_handle("VertexPosition", glh::BufferSignature(glh::TypeId::Float32, 3));
     bufs.create_handle("VertexColor",    glh::BufferSignature(glh::TypeId::Float32, 3));
+    bufs.create_handle("TexCoord",       glh::BufferSignature(glh::TypeId::Float32, 2));
 
     bufs.assign("VertexPosition", poschunk);
     bufs.assign("VertexColor", colchunk);
+    bufs.assign("TexCoord", texchunk);
 
     load_image();
 
@@ -170,10 +241,11 @@ void render(glh::App* app)
     apply(g_renderpass_settings);
 
 
-    auto active = glh::make_active(*sp_vcolor_rot_handle);
+    auto active = glh::make_active(*sp_tex_handle);
 
     active.bind_vertex_input(bufs.buffers_);
     active.bind_uniform(obj2world);
+    bind_texture_uniform();
     active.draw();
 }
 

@@ -34,6 +34,8 @@ DeclInterface(ProgramHandle,
     //virtual void draw() = 0;
 );
 
+GLuint program_handle(const ProgramHandle* handle_);
+
 /** Reference to a bound program.
     The lifetime of ActiveProgram may not exceed that of the bound program handle. */
 class ActiveProgram {

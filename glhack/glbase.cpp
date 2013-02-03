@@ -399,6 +399,25 @@ bool write_image_png(const Image8& image, const char* path)
     return (success == 0);
 }
 
+void   flip_vertical(Image8& img)
+{
+    if(img.empty()) return;
+    int stride = img.stride();
+    std::vector<uint8_t> tmp_buffer(stride);
+    uint8_t* high_ptr;
+    uint8_t* low_ptr;
+    uint8_t* tmp_ptr(&tmp_buffer[0]);
+
+    for(int h = 0; h < img.height_/2; ++h)
+    {
+        high_ptr = img.data_ + (h * stride);
+        low_ptr =   img.data_ + ((img.height_ - h - 1) * stride);
+        memcpy(tmp_ptr, high_ptr, stride);
+        memcpy(high_ptr, low_ptr, stride);
+        memcpy(low_ptr, tmp_ptr, stride);
+    }
+}
+
 /////////////////////// Minimal app callbacks ///////////////////////
 
 /** The minimal scene callbacks setup. */

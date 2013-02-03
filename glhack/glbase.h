@@ -257,12 +257,16 @@ public:
     Image8& operator=(Image8&& rhs);
 
     int size() const {return width_ * height_ * channels_;}
+
+    /** Return size of horizontal row in bytes. */
     int stride() const {return width_ * channels_;}
     bool empty() const {return data_ == 0;}
 };
 
 Image8 load_image(const char* path);
 bool   write_image_png(const Image8& image, const char* path);
+void   flip_vertical(Image8& img);
+
 
 ///////////// Misc ///////////////
 

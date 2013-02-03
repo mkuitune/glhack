@@ -84,7 +84,8 @@ bool release_program(ShaderProgram& program);
 
 bool verify_matching_types(ShaderVar::Type stype, TypeId::t t, int32_t components){
     bool result = false;
-    if     (stype == ShaderVar::Vec3 && t == TypeId::Float32 && components == 3)  result = true;
+    if     (stype == ShaderVar::Vec2 && t == TypeId::Float32 && components == 2)  result = true;
+    else if(stype == ShaderVar::Vec3 && t == TypeId::Float32 && components == 3)  result = true;
     else if(stype == ShaderVar::Vec4 && t == TypeId::Float32 && components == 4)  result = true;
     return result;
 }
@@ -188,9 +189,19 @@ public:
 #endif
 };
 
-//////////////////// ActiveProgram ///////////////////
 
 ShaderProgram* shader_program(ProgramHandle* handle){return static_cast<ShaderProgram*>(handle);}
+const ShaderProgram* shader_program(const ProgramHandle* handle){return static_cast<const ShaderProgram*>(handle);}
+
+
+GLuint program_handle(const ProgramHandle* handle_)
+{
+    const ShaderProgram* sp = shader_program(handle_);
+    return sp->program_handle;
+}
+
+//////////////////// ActiveProgram ///////////////////
+
 
 const int g_component_max_count = INT32_MAX;
 
