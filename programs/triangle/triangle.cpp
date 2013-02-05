@@ -57,13 +57,13 @@ const char* sh_vertex_obj_tex   =
 "uniform mat4 ObjectToWorld;"
 "in vec3      VertexPosition;    "
 "in vec3      VertexColor;       "
-"in vec2      TexCoord;"
+"in vec3      TexCoord;"
 "out vec3 v_color;            "
 "out vec2 v_texcoord;"
 "void main()                "
 "{                          "
 "    v_color = VertexColor;   "
-"    v_texcoord = TexCoord;"
+"    v_texcoord = TexCoord.xy;"
 "    gl_Position = ObjectToWorld * vec4( VertexPosition, 1.0 );"
 "}";
 
@@ -104,9 +104,11 @@ bool g_run = true;
 glh::VertexChunk poschunk(glh::BufferSignature(glh::TypeId::Float32, 3));
 glh::VertexChunk normalchunk(glh::BufferSignature(glh::TypeId::Float32, 3));
 glh::VertexChunk colchunk(glh::BufferSignature(glh::TypeId::Float32, 3));
-glh::VertexChunk texchunk(glh::BufferSignature(glh::TypeId::Float32, 2));
+glh::VertexChunk texchunk(glh::BufferSignature(glh::TypeId::Float32, 3));
 
 glh::BufferSet bufs;
+
+glh::DefaultMesh mesh;
 
 // Screen quad shader
 const char* sp_vcolors = "screen";
@@ -190,9 +192,9 @@ void init_vertex_data()
     size_t coldatasize = sizeof(posdata) / sizeof(*posdata);
 
     float texdata[] = {
-        0.0f, 0.0f,
-        1.0f, 0.0f,
-        0.5f, 1.0f
+        0.0f, 0.0f, 0.0f,
+        1.0f, 0.0f, 0.0f,
+        0.5f, 1.0f, 0.0f
     };
     size_t texdatasize = sizeof(texdata) / sizeof(*texdata);
 
@@ -243,6 +245,7 @@ void render(glh::App* app)
 
     auto active = glh::make_active(*sp_tex_handle);
 
+    //active.bind_vertex_input_guess_names(bufs.buffers_);
     active.bind_vertex_input(bufs.buffers_);
     active.bind_uniform(obj2world);
     bind_texture_uniform();

@@ -17,6 +17,7 @@
     <ClCompile Include="..\glhack\glbuffers.cpp" />
     <ClCompile Include="..\glhack\glhack.cpp" />
     <ClCompile Include="..\glhack\glh_index.cpp" />
+    <ClCompile Include="..\glhack\glh_mesh.cpp" />
     <ClCompile Include="..\glhack\glprogramvars.cpp" />
     <ClCompile Include="..\glhack\glsystem.cpp" />
     <ClCompile Include="..\glhack\managed_structures.cpp" />
@@ -41,6 +42,7 @@
     <ClInclude Include="..\glhack\glbuffers.h" />
     <ClInclude Include="..\glhack\glhack.h" />
     <ClInclude Include="..\glhack\glh_index.h" />
+    <ClInclude Include="..\glhack\glh_mesh.h" />
     <ClInclude Include="..\glhack\glh_typedefs.h" />
     <ClInclude Include="..\glhack\glprogramvars.h" />
     <ClInclude Include="..\glhack\glsystem.h" />

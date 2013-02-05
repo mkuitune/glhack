@@ -105,6 +105,8 @@ private:
 
 typedef std::map<std::string, std::shared_ptr<BufferHandle> > NamedBufferHandles;
 
+
+
 class BufferSet {
 public:
 
@@ -119,8 +121,13 @@ public:
     void create_handle(const char* name, const BufferSignature& sig){
         buffers_[name] = std::make_shared<BufferHandle>(sig);
     }
+    void create_handle(const std::string& name, const BufferSignature& sig){
+        buffers_[name] = std::make_shared<BufferHandle>(sig);
+    }
 
     NamedBufferHandles buffers_;
 };
+
+
 
 }// end namespace glh

@@ -131,6 +131,8 @@ public:
 
     virtual const char* name() override {return name_.c_str();}
 
+    virtual const ShaderVarList& inputs() override {return vertex_input_vars;}
+
     void use() {glUseProgram(program_handle);}
 
     void bind_vertex_input(NamedBufferHandles& buffers)
@@ -199,6 +201,33 @@ GLuint program_handle(const ProgramHandle* handle_)
     const ShaderProgram* sp = shader_program(handle_);
     return sp->program_handle;
 }
+
+/** Add handle per each input buffer found in program.*/
+void init_bufferset_from_program(BufferSet& bufs, ProgramHandle* h)
+{
+    const ShaderVarList& inputs = h->inputs();
+    for(auto& i: inputs){
+        glh::TypeId::t type;
+        int32_t      dim;
+        std::tie(type, dim) = ShaderVar::typeid_and_dim(i.type);
+        bufs.create_handle(i.name, glh::BufferSignature(type, dim)); 
+    }
+}
+
+/** Map chunk of type ChannelType::<name> to input known by 'name' if
+ *  First three digits of <name> match with any position in 'name'.*/
+// TODO: create a binder object that takes references for these entities and handles the binding
+// without extensive name lookup
+void assign_by_guessing_names(BufferSet& bufs, DefaultMesh& mesh)
+{
+   for(auto&b : bufs.buffers_){
+            if(contains(b.first,"pos")  || contains(b.first,"Pos"))  bufs.assign(b.first, mesh.get(ChannelType::Position));
+       else if(contains(b.first,"norm") || contains(b.first,"Norm")) bufs.assign(b.first, mesh.get(ChannelType::Normal));
+       else if(contains(b.first,"tex")  || contains(b.first,"Tex"))  bufs.assign(b.first, mesh.get(ChannelType::Texture));
+       else if(contains(b.first,"col")  || contains(b.first,"Col"))  bufs.assign(b.first, mesh.get(ChannelType::Color));
+   }
+}
+
 
 //////////////////// ActiveProgram ///////////////////
 

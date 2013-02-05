@@ -16,6 +16,7 @@
     <ClCompile Include="..\glhack\glsystem.cpp" />
     <ClCompile Include="..\glhack\glh_index.cpp" />
     <ClCompile Include="..\glhack\glprogramvars.cpp" />
+    <ClCompile Include="..\glhack\glh_mesh.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\glhack\glbase.h" />
@@ -35,5 +36,6 @@
     <ClInclude Include="..\glhack\glsystem.h" />
     <ClInclude Include="..\glhack\glh_index.h" />
     <ClInclude Include="..\glhack\glprogramvars.h" />
+    <ClInclude Include="..\glhack\glh_mesh.h" />
   </ItemGroup>
 </Project>

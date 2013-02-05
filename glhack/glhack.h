@@ -6,10 +6,8 @@ Targeted OpenGL version: 3.2. Targeted GLSL version: 1.5.
 #pragma once
 
 
-#include "glbuffers.h"
 #include "glprogramvars.h"
-#include "shims_and_types.h"
-
+#include "glh_mesh.h"
 
 #include <list>
 #include <string>
@@ -28,6 +26,7 @@ typedef std::list<ShaderVar> ShaderVarList;
 /** Opaque pointer to a shader program */
 DeclInterface(ProgramHandle,
     virtual const char* name() = 0;
+    virtual const ShaderVarList& inputs() = 0;
     //virtual void use() = 0;
     //virtual void bind_vertex_input(NamedBufferHandles& buffers) = 0;
     //virtual void bind_uniforms(VarMap& vmap) = 0;
@@ -35,6 +34,13 @@ DeclInterface(ProgramHandle,
 );
 
 GLuint program_handle(const ProgramHandle* handle_);
+
+/** Add handle per each input buffer found in program.*/
+void init_bufferset_from_program(BufferSet& bufs, ProgramHandle* h);
+
+/** Map chunk of type ChannelType::<name> to input known by 'name' if
+ *  First three digits of <name> match with any position in 'name'.*/
+void assign_by_guessing_names(BufferSet& bufs, DefaultMesh& mesh);
 
 /** Reference to a bound program.
     The lifetime of ActiveProgram may not exceed that of the bound program handle. */

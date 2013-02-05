@@ -22,6 +22,21 @@ public:
     }
 };
 
+class ChannelType
+{
+public:
+    /** Semantic */
+    enum s{ Position = 0,
+            Normal   = 1, 
+            Color    = 2,
+            Texture  = 3,
+            S_LAST
+    };
+   
+    /** Type*/
+    enum t{Value,Index, T_LAST};
+};
+
 class EntityType{
 public:
     enum t

@@ -9,6 +9,7 @@ Targeted OpenGL version: 3.2. Targeted GLSL version: 1.5.
 #include "glbuffers.h"
 #include "shims_and_types.h"
 
+#include <tuple>
 #include <list>
 #include <string>
 #include <vector>
@@ -42,6 +43,18 @@ public:
         f(Uniform);
         f(StreamIn);
         f(StreamOut);
+    }
+
+    typedef std::tuple<TypeId::t, int32_t> type_dim;
+
+    static type_dim typeid_and_dim(Type t)
+    {
+        switch(t){
+            case Vec2: return std::make_tuple<TypeId::t, int32_t>(TypeId::Float32, 2);
+            case Vec3: return std::make_tuple<TypeId::t, int32_t>(TypeId::Float32, 3);
+            case Vec4: return std::make_tuple<TypeId::t, int32_t>(TypeId::Float32, 4);
+            default:  assert(!"Unsupported type"); return std::make_tuple<TypeId::t, int32_t>(TypeId::Float32, 0);
+        }
     }
 };
 

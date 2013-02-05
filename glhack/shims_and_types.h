@@ -106,6 +106,11 @@ cstring to_string(const T& value)
     return stream.str();
 }
 
+template<class T>
+bool contains(const std::string& str, const T& t){
+    return str.find(t) != std::string::npos;
+}
+
 ///////////// Container operations ////////////////
 
 template<class Container, class Function>
@@ -244,6 +249,7 @@ class AlignedArray
 public:
     typedef T  value_type;
     typedef T* iterator;
+    typedef const T* const_iterator;
 
     // TODO: Check alignment of value type!
     // TODO: Implement move
@@ -307,9 +313,13 @@ public:
     iterator begin() { return data_;}
     iterator end() { return data_ + size_;}
 
+    const_iterator begin() const { return data_;}
+    const_iterator end() const { return data_ + size_;}
+
+
     size_t size() const {return size_;}
-    size_t capacity() { return capacity_;}
-    size_t value_size(){ return sizeof(T);}
+    size_t capacity() const { return capacity_;}
+    size_t value_size() const { return sizeof(T);}
 
     void assign(T* start_ptr, T* end_ptr)
     {
