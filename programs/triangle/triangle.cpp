@@ -101,11 +101,6 @@ glh::RenderPassSettings g_renderpass_settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFE
 
 bool g_run = true;
 
-glh::VertexChunk poschunk(glh::BufferSignature(glh::TypeId::Float32, 3));
-glh::VertexChunk normalchunk(glh::BufferSignature(glh::TypeId::Float32, 3));
-glh::VertexChunk colchunk(glh::BufferSignature(glh::TypeId::Float32, 3));
-glh::VertexChunk texchunk(glh::BufferSignature(glh::TypeId::Float32, 3));
-
 glh::BufferSet bufs;
 
 glh::DefaultMesh mesh;
@@ -129,8 +124,6 @@ void load_image()
     image = glh::load_image(image_path);
     glh::flip_vertical(image);
     write_image_png(image, "out.png");
-
-
 
     glActiveTexture(GL_TEXTURE0);
 
@@ -198,11 +191,10 @@ void init_vertex_data()
     };
     size_t texdatasize = sizeof(texdata) / sizeof(*texdata);
 
-    // Todo create each bufferhandle automatically
-    poschunk.set(posdata, posdatasize);
-    colchunk.set(coldata, coldatasize);
-    texchunk.set(texdata, texdatasize);
-    normalchunk.set(normaldata, normaldatasize);
+    mesh.get(glh::ChannelType::Position).set(posdata, posdatasize);
+    mesh.get(glh::ChannelType::Color).set(coldata, coldatasize);
+    mesh.get(glh::ChannelType::Normal).set(normaldata, normaldatasize);
+    mesh.get(glh::ChannelType::Texture).set(texdata, texdatasize);
 }
 
 bool init(glh::App* app)
@@ -214,15 +206,10 @@ bool init(glh::App* app)
 
     init_vertex_data();
 
-    bufs.create_handle("VertexPosition", glh::BufferSignature(glh::TypeId::Float32, 3));
-    bufs.create_handle("VertexColor",    glh::BufferSignature(glh::TypeId::Float32, 3));
-    bufs.create_handle("TexCoord",       glh::BufferSignature(glh::TypeId::Float32, 2));
-
-    bufs.assign("VertexPosition", poschunk);
-    bufs.assign("VertexColor", colchunk);
-    bufs.assign("TexCoord", texchunk);
-
     load_image();
+
+    glh::init_bufferset_from_program(bufs, sp_tex_handle);
+    glh::assign_by_guessing_names(bufs, mesh);
 
     return true;
 }
@@ -245,7 +232,6 @@ void render(glh::App* app)
 
     auto active = glh::make_active(*sp_tex_handle);
 
-    //active.bind_vertex_input_guess_names(bufs.buffers_);
     active.bind_vertex_input(bufs.buffers_);
     active.bind_uniform(obj2world);
     bind_texture_uniform();
