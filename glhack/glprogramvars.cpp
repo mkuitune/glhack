@@ -26,7 +26,7 @@ ShaderTypeTokens shader_type_tokens()
     add(map, ShaderVar::Vec2, "vec2")
             (ShaderVar::Vec3, "vec3")
             (ShaderVar::Vec4, "vec4")
-            (ShaderVar::Mat4, "mat4"),
+            (ShaderVar::Mat4, "mat4")
             (ShaderVar::Sampler2D, "sampler2D");
 
     return map;

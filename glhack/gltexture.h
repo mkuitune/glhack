@@ -55,6 +55,8 @@ public:
     Texture();
     void get_params_from_image(const Image8& image);
 
+    // TODO: Init from shader program. On assignment verify image matches
+    // with preconfigured values.
     // TODO: Parametrize sampler settings.
     void assign(const Image8& image, int texture_unit);
 

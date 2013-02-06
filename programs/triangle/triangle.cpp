@@ -94,6 +94,8 @@ glh::ProgramHandle* sp_vcolor_handle;
 glh::ProgramHandle* sp_vcolor_rot_handle;
 glh::ProgramHandle* sp_tex_handle;
 
+std::shared_ptr<glh::Texture> texture;
+
 // App state
 
 glh::RenderPassSettings g_renderpass_settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT,
@@ -116,53 +118,30 @@ float radial_speed = 1.0f * PIf;
 
 glh::NamedVar<glh::mat4> obj2world(OBJ2WORLD);
 
-glh::Image8 image;
+glh::Image8 image_test;
+glh::Image8 image_bubble;
+
+// TODO: create texture set from shader program. Assign 
+// default checker pattern prior to having loaded texture data.
 
 void load_image()
 {
-    //const char* image_path = "test_512.png";
-    const char* image_path = "bubble.png";
-    image = glh::load_image(image_path);
-    glh::flip_vertical(image);
-    write_image_png(image, "out.png");
 
-    glActiveTexture(GL_TEXTURE0);
+    texture = std::make_shared<glh::Texture>();
 
-    GLuint tid;
+    const char* image_test_path = "test_512.png";
+    const char* image_buble_path = "bubble.png";
+    image_test = glh::load_image(image_test_path);
+    image_bubble = glh::load_image(image_buble_path);
+    glh::flip_vertical(image_test);
+    write_image_png(image_test, "out.png");
+
+    texture->assign(image_test, 0);
+
+    // TODO: wrap blending on per drawable basis
+    // drawable: program, mesh + uniforms
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-
-    glGenTextures(1, &tid);
-
-    // TODO: image.channels_ -> decide which format to use GL_RGBA etc.
-
-    glBindTexture(GL_TEXTURE_2D, tid);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width_, image.height_, 0, GL_RGBA, GL_UNSIGNED_BYTE, image.data_);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-
-    GLuint tex_prog_handle = program_handle(sp_tex_handle);
-
-        // Set the Tex1 sampler uniform to refer to texture unit 0
-    int sampler_loc = glGetUniformLocation(tex_prog_handle, "Sampler");
-    if( sampler_loc >= 0 )
-        glUniform1i(sampler_loc, 0);
-    else
-        fprintf(stderr, "Uniform variable not found");
-
-}
-
-void bind_texture_uniform()
-{
-     GLuint tex_prog_handle = program_handle(sp_tex_handle);
-
-        // Set the Tex1 sampler uniform to refer to texture unit 0
-    int sampler_loc = glGetUniformLocation(tex_prog_handle, "Sampler");
-    if( sampler_loc >= 0 )
-        glUniform1i(sampler_loc, 0);
-    else
-        fprintf(stderr, "Uniform variable not found");
 }
 
 void init_vertex_data()
@@ -238,7 +217,8 @@ void render(glh::App* app)
 
     active.bind_vertex_input(bufs.buffers_);
     active.bind_uniform(obj2world);
-    bind_texture_uniform();
+    active.bind_uniform("Sampler", *texture);
+
     active.draw();
 }
 
@@ -253,6 +233,8 @@ void key_callback(int key, const glh::Input::ButtonState& s)
          if(key == Input::Esc) { g_run = false;}
     else if(key == Input::Left){ radial_speed -= 0.1f * PIf;}
     else if(key == Input::Right){ radial_speed += 0.1f * PIf;}
+    else if(key == 'T'){ texture->assign(image_test, 0);}
+    else if(key == 'B'){ texture->assign(image_bubble, 0);}
 }
 
 int main(int arch, char* argv)
