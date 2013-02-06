@@ -253,6 +253,11 @@ void ActiveProgram::bind_uniform(const std::string& name, const vec4& vec){
     if(sp->has_uniform(name, ShaderVar::Vec4)) assign(sp->program_handle, name.c_str(), vec);
 }
 
+void ActiveProgram::bind_uniform(const std::string& name, const Texture& tex){
+    ShaderProgram* sp = shader_program(handle_);
+    if(sp->has_uniform(name, ShaderVar::Sampler2D)) assign(sp->program_handle, name.c_str(), tex);
+}
+
 void ActiveProgram::draw(){
     if(component_count_ != g_component_max_count) glDrawArrays(GL_TRIANGLES, 0, component_count_);
 }

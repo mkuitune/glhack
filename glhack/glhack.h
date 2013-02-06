@@ -8,6 +8,7 @@ Targeted OpenGL version: 3.2. Targeted GLSL version: 1.5.
 
 #include "glprogramvars.h"
 #include "glh_mesh.h"
+#include "gltexture.h"
 
 #include <list>
 #include <string>
@@ -51,6 +52,7 @@ public:
     void draw();
     void bind_uniform(const std::string& name, const mat4& mat);
     void bind_uniform(const std::string& name, const vec4& vec);
+    void bind_uniform(const std::string& name, const Texture& tex);
 
     template<class T> void bind_uniform(const NamedVar<T>& named_var){bind_uniform(named_var.name_, named_var.var_);}
 

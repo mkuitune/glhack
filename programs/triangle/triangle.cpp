@@ -120,7 +120,8 @@ glh::Image8 image;
 
 void load_image()
 {
-    const char* image_path = "test_512.png";
+    //const char* image_path = "test_512.png";
+    const char* image_path = "bubble.png";
     image = glh::load_image(image_path);
     glh::flip_vertical(image);
     write_image_png(image, "out.png");
@@ -128,13 +129,16 @@ void load_image()
     glActiveTexture(GL_TEXTURE0);
 
     GLuint tid;
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
 
     glGenTextures(1, &tid);
 
     // TODO: image.channels_ -> decide which format to use GL_RGBA etc.
 
     glBindTexture(GL_TEXTURE_2D, tid);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width_, image.height_, 0, GL_RGB, GL_UNSIGNED_BYTE, image.data_);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width_, image.height_, 0, GL_RGBA, GL_UNSIGNED_BYTE, image.data_);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 

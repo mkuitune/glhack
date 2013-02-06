@@ -1,1 +1,0 @@
-./configure --disable-cli --enable-shared --enable-win32thread --extra-ldflags=-Wl,--output-def=libx264.def

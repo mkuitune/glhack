@@ -8,6 +8,7 @@ Targeted OpenGL version: 3.2. Targeted GLSL version: 1.5.
 
 #include "glbuffers.h"
 #include "shims_and_types.h"
+#include "gltexture.h"
 
 #include <tuple>
 #include <list>
@@ -25,7 +26,7 @@ namespace glh {
 class ShaderVar {
 public:
     enum Mapping{Uniform, StreamIn, StreamOut, MAPPING_LAST};
-    enum Type{Vec2, Vec3, Vec4, Mat4, TYPE_LAST};
+    enum Type{Vec2, Vec3, Vec4, Mat4, Sampler2D, TYPE_LAST};
 
     Mapping     mapping;
     Type        type;
@@ -69,6 +70,8 @@ ShaderMappingTokens shader_mapping_tokens();
 
 void assign(const GLuint program, const char* name, const vec4& vec);
 void assign(const GLuint program, const char* name, const mat4& mat);
+void assign(const GLuint program, const char* name, const Texture& tex);
+
 
 template<class T> struct NamedVar{
     const std::string name_;
