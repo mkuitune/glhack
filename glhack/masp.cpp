@@ -1962,6 +1962,79 @@ evaluation_result eval(Masp& m, const Value* v)
     return evaluation_result(result);
 }
 
+const Value* get_value(Masp& m, const char* pathstr)
+{
+    const Value* result = 0;
+
+    if(pathstr)
+    {
+        const Value* tmpresult = 0;
+        std::string path(pathstr);
+        Map* map = &m.env()->get_env();
+
+        if(path.find('/') != std::string::npos)
+        {
+            auto lines = glh::string_split(pathstr, "/");
+
+            for(auto &l : lines){
+                Value key =  make_value_string(l.string);
+                glh::ConstOption<Value> value = map->try_get_value(key);
+
+                if(value.is_valid())
+                {
+                    tmpresult = value.get();
+                    if(&l != &*lines.rbegin())
+                    {
+                        map = value_map(*tmpresult);
+                        if(!map){
+                            tmpresult = 0;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        else{
+            //Value mapv;
+            //mapv.type = MAP;
+            //mapv.value.map = map;
+            //auto mapstr = value_to_string(mapv);
+            //mapv.value.map = 0;
+            //mapv.type = NIL;
+
+            //std::cout << mapstr << std::endl;
+
+            // Check if root env contains the value
+            Value key =  make_value_symbol(path.c_str());
+            glh::ConstOption<Value> value = map->try_get_value(key);
+            if(value.is_valid()) tmpresult = value.get();
+        }
+
+        result = tmpresult;
+    }
+
+    return result;
+}
+
+Type value_type(const Value* v)
+{
+    return v ? v->type : NIL;
+}
+
+std::string  get_value_string(const Value* v)
+{
+    std::string result;
+    if(v->is(STRING) || v->is(SYMBOL)) result = *v->value.string;
+    return result;
+}
+
+Number get_value_number(const Value* v)
+{
+    Number result = Number::make(0);
+    if(v->is(NUMBER)) result = v->value.number;
+    return result;
+}
+
 
 //////////// Native operators ////////////
 

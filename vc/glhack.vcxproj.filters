@@ -19,6 +19,8 @@
     <ClCompile Include="..\glhack\glh_mesh.cpp" />
     <ClCompile Include="..\glhack\gltexture.cpp" />
     <ClCompile Include="..\glhack\glh_image.cpp" />
+    <ClCompile Include="..\glhack\asset_manager.cpp" />
+    <ClCompile Include="..\glhack\iotools.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\glhack\glbase.h" />
@@ -41,5 +43,7 @@
     <ClInclude Include="..\glhack\glh_mesh.h" />
     <ClInclude Include="..\glhack\gltexture.h" />
     <ClInclude Include="..\glhack\glh_image.h" />
+    <ClInclude Include="..\glhack\asset_manager.h" />
+    <ClInclude Include="..\glhack\iotools.h" />
   </ItemGroup>
 </Project>

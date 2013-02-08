@@ -25,7 +25,7 @@ public:
 */
 
 #include "glbase.h"
-
+#include "asset_manager.h"
 
 const char* sh_vertex   = 
 "#version 150               \n"
@@ -121,6 +121,8 @@ glh::NamedVar<glh::mat4> obj2world(OBJ2WORLD);
 glh::Image8 image_test;
 glh::Image8 image_bubble;
 
+glh::AssetManagerPtr manager;
+
 // TODO: create texture set from shader program. Assign 
 // default checker pattern prior to having loaded texture data.
 
@@ -131,9 +133,10 @@ void load_image()
 
     const char* image_test_path = "test_512.png";
     const char* image_buble_path = "bubble.png";
-    image_test = glh::load_image(image_test_path);
-    image_bubble = glh::load_image(image_buble_path);
-    glh::flip_vertical(image_test);
+
+    image_test   = manager->load_image_gl("test_512.png");
+    image_bubble = manager->load_image_gl("bubble.png");
+
     write_image_png(image_test, "out.png");
 
     texture->assign(image_test, 0);
@@ -151,28 +154,28 @@ void init_vertex_data()
         0.8f, -0.8f, 0.0f,
         0.0f, 0.8f, 0.0f
     };
-    size_t posdatasize = sizeof(posdata) / sizeof(*posdata);
+    size_t posdatasize = static_array_size(posdata);
 
     float normaldata[] = {
         0.0f, 0.0f, 1.0f,
         0.0f, 0.0f, 1.0f,
         0.0f, 0.0f, 1.0f
     };
-    size_t normaldatasize = sizeof(normaldata) / sizeof(*normaldata);
+    size_t normaldatasize = static_array_size(normaldata);
 
     float coldata[] = {
         1.0f, 0.0f, 0.0f,
         0.0f, 1.0f, 0.0f,
         0.0f, 0.0f, 1.0f
     };
-    size_t coldatasize = sizeof(posdata) / sizeof(*posdata);
+    size_t coldatasize = static_array_size(coldata);
 
     float texdata[] = {
         0.0f, 0.0f, 0.0f,
         1.0f, 0.0f, 0.0f,
         0.5f, 1.0f, 0.0f
     };
-    size_t texdatasize = sizeof(texdata) / sizeof(*texdata);
+    size_t texdatasize = static_array_size(texdata);
 
     mesh.get(glh::ChannelType::Position).set(posdata, posdatasize);
     mesh.get(glh::ChannelType::Color).set(coldata, coldatasize);
@@ -185,7 +188,7 @@ bool init(glh::App* app)
     glh::GraphicsManager* gm = app->graphics_manager();
     sp_vcolor_handle     = gm->create_program(sp_vcolors, sh_geometry, sh_vertex, sh_fragment);
     sp_vcolor_rot_handle = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment);
-    sp_tex_handle = gm->create_program(sp_obj_tex, sh_geometry, sh_vertex_obj_tex, sh_fragment_tex);
+    sp_tex_handle        = gm->create_program(sp_obj_tex, sh_geometry, sh_vertex_obj_tex, sh_fragment_tex);
 
     init_vertex_data();
 
@@ -243,6 +246,10 @@ int main(int arch, char* argv)
 
     config.width = 1024;
     config.height = 640;
+
+    const char* config_file = "config.mp";
+
+    manager = glh::make_asset_manager(config_file);
 
     glh::App app(config);
 

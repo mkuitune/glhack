@@ -152,6 +152,9 @@ typedef glh::AnnotatedResult<ValuePtr> evaluation_result;
 /** Parse string to value data structure.*/
 parser_result string_to_value(Masp& m, const char* str);
 
+/** Parse and evaluate contents of file and return the result as a value data structure. */
+// TODO: evaluation_result readfile(Masp& m, const char* file_path);
+
 /** Return string representation of value. */
 std::string value_to_string(const Value* v);
 
@@ -163,5 +166,20 @@ const char* value_type_to_string(const Value* v);
 
 /** Evaluate the datastructure held within the atom in the context of the Masp env. Return result as atom.*/
 evaluation_result eval(Masp& m, const Value* v);
+
+/** Try to access value of name 'valpath' from m root env. Recursive access from maps is supported through
+*   URI paths, ie foo/bar will attempt to access the value in key 'bar' in map 'foo'. And "cat/hat/rat" will
+*   attempt to access the value by the key 'rat' held in the map stored in the map cat by the key 'hat' etc.
+*   If the value is not found, a null pointer is returned.*/
+const Value* get_value(Masp& m, const char* path);
+
+/** Get type of value. @param v Value to query @return Type of v. If v is null returns NIL. */
+Type         value_type(const Value* v);
+
+/** Get string contained within v if v is of type string or symbol, otherwise return empty string. */
+std::string  get_value_string(const Value* v);
+
+/** Return number stored in v. If v is not number will return 0. */
+Number       get_value_number(const Value* v);
 
 }//Namespace masp

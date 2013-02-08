@@ -90,7 +90,7 @@ bool verify_matching_types(ShaderVar::Type stype, TypeId::t t, int32_t component
     return result;
 }
 
-GLenum bufferttype_to_gltype(TypeId::t t){
+GLenum buffertype_to_gltype(TypeId::t t){
     switch(t)
     {
         case TypeId::Float32: return GL_FLOAT;
@@ -150,7 +150,7 @@ public:
 
             int32_t       components = bufferhandle.components();
             TypeId::t     btype      = bufferhandle.mapped_sig_.type_;
-            auto          gltype     = bufferttype_to_gltype(btype);
+            auto          gltype     = buffertype_to_gltype(btype);
             GLsizei       stride     = 0;
             const GLvoid* offset     = 0;
 
