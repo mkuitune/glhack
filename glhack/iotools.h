@@ -21,6 +21,7 @@ public:
     ~InputFile();
     std::ifstream& file();
     bool is_open();
+    void close();
     std::tuple<std::string, bool> contents_to_string();
 
     std::ifstream file_;
@@ -28,7 +29,13 @@ public:
 
 class OutputFile{
 public:
-    std::ofstream& file(){}
+    OutputFile(const char* path);
+    OutputFile(const char* path, bool append);
+    ~OutputFile();
+    bool is_open();
+    void close();
+    std::ofstream& file();
+
 
     std::ofstream file_;
 };

@@ -2458,6 +2458,12 @@ namespace {
         return Value();
     }
 
+    OPDEF(op_printf, arg_start, arg_end)
+    {
+        m.get_output() << value_iters_to_string(arg_start, arg_end, " ");
+        return Value();
+    }
+
     // Container operations
 
     OPDEF(op_count, arg_i, arg_end)
@@ -2573,6 +2579,7 @@ void Masp::Env::load_default_env()
     add_fun("make-vector", op_make_vector);
 
     add_fun("println", op_println);
+    add_fun("printf", op_printf);
     add_fun("str", op_str);
 
     add_fun("count", op_count); 

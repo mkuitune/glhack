@@ -17,6 +17,8 @@ std::ifstream& InputFile::file(){return file_;}
 
 bool InputFile::is_open(){if(file_) return true; else return false;}
 
+void InputFile::close(){file_.close();}
+
 std::tuple<std::string, bool> InputFile::contents_to_string()
 {
     std::string contents;
@@ -33,3 +35,24 @@ std::tuple<std::string, bool> InputFile::contents_to_string()
 
     return std::make_tuple(contents, success);
 }
+
+//// OutputFile ////
+
+OutputFile::OutputFile(const char* path)
+{
+    file_.open(path, std::ios::out | std::ios::binary);
+}
+
+OutputFile::OutputFile(const char* path, bool append)
+{
+    auto openflags = append ? std::ios::out | std::ios::app | std::ios::binary : std::ios::out | std::ios::binary;
+    file_.open(path, std::ios::out | std::ios::binary);
+}
+
+OutputFile::~OutputFile(){if(file_) file_.close();}
+
+bool OutputFile::is_open(){if(file_) return true; else return false;}
+
+void OutputFile::close(){file_.close();}
+
+std::ofstream& OutputFile::file(){return file_;}
