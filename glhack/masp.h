@@ -4,11 +4,15 @@
 #pragma once
 
 #include "annotated_result.h"
+#include "persistent_containers.h"
 
 #include<list>
 #include<memory>
 #include<cstdint>
 #include<ostream>
+#include<deque>
+#include<functional>
+#include<vector>
 
 namespace masp{
 
@@ -95,7 +99,88 @@ struct Number{
 
 };
 
+typedef std::vector<Number> NumberArray;
+
 class Value;
+
+// define hash function for value
+
+class ValuesAreEqual { public:
+    static bool compare(const Value& k1, const Value& k2);
+};
+
+class ValueHash { public:
+    static uint32_t hash(const Value& h);
+};
+
+
+typedef glh::PMapPool<Value, Value, ValuesAreEqual, ValueHash> MapPool;
+typedef MapPool::Map   Map;
+
+typedef glh::PListPool<Value>              ListPool;
+typedef glh::PListPool<Value>::List        List;
+typedef List::iterator VRefIterator;
+
+/**  Object interface */
+
+class IObject{
+public:
+    virtual ~IObject(){}
+};
+
+struct Function;
+
+/** Masp value. */
+class Value
+{
+public:
+    Type type;
+
+    typedef std::deque<Value> Vector;
+
+    union
+    {
+        Number       number;
+        std::string* string; //> Data for string | symbol
+        List*        list;
+        Map*         map;
+        Vector*      vector;
+        Function*    function;
+        IObject*     object;
+        NumberArray* number_array;
+        bool         boolean;
+    } value;
+
+    Value();
+    ~Value();
+    Value(const Value& v);
+    Value(Value&& v);
+    Value& operator=(const Value& v);
+    Value& operator=(Value&& v);
+    void alloc_str(const char* str);
+    void alloc_str(const std::string& str);
+    void alloc_str(const char* str, const char* end);
+    bool is_nil() const;
+    bool is_str(const char* str);
+    bool is(const Type t) const{return type == t;}
+    bool operator==(const Value& v) const;
+    uint32_t get_hash() const;
+
+    void movefrom(Value& v);
+
+private:
+    void dealloc();
+    void copy(const Value& v);
+
+};
+
+class Masp;
+
+typedef Value::Vector Vector;
+typedef Vector::iterator VecIterator;
+typedef std::function<Value(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)> PrimitiveFunction;
+
+
 void free_value(Value* v);
 
 class ValueDeleter{
@@ -146,6 +231,7 @@ private:
     Env* env_;
 };
 
+
 typedef glh::AnnotatedResult<ValuePtr> parser_result;
 typedef glh::AnnotatedResult<ValuePtr> evaluation_result;
 
@@ -181,5 +267,7 @@ std::string  get_value_string(const Value* v);
 
 /** Return number stored in v. If v is not number will return 0. */
 Number       get_value_number(const Value* v);
+
+void add_object(Masp& m, IObject* f);
 
 }//Namespace masp

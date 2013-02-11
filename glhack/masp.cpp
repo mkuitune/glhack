@@ -11,39 +11,14 @@
 #include<cctype>
 #include<regex>
 #include<sstream>
-#include<functional>
 #include<numeric>
 #include<tuple>
 #include<utility>
 #include<limits>
-#include<deque>
+
 
 namespace masp{
-
-////// Opaque value wrappers. ///////
-
-// define hash function for value
-
-class Value;
-
-class ValuesAreEqual { public:
-    static bool compare(const Value& k1, const Value& k2);
-};
-
-class ValueHash { public:
-    static uint32_t hash(const Value& h);
-};
-
-
-typedef glh::PMapPool<Value, Value, ValuesAreEqual, ValueHash> MapPool;
-typedef MapPool::Map   Map;
-
-typedef glh::PListPool<Value>              ListPool;
-typedef glh::PListPool<Value>::List        List;
-typedef List::iterator VRefIterator;
-
-typedef std::vector<Number> NumberArray;
-
+#if 1
 
 bool all_are_float(NumberArray& arr)
 {
@@ -68,62 +43,6 @@ void convert_to_int(NumberArray& arr)
 {
     for(auto n = arr.begin(); n != arr.end(); ++n){int i = n->to_int(); n->set(i);}
 }
-
-typedef int Object; // TODO - is just tagged list?
-typedef int Lambda; // TODO - can use after syntactic analysis - store lambda parameters
-
-struct Function;
-
-class Value
-{
-public:
-    Type type;
-
-    typedef std::deque<Value> Vector;
-
-    union
-    {
-        Number       number;
-        std::string* string; //> Data for string | symbol
-        List*        list;
-        Map*         map;
-        Object*      object;
-        Vector*      vector;
-        Function*    function;
-        NumberArray* number_array;
-        Lambda*      lambda;
-        bool         boolean;
-    } value;
-
-    Value();
-    ~Value();
-    Value(const Value& v);
-    Value(Value&& v);
-    Value& operator=(const Value& v);
-    Value& operator=(Value&& v);
-    void alloc_str(const char* str);
-    void alloc_str(const std::string& str);
-    void alloc_str(const char* str, const char* end);
-    bool is_nil() const;
-    bool is_str(const char* str){return glh::any_of(type, STRING, SYMBOL) && strcmp(value.string->c_str(), str) == 0;}
-    bool is(const Type t) const{return type == t;}
-    bool operator==(const Value& v) const;
-    uint32_t get_hash() const;
-
-    void movefrom(Value& v);
-
-
-private:
-    void dealloc();
-    void copy(const Value& v);
-
-};
-
-
-typedef Value::Vector Vector;
-typedef Vector::iterator VecIterator;
-typedef std::function<Value(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)> PrimitiveFunction;
-
 
 struct Function{PrimitiveFunction fun;};
 
@@ -151,6 +70,8 @@ Value::~Value()
 {
     dealloc();
 }
+
+bool Value::is_str(const char* str){return glh::any_of(type, STRING, SYMBOL) && strcmp(value.string->c_str(), str) == 0;}
 
 template<class V>
 V* copy_new(const V* v)
@@ -666,12 +587,11 @@ Value make_value_function(PrimitiveFunction f)
 
 }
 
-Value make_value_object(Masp& m)
+Value make_value_object(IObject* alloced_object)
 {
-    // TODO
     Value a;
     a.type = OBJECT;
-    a.value.object = new Object();
+    a.value.object = alloced_object;
     return a;
 }
 
@@ -2587,5 +2507,5 @@ void Masp::Env::load_default_env()
 }
 
 
-
+#endif
 } // Namespace masp ends
