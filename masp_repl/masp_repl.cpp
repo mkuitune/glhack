@@ -22,7 +22,7 @@ void printing_response(masp::Masp& M, masp::Value* v)
 
 void eval_response(masp::Masp& M, masp::Value* v)
 {
-    masp::evaluation_result result = masp::eval(M,v);
+    masp::masp_result result = masp::eval(M,v);
     if(result.valid())
     {
         printing_response(M, (*result).get());
@@ -110,7 +110,7 @@ int main(int argc, char* argv[])
         }
         else
         {
-            parser_result result = string_to_value(M, line);
+            masp_result result = string_to_value(M, line);
             if(result.valid())
             {
                 if(mode == PRINT)

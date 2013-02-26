@@ -33,19 +33,19 @@ public:
         if(file_ok)
         {
             // TODO: masp::readfile
-            masp::parser_result parser_result = string_to_value(M, config_file_lines.c_str());
-            if(parser_result.valid())
+            masp::masp_result masp_result = string_to_value(M, config_file_lines.c_str());
+            if(masp_result.valid())
             {
-                masp::evaluation_result eval_result = masp::eval(M, (*parser_result).get());
+                masp::masp_result eval_result = masp::eval(M, (*masp_result).get());
                 if(eval_result.valid()){
                     const masp::Value* asset_path_val = masp::get_value(M, g_asset_path_name);
                     if(asset_path_val) asset_path = masp::get_value_string(asset_path_val);
                 } else {
-                    std::string msg = std::string("Config file evaluation error:") + parser_result.message() + std::string("(") + config_file_path + std::string(")");
+                    std::string msg = std::string("Config file evaluation error:") + masp_result.message() + std::string("(") + config_file_path + std::string(")");
                     throw GraphicsException(msg);
                 }
             } else {
-                std::string msg = std::string("Config file parse error:") + parser_result.message() + std::string("(") + config_file_path + std::string(")");
+                std::string msg = std::string("Config file parse error:") + masp_result.message() + std::string("(") + config_file_path + std::string(")");
                 throw GraphicsException(msg);
             }
         } else {

@@ -45,5 +45,6 @@
     <ClInclude Include="..\glhack\glh_image.h" />
     <ClInclude Include="..\glhack\asset_manager.h" />
     <ClInclude Include="..\glhack\iotools.h" />
+    <ClInclude Include="..\glhack\masp_classwrap.h" />
   </ItemGroup>
 </Project>

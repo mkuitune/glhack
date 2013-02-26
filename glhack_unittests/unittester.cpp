@@ -1,35 +1,25 @@
-// This file unittester.cpp is part of Tiny Unittesting Framework.
+// This file unittester.cpp is part of Tiny Unittester.
 //
 // See unittester.h for instructions.
 //
 // This code is int the public domain.
 //
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-// IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-// OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-// ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-// OTHER DEALINGS IN THE SOFTWARE.
+// The software is provided "as is", without warranty of any kind etc.
 //
 // Author: Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)
 //
 #include "unittester.h"
 
-TestSet* g_tests = 0;
-std::list<std::string>* g_active_groups = 0;
+TestSet*                  g_tests = 0;
 
 struct ActiveGroups
 {
     ~ActiveGroups()
     {
-        if(g_active_groups) delete g_active_groups;
-
         if(g_tests) delete g_tests;
     }
-    void init(){
-        if(!g_active_groups ) g_active_groups = new std::list<std::string>();
-
+    void init()
+    {
         if(!g_tests) g_tests = new TestSet();
     }
 } g_ag;
@@ -59,26 +49,16 @@ std::ostream* g_outstream = &std::cout;
 std::ostream& ut_test_out(){return *g_outstream;}
 
 
-AddGroup::AddGroup(const char* str)
-{
-    g_ag.init();
-    g_active_groups->push_back(std::string(str));
-}
-
 /** Execute one test.*/
 void run_test(const TestCallback& test)
 {
-    ut_test_out() << "Run " << test.name << " ";
+    //ut_test_out() << "Run " << test.name << " ";
     g_exec_result = true;
+
     test.callback();
-    if(g_exec_result)
-    {
-        ut_test_out() << "\n    passed." << std::endl;
-    }
-    else
-    {
-        ut_test_out() << test.name << "\n    FAILED!" << std::endl; 
-    }
+
+    if(g_exec_result) ut_test_out() << "\n[Test " << test.group << ":" << test.name << " passed.]" << std::endl;
+    else              ut_test_out() << "\n[Test " << test.group << ":"<< test.name << " FAILED.]" << std::endl; 
 }
 
 /** Execute the test within one test group.*/
@@ -96,29 +76,28 @@ bool run_all_tests()
     return result;
 }
 
-/** If the user has defined exclusively runnable groups using ut_add_group then
- *  this function is used to execute them. */
-bool run_tests(const std::list<std::string>& group_names)
+int main(int argc, char* argv[])
 {
-    bool result = true;
-    for(auto gname = group_names.begin(); gname != group_names.end(); ++gname)
+    // Filter tests are run based on input: test names with any matching strings are run.
+    // If there is no input, then all tests are run.
+    if(argc < 2)
     {
-        auto test = g_tests->find(*gname);
-        if(test == g_tests->end())
+        run_all_tests();
+    }
+    else
+    {
+        for(auto& test_set : *g_tests)
         {
-            ut_test_out() << "Warning: Could not find group:" << *gname << std::endl;
-        }
-        {
-            run_group(*test);
+            for(auto& test_group : test_set.second)
+            {
+                bool run = false;
+                for(int i = 1; i < argc; ++i){
+                    if(test_group.second.names_match(argv[i])) run = true;
+                }
+                if(run) run_test(test_group.second);
+            }
         }
     }
 
-    return result;
-}
-
-int main(int argc, char* argv[])
-{
-    if(g_active_groups->size() > 0) run_tests(*g_active_groups);
-    else run_all_tests();
     return 0;
 }

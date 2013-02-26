@@ -23,6 +23,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "triangle", "triangle.vcxpro
 		{44F323EF-6A0E-4F1C-989F-ED5CEE4FC70F} = {44F323EF-6A0E-4F1C-989F-ED5CEE4FC70F}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "masp-unittest", "masp-unittest.vcxproj", "{985C45B7-039C-4CD1-B526-E136AA30E054}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pcontainers-unittest", "pcontainers-unittest.vcxproj", "{484D0F21-025A-49A7-B2F2-5AB59B789BA3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -49,6 +53,14 @@ Global
 		{4E897010-9AA6-43F0-8F81-8C86C460CE86}.Debug|Win32.Build.0 = Debug|Win32
 		{4E897010-9AA6-43F0-8F81-8C86C460CE86}.Release|Win32.ActiveCfg = Release|Win32
 		{4E897010-9AA6-43F0-8F81-8C86C460CE86}.Release|Win32.Build.0 = Release|Win32
+		{985C45B7-039C-4CD1-B526-E136AA30E054}.Debug|Win32.ActiveCfg = Debug|Win32
+		{985C45B7-039C-4CD1-B526-E136AA30E054}.Debug|Win32.Build.0 = Debug|Win32
+		{985C45B7-039C-4CD1-B526-E136AA30E054}.Release|Win32.ActiveCfg = Release|Win32
+		{985C45B7-039C-4CD1-B526-E136AA30E054}.Release|Win32.Build.0 = Release|Win32
+		{484D0F21-025A-49A7-B2F2-5AB59B789BA3}.Debug|Win32.ActiveCfg = Debug|Win32
+		{484D0F21-025A-49A7-B2F2-5AB59B789BA3}.Debug|Win32.Build.0 = Debug|Win32
+		{484D0F21-025A-49A7-B2F2-5AB59B789BA3}.Release|Win32.ActiveCfg = Release|Win32
+		{484D0F21-025A-49A7-B2F2-5AB59B789BA3}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

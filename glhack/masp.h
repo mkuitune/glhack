@@ -97,7 +97,13 @@ struct Number{
     static Number make(int i){Number n; n.set(i); return n;}
     static Number make(double f){Number n; n.set(f); return n;}
 
+    friend std::ostream& operator<<(std::ostream& os, const Number& n){
+        if(n.type == Number::INT) os << n.to_int(); else os << n.to_float();
+        return os;
+    }
+
 };
+
 
 typedef std::vector<Number> NumberArray;
 
@@ -126,6 +132,8 @@ typedef List::iterator VRefIterator;
 class IObject{
 public:
     virtual ~IObject(){}
+    virtual std::string to_string() = 0;
+    virtual IObject* copy() = 0;
 };
 
 struct Function;
@@ -232,17 +240,24 @@ private:
 };
 
 
-typedef glh::AnnotatedResult<ValuePtr> parser_result;
-typedef glh::AnnotatedResult<ValuePtr> evaluation_result;
+typedef glh::AnnotatedResult<ValuePtr> masp_result;
 
 /** Parse string to value data structure.*/
-parser_result string_to_value(Masp& m, const char* str);
+masp_result string_to_value(Masp& m, const char* str);
+
+/** Evaluate the datastructure held within the atom in the context of the Masp env. Return result as atom.*/
+masp_result eval(Masp& m, const Value* v);
+
+/** Parse string and evaluate result */
+masp_result read_eval(Masp& m, const char* str);
 
 /** Parse and evaluate contents of file and return the result as a value data structure. */
-// TODO: evaluation_result readfile(Masp& m, const char* file_path);
+// TODO: masp_result readfile(Masp& m, const char* file_path);
 
 /** Return string representation of value. */
 std::string value_to_string(const Value* v);
+
+std::ostream& operator<<(std::ostream& os, const Value& v);
 
 /** Return string representation of value annotated with type. */
 std::string value_to_typed_string(const Value* v);
@@ -250,8 +265,10 @@ std::string value_to_typed_string(const Value* v);
 /** Return type of value as string.*/
 const char* value_type_to_string(const Value* v);
 
-/** Evaluate the datastructure held within the atom in the context of the Masp env. Return result as atom.*/
-evaluation_result eval(Masp& m, const Value* v);
+
+void add_fun(Masp& m, const char* name, PrimitiveFunction f);
+
+/// State accessors
 
 /** Try to access value of name 'valpath' from m root env. Recursive access from maps is supported through
 *   URI paths, ie foo/bar will attempt to access the value in key 'bar' in map 'foo'. And "cat/hat/rat" will
@@ -262,12 +279,65 @@ const Value* get_value(Masp& m, const char* path);
 /** Get type of value. @param v Value to query @return Type of v. If v is null returns NIL. */
 Type         value_type(const Value* v);
 
-/** Get string contained within v if v is of type string or symbol, otherwise return empty string. */
-std::string  get_value_string(const Value* v);
 
-/** Return number stored in v. If v is not number will return 0. */
-Number       get_value_number(const Value* v);
+// object_factory = return list (value:IObject, value:map{name, objfun, name, objfun})
+// objfun : void foo(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
+// {obj = value_object(&*arg_start); if(obj){inst = dynamic_cast<inst_type>(obj)}}
+// TOOD: add shorthand (. fun obj params) :=  (((fnext obj) fun) (first obj) params) = 
+//                           
 
-void add_object(Masp& m, IObject* f);
+Vector*      value_vector(Value& v);
+NumberArray* value_number_array(Value& v);
+Map*         value_map(const Value& v);
+IObject*     value_object(const Value& v);
+Number       value_number(const Value& v);
+List*        value_list(const Value& v);
+const char*  value_string(const Value& v);
+bool         value_boolean(const Value& v);
+
+const Value* value_list_first(const Value& v);
+const Value* value_list_nth(const Value& v, size_t n);
+
+// Value factories
+Value make_value_number(const Number& num);
+Value make_value_number(int i);
+Value make_value_number(double d);
+
+Value make_value_string(const char* str);
+Value make_value_string(const std::string& str);
+Value make_value_string(const char* str, const char* str_end);
+
+Value make_value_symbol(const char* str);
+Value make_value_symbol(const char* str, const char* str_end);
+Value make_value_list(Masp& m);
+Value make_value_list(const List& oldlist);
+
+Value make_value_map(Masp& m);
+Value make_value_map(const Map& oldmap);
+
+Value make_value_function(PrimitiveFunction f);
+
+Value make_value_object(IObject* alloced_object);
+
+Value make_value_vector();
+Value make_value_vector(Vector& old, Value& v);
+Value make_value_vector(Value& v, Vector& old);
+
+Value make_value_number_array();
+Value make_value_boolean(bool b);
+
+/** Evaluation errors will throw a EvaluationException. */ 
+class EvaluationException
+{
+public:
+
+    EvaluationException(const char* msg):msg_(msg){}
+    EvaluationException(const std::string& msg):msg_(msg){}
+    ~EvaluationException(){}
+
+    std::string get_message(){return msg_;}
+
+    std::string msg_;
+};
 
 }//Namespace masp

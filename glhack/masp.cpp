@@ -98,7 +98,7 @@ void Value::copy(const Value& v)
     else if(type == SYMBOL || type == STRING) COPY_PARAM_V(string);
     else if(type == LIST)    COPY_PARAM_V(list);
     else if(type == MAP)     COPY_PARAM_V(map);
-    else if(type == OBJECT)  COPY_PARAM_V(object);
+    else if(type == OBJECT) value.object = v.value.object->copy();
     else if(type == VECTOR)  COPY_PARAM_V(vector);
     else if(type == FUNCTION) COPY_PARAM_V(function);
     else if(type == NUMBER_ARRAY) COPY_PARAM_V(number_array);
@@ -266,8 +266,16 @@ bool all_are_of_type(VI begin, VI end, Type t, size_t* out_size)
 inline Number value_number(const Value& v){return v.type == NUMBER ? v.value.number : Number::make(0);}
 
 inline List* value_list(const Value& v){return v.type == LIST ? v.value.list : 0;}
+
 inline Vector* value_vector(const Value& v){return v.type == VECTOR ? v.value.vector : 0;}
 
+inline const char* value_string(const Value& v){
+    return (v.type == STRING ||  v.type == SYMBOL) ? v.value.string->c_str() : 0;
+}
+
+inline bool value_boolean(const Value& v){
+    return (v.type == BOOLEAN) ? v.value.boolean : false;
+}
 
 inline const Value* value_list_first(const Value& v)
 {
@@ -314,6 +322,7 @@ inline Vector* value_vector(Value& v){return v.type == VECTOR ? v.value.vector :
 inline NumberArray* value_number_array(Value& v){return v.type == NUMBER_ARRAY ? v.value.number_array : 0;}
 
 inline Map* value_map(const Value& v){return v.type == MAP ? v.value.map : 0;}
+inline IObject* value_object(const Value& v){return v.type == OBJECT ? v.value.object : 0;}
 
 void append_to_value_stl_list(std::list<Value>& ext_value_list, const Value& v)
 {
@@ -1181,7 +1190,7 @@ public:
         }
     }
 
-    parser_result parse(const char* str)
+    masp_result parse(const char* str)
     {
         size_t size = strlen(str);
         init(str, str + size);
@@ -1190,7 +1199,7 @@ public:
 
         if(!scope_result.success())
         {
-            return parser_result(scope_result.report());
+            return masp_result(scope_result.report());
         }
 
         Value* root = make_value_list_alloc(masp_);
@@ -1199,13 +1208,13 @@ public:
             recursive_parse(*root);
         }
         catch(ParseException& e){
-            return parser_result(e.get_message());
+            return masp_result(e.get_message());
         }
 
         List* root_list = value_list(*root);
         *root_list = root_list->add(make_value_symbol("begin"));
 
-        return parser_result(ValuePtr(root, ValueDeleter()));
+        return masp_result(ValuePtr(root, ValueDeleter()));
     }
 
 };
@@ -1244,7 +1253,7 @@ std::ostream& Masp::get_output()
 
 ///// Evaluation utilities /////
 
-parser_result string_to_value(Masp& m, const char* str)
+masp_result string_to_value(Masp& m, const char* str)
 {
     ValueParser parser(m);
 
@@ -1353,6 +1362,11 @@ std::string value_to_string(const Value& v)
     return stream.str();
 }
 
+std::ostream& operator<<(std::ostream& os, const Value& v){
+    os << value_to_string(v);
+    return os;
+}
+
 std::string value_type_to_string(const Value& v);
 
 std::string value_to_typed_string(const Value* v)
@@ -1391,20 +1405,6 @@ std::string value_type_to_string(const Value& v)
 // More or less straightforward translation of the simple Evaluator 
 // in 'Structure and Interpretation of Computer Programs' (Steele 1996)
 // Section 4.1.1 'The Core of the Evaluator'
-
-class EvaluationException
-{
-public:
-
-    EvaluationException(const char* msg):msg_(msg){}
-    EvaluationException(const std::string& msg):msg_(msg){}
-    ~EvaluationException(){}
-
-    std::string get_message(){return msg_;}
-
-    std::string msg_;
-};
-
 
 namespace {
 
@@ -1859,7 +1859,7 @@ public:
     }
 };
 
-evaluation_result eval(Masp& m, const Value* v)
+masp_result eval(Masp& m, const Value* v)
 {
     Evaluator e(m);
 
@@ -1873,13 +1873,21 @@ evaluation_result eval(Masp& m, const Value* v)
         *result = e.eval_value(*v);
     }catch(EvaluationException& e)
     {
-        return evaluation_result(e.get_message());
+        return masp_result(e.get_message());
     }
 
     // value - if not in place, add to value_stack, add reference to ref_stack
     // add value references to eval stack
 
-    return evaluation_result(result);
+    return masp_result(result);
+}
+
+masp_result read_eval(Masp& m, const char* str){
+    masp_result parse_result = string_to_value(m, str);
+    if(parse_result.valid()){
+        return eval(m, parse_result.as_value()->get());
+    }
+    else{return parse_result;}
 }
 
 const Value* get_value(Masp& m, const char* pathstr)
@@ -2449,6 +2457,17 @@ namespace {
     }
     
 
+    OPDEF(op_call_member_fun, arg_i, arg_end) 
+    {
+        // TODO (. fun obj params) :=  (((fnext obj) fun) (first obj) params)
+        //                                 map       sym
+        //                                    function
+        std::cout << "FOOBARIC IMPLEMENT ME!" << std::endl;
+        return Value();
+
+        throw EvaluationException("op_conj: bad syntax. Cons must be applied to at least two parameters: (conj collection elem ... )."); 
+        return Value();
+    }
     // TODO:while  dot cross str
     // map filter range apply count zip
 
@@ -2504,7 +2523,11 @@ void Masp::Env::load_default_env()
 
     add_fun("count", op_count); 
     add_fun("cons", op_cons);
+
+    add_fun(".", op_call_member_fun);
 }
+
+void add_fun(Masp& m, const char* name, PrimitiveFunction f) {m.env()->add_fun(name, f);}
 
 
 #endif

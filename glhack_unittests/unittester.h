@@ -1,14 +1,11 @@
-// This file unittester.h is part of Tiny Unittesting Framework (TU).
-// This code is in the public domain. There is no warranty implied; use this code at your own risk. 
-//
-// Author: Mikko Kuitunen (mkuitune.kapsi.fi)
+// This file unittester.h is part of Tiny Unittester.
 //
 // A short guide
 // =============
 //
 // Introduction
 // ------------
-// A Tiny Unittester Framework is a lightweight unit test suite.
+// Tiny Unittester is a lightweight unit test suite.
 //
 // It contains two files - unittester.h and unittester.cpp. The latter implements the
 // test entry point main -function.
@@ -47,11 +44,6 @@
 //  ASSERT_TRUE(c == std::string("foobar"), "String catenation using operator '+' failed.");
 // }
 //
-// The test group parameter is used for specifying individual groups for test execution. You can exclude the execution of all but
-// explicitly added tests by using the following function:
-//
-// void ut_add_group(const std::string& str).
-//
 //
 // Complete example:
 // ----------------
@@ -77,19 +69,10 @@
 //  ASSERT_TRUE(*(list.begin()) == 12 , "Acquiring iterator to begin of string failed.");
 // }
 //
-// ut_add_group("list_tests");
 //
-// // Now only the tests in list_tests group is run. Without the previous call all tests would execute.
+// This code is int the public domain.
 //
-// This code is in the public domain.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-// IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-// OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-// ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-// OTHER DEALINGS IN THE SOFTWARE.
+// The software is provided "as is", without warranty of any kind etc.
 //
 // Author: Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)
 //
@@ -124,13 +107,6 @@ void utestclass_##test_name::run()
 
 // Asset that the stmnt_param evaluates to false, or signall failed test and log the message in msg_param. Test ends.
 #define ASSERT_FALSE(stmnt_param, msg_param)do{if(stmnt_param){ut_test_err(); ut_test_out() << std::endl << "  " << msg_param << std::endl;return;}}while(0)
-
-// Use this macro to define and add tests to the exclusively run test group
-#define ADD_GROUP(str_param) AddGroup str_param##run_grp(#str_param)
-
-/** Add groups for exclusive testruns. If no groups are added then all the tests are run.
- *  Otherwise only those groups that are exclusively added are run.*/
-class AddGroup{public:AddGroup(const char* str);};
 
 
 /////////// Test utilities ///////////
@@ -169,6 +145,7 @@ struct TestCallback{
     TestCallback(UtTestFun f, const char* grp, const char* str):
         callback(f), group(grp), name(str){}
    TestCallback():callback(TestCallback::dummy), name(""){}
+   bool names_match(const char* str){return (group.find(str) != std::string::npos) || (name.find(str) != std::string::npos);}
 };
 
 typedef std::map<std::string, TestCallback> TestGroup;

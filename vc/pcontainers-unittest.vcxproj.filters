@@ -1,8 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="..\glhack_unittests\glhack_tests.cpp" />
     <ClCompile Include="..\glhack_unittests\unittester.cpp" />
+    <ClCompile Include="..\glhack_unittests\pcontainers_tests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\glhack_unittests\unittester.h" />

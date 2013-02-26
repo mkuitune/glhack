@@ -11,7 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{FDDCFC6E-BF8A-44E1-B437-B45B53D2D70F}</ProjectGuid>
+    <ProjectGuid>{484D0F21-025A-49A7-B2F2-5AB59B789BA3}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>glhack-unittest</RootNamespace>
   </PropertyGroup>
@@ -88,7 +88,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\glhack_unittests\glhack_tests.cpp" />
+    <ClCompile Include="..\glhack_unittests\pcontainers_tests.cpp" />
     <ClCompile Include="..\glhack_unittests\unittester.cpp" />
   </ItemGroup>
   <ItemGroup>
