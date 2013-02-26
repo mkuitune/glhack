@@ -109,13 +109,13 @@ UTEST(masp, object_interface)
     /*
          builder: return value, tahtn
     */
-    WrappedInput wrapped(std::string("file.txt"));
-    auto is_open = masp::wrap_member(&FakeInputFile::is_open);
-    auto close = masp::wrap_member(&FakeInputFile::close);
-    auto contents_to_string = masp::wrap_member(&FakeInputFile::contents_to_string);
 
     masp::add_fun(m, "make_FakeInputFile", make_FakeInputFile);
 
+    const char* src = "(def m (make_FakeInputFile \"input.txt\" ))"
+                      "(. is_open m)";
+
+    masp::masp_result res = masp::read_eval(m, src);
 }
 
 
