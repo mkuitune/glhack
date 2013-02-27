@@ -55,15 +55,19 @@ bool compare_parsing(masp::Masp& m, const char* str, std::function<T(const masp:
 
     return result;
 }
-
+#define FAKE_CONTENTS "Fake!"
 class FakeInputFile{
 public:
     FakeInputFile(const std::string& path):path_(path){}
     ~FakeInputFile(){}
     std::istream& file(){}
-    bool is_open(){return true;}
+    bool is_open(){
+        return true;
+    }
     void close(){}
-    std::tuple<std::string, bool> contents_to_string(){return std::make_tuple(std::string("Fake!"), true);}
+    std::tuple<std::string, bool> contents_to_string(){
+        return std::make_tuple(std::string(FAKE_CONTENTS), true);
+    }
 
     std::string path_;
 
@@ -100,7 +104,7 @@ masp::Value make_FakeInputFile(masp::Masp& m,
     return listv;
 }
 
-UTEST(masp, object_interface)
+UTEST(masp, object_interface_fake_input)
 {
     using namespace glh;
 
@@ -110,14 +114,46 @@ UTEST(masp, object_interface)
          builder: return value, tahtn
     */
 
-    masp::add_fun(m, "make_FakeInputFile", make_FakeInputFile);
+    masp::add_fun(m, "FakeInputFile", make_FakeInputFile);
 
-    const char* src = "(def m (make_FakeInputFile \"input.txt\" ))"
-                      "(. is_open m)";
+    const char* src = "(def m (FakeInputFile \"input.txt\" ))"
+                      "(def res (. 'is_open m))"
+                      "(def contlist (. 'contents_to_string m))"
+                      "(def contstring (first contlist))"
+                      ;
 
-    masp::masp_result res = masp::read_eval(m, src);
+    masp::masp_result evalresult = masp::read_eval(m, src);
+
+    ASSERT_TRUE(evalresult.valid(), "Unsuccesfull parsing");
+
+    auto res = masp::get_value(m, "res");
+
+    ASSERT_TRUE(masp::value_type(res) == masp::BOOLEAN, "Type is not boolean");
+    ASSERT_TRUE(masp::value_boolean(*res), "Result was not true.");
+
+
+    auto contstring = masp::get_value(m, "contstring");
+    auto contlist = masp::get_value(m, "contlist");
+
+    ASSERT_TRUE(masp::value_type(contstring) == masp::STRING, "Type is not string");
+    ASSERT_TRUE(strcmp(masp::value_string(*contstring),FAKE_CONTENTS) == 0
+        , "Result did not match expected.");
+
 }
 
+
+UTEST(masp, get_value)
+{
+    using namespace glh;
+
+    masp::Masp m;
+
+    const char* def1 = "";
+
+    ASSERT_TRUE(compare_parsing<masp::Number>(m, "1", masp::value_number, masp::Number::make(1), masp::NUMBER), "value mismatch");
+    ASSERT_TRUE(compare_parsing<std::string>(m, "\"foo\"", masp::value_string, std::string("foo"), masp::STRING), "value mismatch");
+    ASSERT_TRUE(compare_parsing<std::string>(m, "(def fooname \"foo\") fooname", masp::value_string, std::string("foo"), masp::STRING), "value mismatch");
+}
 
 UTEST(masp, simple_evaluations)
 {
@@ -129,7 +165,6 @@ UTEST(masp, simple_evaluations)
     ASSERT_TRUE(compare_parsing<std::string>(m, "(def fooname \"foo\") fooname", masp::value_string, std::string("foo"), masp::STRING), "value mismatch");
 
 }
-
 
 UTEST(masp, simple_parsing)
 {

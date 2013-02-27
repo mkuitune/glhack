@@ -4,6 +4,7 @@
 #include "masp.h"
 #include "persistent_containers.h"
 
+
 #include<stack>
 #include<cstring>
 #include<algorithm>
@@ -269,11 +270,11 @@ inline List* value_list(const Value& v){return v.type == LIST ? v.value.list : 0
 
 inline Vector* value_vector(const Value& v){return v.type == VECTOR ? v.value.vector : 0;}
 
-inline const char* value_string(const Value& v){
+const char* value_string(const Value& v){
     return (v.type == STRING ||  v.type == SYMBOL) ? v.value.string->c_str() : 0;
 }
 
-inline bool value_boolean(const Value& v){
+bool value_boolean(const Value& v){
     return (v.type == BOOLEAN) ? v.value.boolean : false;
 }
 
@@ -317,12 +318,12 @@ inline const Value* value_list_fourth(const Value& v)
     return value_list_nth(v, 3);
 }
 
-inline Vector* value_vector(Value& v){return v.type == VECTOR ? v.value.vector : 0;}
+Vector* value_vector(Value& v){return v.type == VECTOR ? v.value.vector : 0;}
 
-inline NumberArray* value_number_array(Value& v){return v.type == NUMBER_ARRAY ? v.value.number_array : 0;}
+NumberArray* value_number_array(Value& v){return v.type == NUMBER_ARRAY ? v.value.number_array : 0;}
 
-inline Map* value_map(const Value& v){return v.type == MAP ? v.value.map : 0;}
-inline IObject* value_object(const Value& v){return v.type == OBJECT ? v.value.object : 0;}
+Map* value_map(const Value& v){return v.type == MAP ? v.value.map : 0;}
+IObject* value_object(const Value& v){return v.type == OBJECT ? v.value.object : 0;}
 
 void append_to_value_stl_list(std::list<Value>& ext_value_list, const Value& v)
 {
@@ -1115,6 +1116,47 @@ public:
             *list_ptr = new_list(masp_, rewritten_list);
     }
 
+    void rewrite_member_call(std::list<Value>& build_list, List* list_ptr)
+    {
+        // (. fun obj params) :=  (((fnext obj) fun) (first obj) params)
+        //                                 map       sym
+        //                                    function
+        if(build_list.size() < 3) throw ParseException("recursive_parse: member call must contain at least 3 params.");
+
+        // Decompose build list to parts
+        auto build_iter = build_list.begin(); //build_list := (. funname obj params)
+        auto funname = build_iter; ++funname;
+        auto obj = funname; ++obj;
+        auto params = obj; ++params;
+        auto iend = build_list.end();
+
+        // TODO: Add 'verify object' call somewhere in order not to make object
+        // evaluation errors so inscrutable.
+
+        // Populate outer list.
+        std::list<Value> rewritten_list;
+
+        rewritten_list.push_back(make_value_list(masp_));
+        List* outermaplist = value_list(*rewritten_list.rbegin());
+        rewritten_list.push_back(make_value_list(masp_));
+        List* symcalllist = value_list(*rewritten_list.rbegin());
+        rewritten_list.insert(rewritten_list.end(), params, iend);
+
+        // Populate first inner list
+        *outermaplist = outermaplist->add(*funname);
+        Value innermaplist = make_value_list(masp_);
+        List* innermap = value_list(innermaplist);
+        *innermap = innermap->add(*obj);
+        *innermap = innermap->add(make_value_symbol("fnext"));
+        *outermaplist = outermaplist->add(innermaplist);
+
+        // Populate second inner list
+        *symcalllist =  symcalllist->add(*obj);
+        *symcalllist =  symcalllist->add(make_value_symbol("first"));
+
+        *list_ptr = new_list(masp_, rewritten_list);
+    }
+
     void recursive_parse(Value& root)
     {
         if(glh::is_not(root.type, LIST))
@@ -1182,13 +1224,19 @@ public:
 
         if(build_list.front().is_str("defn"))
         {
-           rewrite_defn(build_list, list_ptr);
+            rewrite_defn(build_list, list_ptr);
+        }
+        else if(build_list.front().is_str("."))
+        {
+            rewrite_member_call(build_list, list_ptr);
         }
         else
         {
             *list_ptr = new_list(masp_, build_list);
         }
     }
+
+
 
     masp_result parse(const char* str)
     {
@@ -1210,6 +1258,8 @@ public:
         catch(ParseException& e){
             return masp_result(e.get_message());
         }
+
+
 
         List* root_list = value_list(*root);
         *root_list = root_list->add(make_value_symbol("begin"));
@@ -2455,19 +2505,7 @@ namespace {
         throw EvaluationException("op_conj: bad syntax. Cons must be applied to at least two parameters: (conj collection elem ... )."); 
         return Value();
     }
-    
 
-    OPDEF(op_call_member_fun, arg_i, arg_end) 
-    {
-        // TODO (. fun obj params) :=  (((fnext obj) fun) (first obj) params)
-        //                                 map       sym
-        //                                    function
-        std::cout << "FOOBARIC IMPLEMENT ME!" << std::endl;
-        return Value();
-
-        throw EvaluationException("op_conj: bad syntax. Cons must be applied to at least two parameters: (conj collection elem ... )."); 
-        return Value();
-    }
     // TODO:while  dot cross str
     // map filter range apply count zip
 
@@ -2523,8 +2561,6 @@ void Masp::Env::load_default_env()
 
     add_fun("count", op_count); 
     add_fun("cons", op_cons);
-
-    add_fun(".", op_call_member_fun);
 }
 
 void add_fun(Masp& m, const char* name, PrimitiveFunction f) {m.env()->add_fun(name, f);}

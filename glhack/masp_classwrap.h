@@ -106,8 +106,8 @@ masp::Value to_value(masp::Masp& m, const std::tuple<P0, P1>& input)
     using namespace masp;
     Value vlist = make_value_list(m);
     List* lst = value_list(vlist);
-    lst->add(to_value(m, std::get<1>(input)));
-    lst->add(to_value(m, std::get<0>(input)));
+    *lst = lst->add(to_value(m, std::get<1>(input)));
+    *lst = lst->add(to_value(m, std::get<0>(input)));
     return vlist;
 }
 
@@ -284,7 +284,7 @@ class FunMap{public:
     }
     void add(const char* name, PrimitiveFunction fun){
         Map* map = value_map(mapv_);
-        *map = map->add(make_value_string(name), make_value_function(fun));
+        *map = map->add(make_value_symbol(name), make_value_function(fun));
     }
     Value& map(){return mapv_;}
 };

@@ -39,7 +39,7 @@ public:
                 masp::masp_result eval_result = masp::eval(M, (*masp_result).get());
                 if(eval_result.valid()){
                     const masp::Value* asset_path_val = masp::get_value(M, g_asset_path_name);
-                    if(asset_path_val) asset_path = masp::get_value_string(asset_path_val);
+                    if(asset_path_val) asset_path = masp::value_string(*asset_path_val);
                 } else {
                     std::string msg = std::string("Config file evaluation error:") + masp_result.message() + std::string("(") + config_file_path + std::string(")");
                     throw GraphicsException(msg);
