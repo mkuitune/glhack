@@ -117,6 +117,10 @@ T value_to_type(const Value& val);
 
 #define TO_TYPE(type_param) template<> inline type_param value_to_type<type_param>(const Value& val)
 
+TO_TYPE(Number){
+    return value_number(val);
+}
+
 TO_TYPE(int){
     Number num = value_number(val);
     return num.to_int();
@@ -186,6 +190,15 @@ public:
 
         wrap(rest...);
     }
+    
+    /** Return number of elements in wrapped range*/
+    size_t size() const{
+        VecIterator i(i_);
+        size_t count = 0;
+        while(i != end_){count++; ++i;}
+        return count;
+    }
+
 };
 
 

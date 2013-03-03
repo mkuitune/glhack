@@ -684,27 +684,33 @@ public:
 
         Node* cpy_head = 0;
         Node* cpy_pos;
-        while(o_i != o_end)
-        {
-            Node* n = new_node(*o_i);
 
-            if(!cpy_head)
+        if(o_i == o_end){
+            Node* new_head = add_elem(i_begin, i_end);
+            return List( *this, new_head);
+        }else{
+
+            while(o_i != o_end)
             {
-                cpy_head = n;
-                cpy_pos = cpy_head;
-            }
-            else
-            {
-                cpy_pos->next = n;
-                cpy_pos = n;
+                Node* n = new_node(*o_i);
+
+                if(!cpy_head)
+                {
+                    cpy_head = n;
+                    cpy_pos = cpy_head;
+                }
+                else
+                {
+                    cpy_pos->next = n;
+                    cpy_pos = n;
+                }
+
+                ++o_i;
             }
 
-            ++o_i;
+            cpy_pos->next = add_elem(i_begin, i_end);
+            return List( *this, cpy_head);
         }
-
-        cpy_pos->next = add_elem(i_begin, i_end);
-
-        return List( *this, cpy_head);
     }
 
 

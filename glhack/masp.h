@@ -5,6 +5,7 @@
 
 #include "annotated_result.h"
 #include "persistent_containers.h"
+#include "math_tools.h"
 
 #include<list>
 #include<memory>
@@ -103,7 +104,6 @@ struct Number{
     }
 
 };
-
 
 typedef std::vector<Number> NumberArray;
 
@@ -349,3 +349,8 @@ public:
 };
 
 }//Namespace masp
+
+
+ template<> inline masp::Number to_number<masp::Number,int>(int i){return masp::Number::make(i);}
+ template<> inline masp::Number to_number<masp::Number,double>(double d){return masp::Number::make(d);}
+

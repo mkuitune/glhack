@@ -15,6 +15,27 @@
 
 #define PIf 3.141592846f
 
+
+/////////////// Hash functions //////////////
+
+uint32_t hash32(const char* data, int len);
+
+uint32_t hash32(const std::string&  string);
+
+template<class T>
+uint32_t hash32(const T& hashable)
+{
+    int len = sizeof(T);
+    return hash32((char*)&hashable, len);
+}
+
+
+////////////// Numeric conversions /////////////
+
+template<class R, class P>
+R to_number(P in){return (R) in;}
+
+
 namespace glh{
 
 typedef Eigen::Vector4f vec4;
@@ -66,24 +87,47 @@ inline bool bit_is_on(const uint32_t field, const uint32_t bit)
 
 //////////////////// Generators ///////////////////////////
 
+/** Generator for a start-inclusive an end-exclusive range := (start, end].*/
 template<class T> class Range {
 public:
+
     struct iterator {
-
         T current_;
-        bool operator!=(const iterator& i){return current_ !=  i.current_;}
-        const T& operator*(){return current_;}
-        void operator++(){++current_;}
+        T increment_;
+        bool increasing_;
 
-        iterator(T start):current_(start){}
+        // A bit abusive for boolean operations but semantically conforms
+        // to common iterator usage where != signals wether to continue iteration
+        // or not.
+        bool operator!=(const iterator& i){
+            return increasing_ ? current_ <  i.current_ : current_ >  i.current_ ;
+        }
+
+        const T& operator*(){return current_;}
+
+        void operator++(){current_ += increment_;}
+
+        iterator(T val, T increment):current_(val), increment_(increment){
+            increasing_ = increment_ > to_number<T, int>(0); 
+        }
     };
 
     T range_start_;
     T range_end_;
-    Range(T range_start, T range_end):range_start_(range_start), range_end_(range_end){}
+    T increment_;
 
-    iterator begin() const {return iterator(range_start_);}
-    iterator end() const {return iterator(range_end_);}
+    Range(T range_start, T range_end):
+        range_start_(range_start), range_end_(range_end), increment_(to_number<T, int>(1)){}
+
+    Range(T range_start, T increment, T range_end):
+        range_start_(range_start), range_end_(range_end), increment_(increment)
+    {
+        if((range_end < range_start) && increment_ > to_number<T,int>(0))
+                increment_ *= to_number<T,int>(-1); 
+    }
+
+    iterator begin() const {return iterator(range_start_, increment_);}
+    iterator end() const {return iterator(range_end_, increment_);}
 };
 
 template<class T>
@@ -212,16 +256,3 @@ std::list<std::pair<typename V::value_type, typename V::value_type>> all_pairs(V
 
 } // namespace glh
 
-
-/////////////// Hash functions //////////////
-
-uint32_t hash32(const char* data, int len);
-
-uint32_t hash32(const std::string&  string);
-
-template<class T>
-uint32_t hash32(const T& hashable)
-{
-    int len = sizeof(T);
-    return hash32((char*)&hashable, len);
-}

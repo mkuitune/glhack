@@ -1231,12 +1231,12 @@ public:
         List* list_ptr = value_list(root);
 
         // Term rewritings that we prefer to do in parsing rather than evaluation stage ("poor mans macro system").
-
-        if(build_list.front().is_str("defn"))
+        bool list_occupied = !build_list.empty();
+        if(list_occupied && build_list.front().is_str("defn"))
         {
             rewrite_defn(build_list, list_ptr);
         }
-        else if(build_list.front().is_str("."))
+        else if(list_occupied && build_list.front().is_str("."))
         {
             rewrite_member_call(build_list, list_ptr);
         }
@@ -1245,8 +1245,6 @@ public:
             *list_ptr = new_list(masp_, build_list);
         }
     }
-
-
 
     masp_result parse(const char* str)
     {
@@ -1268,8 +1266,6 @@ public:
         catch(EvaluationException& e){
             return masp_fail(e.get_message());
         }
-
-
 
         List* root_list = value_list(*root);
         *root_list = root_list->add(make_value_symbol("begin"));
@@ -1310,20 +1306,16 @@ void Masp::set_output(std::ostream* os)
 
 void Masp::set_args(int argc, char* argv[])
 {
-    Value count = make_value_number(Number::make(argc));
-
     Value argmap = make_value_map(*this);
     Map* map     = value_map(argmap);
-
-    *map = map->add(make_value_symbol("count"), count);
 
     for(int i = 0; i < argc; ++i){
         *map = map->add(make_value_number(i), make_value_string(argv[i]));
     }
 
-    env_->def(make_value_symbol("args"), argmap);
-    
-    std::cout << "Args set" << std::endl;
+    env_->def(make_value_symbol("sys/args"), argmap);
+
+    //std::cout << "Args set" << std::endl;
 
 }
 
@@ -2109,6 +2101,57 @@ namespace {
         return make_value_number(n);
     }
 
+    OPDEF(op_make_range, arg_start, arg_end)
+    {
+        ArgWrap args(arg_start, arg_end); 
+
+        size_t count = args.size();
+        
+        Number start;
+        Number end;
+        Number increment;
+         
+        if(args.size() == 1){
+            args.wrap(&end);
+            if(end.type == Number::FLOAT){start.set(0.0); increment.set(1.0);}
+            else                         {start.set(0); increment.set(1);}
+        }
+        else if(args.size() == 2){
+            args.wrap(&start, &end);
+            if(glh::any_of(Number::FLOAT, start.type, end.type)){
+                start.set(start.to_float());
+                end.set(end.to_float());
+                increment.set(1.0);
+            }
+            else {
+                increment.set(1);
+            }
+        }
+        else if(args.size() == 3){
+            args.wrap(&start, &increment, &end);
+            if(glh::any_of(Number::FLOAT, start.type, end.type, increment.type)){
+                start.set(start.to_float());
+                end.set(end.to_float());
+                increment.set(increment.to_float());
+            }
+        }
+        else throw EvaluationException("op_make_range: need 1 - 3 numeric arguments.");
+
+        glh::Range<Number> range(start, increment, end);
+        
+        std::vector<Value> rangeinstance;
+
+        for(auto r : range){
+            rangeinstance.push_back(make_value_number(r));
+        }
+
+        Value result = make_value_list(m);
+        List* res_list = value_list(result);
+        *res_list = new_list(m, rangeinstance);
+        
+        return result;
+    }
+
     // Booleans
 
 #define ITER_TO_PTR(iter_param, end_param) ((iter_param != end_param) ? (&(*iter_param)) : 0)
@@ -2518,6 +2561,9 @@ namespace {
         return Value();
     }
 
+
+    // System ops
+
     OPDEF(op_import_file, arg_i, arg_end)
     {
         Value* fst = (arg_i != arg_end) ? &*arg_i : 0;
@@ -2581,6 +2627,8 @@ void Masp::Env::load_default_env()
     add_fun("*", op_mul);
     add_fun("/", op_div);
 
+    add_fun("range", op_make_range);
+
     add_fun("=", op_equal);
     add_fun("!=", op_not_equal);
     add_fun("<", op_less);
@@ -2611,6 +2659,15 @@ void Masp::Env::load_default_env()
 
     add_fun("count", op_count); 
     add_fun("cons", op_cons);
+    add_fun("conj", op_conj);
+
+    // TODO map 
+    // TODO iter: (iter (<syms> collection) f) = fill syms sequentially from collection, call f with each 
+    //                                           symbol set in turn, ie.
+    //                                           (iter (x y alist) foo) would fill x and y from alist and call
+    //                                            (foo x y) for each instantiated set
+
+    // Fix conj, cons for map
 
     add_fun("println", op_println);
     add_fun("printf", op_printf);
