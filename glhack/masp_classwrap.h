@@ -1,4 +1,4 @@
-/** \file masp_classwrap.h. Wrapper for classes.
+﻿/** \file masp_classwrap.h. Wrapper for classes.
     \author Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)
 */
 #pragma once
@@ -92,13 +92,14 @@ T* get_wrapped(IObject* iobj){
     return wrapped->t_.get();
 }
 
-
 template<class T>
 masp::Value to_value(masp::Masp& m, const T& val);
+
 template<>
-masp::Value to_value<bool>(masp::Masp& m, const bool& val){return masp::make_value_boolean(val);}
+inline masp::Value to_value<bool>(masp::Masp& m, const bool& val){return masp::make_value_boolean(val);}
+
 template<>
-masp::Value to_value<std::string>(masp::Masp& m, const std::string& str){return masp::make_value_string(str);}
+inline masp::Value to_value<std::string>(masp::Masp& m, const std::string& str){return masp::make_value_string(str);}
 
 template<class P0, class P1>
 masp::Value to_value(masp::Masp& m, const std::tuple<P0, P1>& input)
@@ -114,7 +115,7 @@ masp::Value to_value(masp::Masp& m, const std::tuple<P0, P1>& input)
 template<class T>
 T value_to_type(const Value& val);
 
-#define TO_TYPE(type_param) template<> type_param value_to_type<type_param>(const Value& val)
+#define TO_TYPE(type_param) template<> inline type_param value_to_type<type_param>(const Value& val)
 
 TO_TYPE(int){
     Number num = value_number(val);
@@ -134,6 +135,12 @@ TO_TYPE(std::string){
     const char* str = value_string(val);
     if(!str) throw EvaluationException("Cannot convert type to string");
     return std::string(str);
+}
+
+TO_TYPE(const char*){
+    const char* str = value_string(val);
+    if(!str) throw EvaluationException("Cannot convert type to string");
+    return str;
 }
 
 TO_TYPE(IObject*){
@@ -181,12 +188,96 @@ public:
     }
 };
 
-template<class CLS>
+
 class FunWrap0_0 : public FunBase{public:
-    typedef std::function<void(CLS)> funt;
+    typedef std::function<void(void)> funt;
     funt fun_;
 
     FunWrap0_0(funt fun):fun_(fun){}
+
+    Value operator()(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env) override {
+        fun_();
+        return Value();
+    }
+};
+
+template<class P0>
+class FunWrap0_1 : public FunBase{public:
+    typedef std::function<void(P0)> funt;
+    funt fun_;
+
+    FunWrap0_1(funt fun):fun_(fun){}
+
+    Value operator()(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env) override {
+        P0 p0;
+        ArgWrap(arg_start, arg_end).wrap(&p0);
+        fun_(p0);
+        return Value();
+    }
+};
+
+template<class R>
+class FunWrap1_0 : public FunBase{public:
+    typedef std::function<R(void)> funt;
+    funt fun_;
+
+    FunWrap1_0(funt fun):fun_(fun){}
+
+    Value operator()(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env) override {
+        return to_value(m, fun_());
+    }
+};
+
+template<class R, class P0>
+class FunWrap1_1 : public FunBase{public:
+    typedef std::function<R(P0)> funt;
+    funt fun_;
+
+    FunWrap1_1(funt fun):fun_(fun){}
+
+    Value operator()(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env) override {
+        P0 p0;
+        ArgWrap(arg_start, arg_end).wrap(&p0);
+        return to_value(m, fun_(p0));
+    }
+};
+
+template<class R, class P0, class P1>
+class FunWrap1_2 : public FunBase{public:
+    typedef std::function<R(P0, P1)> funt;
+    funt fun_;
+
+    FunWrap1_2(funt fun):fun_(fun){}
+
+    Value operator()(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env) override {
+        P0 p0;
+        P1 p1;
+        ArgWrap(arg_start, arg_end).wrap(&p0, &p1);
+        return to_value(m, fun_(p0, p1));
+    }
+};
+
+inline PrimitiveFunction wrap_function(void (*mmbr)(void)){return FunWrap0_0(mmbr);}
+
+template<class P0>
+PrimitiveFunction wrap_function(void (*mmbr)(P0)){return FunWrap0_1<P0>(mmbr);}
+
+template<class R, class P0>
+PrimitiveFunction wrap_function(R (*mmbr)(P0)){return FunWrap1_1<R, P0>(mmbr);}
+
+template<class R>
+PrimitiveFunction wrap_function(R (*mmbr)(void)){return FunWrap1_0<R>(mmbr);}
+
+template<class R, class P0, class P1>
+PrimitiveFunction wrap_function(R (*mmbr)(P0, P1)){return FunWrap1_2<R, P0, P1>(mmbr);}
+
+
+template<class CLS>
+class MemFunWrap0_0 : public FunBase{public:
+    typedef std::function<void(CLS)> funt;
+    funt fun_;
+
+    MemFunWrap0_0(funt fun):fun_(fun){}
 
     Value operator()(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env) override {
         IObject* obj;
@@ -198,11 +289,11 @@ class FunWrap0_0 : public FunBase{public:
 };
 
 template<class CLS, class P0>
-class FunWrap0_1 : public FunBase{public:
+class MemFunWrap0_1 : public FunBase{public:
     typedef std::function<void(CLS, P0)> funt;
     funt fun_;
 
-    FunWrap0_1(funt fun):fun_(fun){}
+    MemFunWrap0_1(funt fun):fun_(fun){}
 
     Value operator()(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env) override {
         IObject* obj;
@@ -215,11 +306,11 @@ class FunWrap0_1 : public FunBase{public:
 };
 
 template<class CLS, class R>
-class FunWrap1_0 : public FunBase{public:
+class MemFunWrap1_0 : public FunBase{public:
     typedef std::function<R(CLS)> funt;
     funt fun_;
 
-    FunWrap1_0(funt fun):fun_(fun){}
+    MemFunWrap1_0(funt fun):fun_(fun){}
 
     Value operator()(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env) override {
         IObject* obj;
@@ -230,11 +321,11 @@ class FunWrap1_0 : public FunBase{public:
 };
 
 template<class CLS, class R, class P0>
-class FunWrap1_1 : public FunBase{public:
+class MemFunWrap1_1 : public FunBase{public:
     typedef std::function<R(CLS, P0)> funt;
     funt fun_;
 
-    FunWrap1_1(funt fun):fun_(fun){}
+    MemFunWrap1_1(funt fun):fun_(fun){}
 
     Value operator()(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env) override {
         IObject* obj;
@@ -246,11 +337,11 @@ class FunWrap1_1 : public FunBase{public:
 };
 
 template<class CLS, class R, class P0, class P1>
-class FunWrap1_2 : public FunBase{public:
+class MemFunWrap1_2 : public FunBase{public:
     typedef std::function<R(CLS, P0, P1)> funt;
     funt fun_;
 
-    FunWrap1_2(funt fun):fun_(fun){}
+    MemFunWrap1_2(funt fun):fun_(fun){}
 
     Value operator()(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env) override {
         IObject* obj;
@@ -263,19 +354,19 @@ class FunWrap1_2 : public FunBase{public:
 };
 
 template<class T>
-PrimitiveFunction wrap_member(void (T::*mmbr)(void)){return FunWrap0_0<T>(mmbr);}
+PrimitiveFunction wrap_member(void (T::*mmbr)(void)){return MemFunWrap0_0<T>(mmbr);}
 
 template<class T, class P0>
-PrimitiveFunction wrap_member(void (T::*mmbr)(P0)){return FunWrap0_1<T, P0>(mmbr);}
+PrimitiveFunction wrap_member(void (T::*mmbr)(P0)){return MemFunWrap0_1<T, P0>(mmbr);}
 
 template<class T, class R, class P0>
-PrimitiveFunction wrap_member(R (T::*mmbr)(P0)){return FunWrap1_1<T, R, P0>(mmbr);}
+PrimitiveFunction wrap_member(R (T::*mmbr)(P0)){return MemFunWrap1_1<T, R, P0>(mmbr);}
 
 template<class T, class R>
-PrimitiveFunction wrap_member(R (T::*mmbr)(void)){return FunWrap1_0<T, R>(mmbr);}
+PrimitiveFunction wrap_member(R (T::*mmbr)(void)){return MemFunWrap1_0<T, R>(mmbr);}
 
 template<class T, class R, class P0, class P1>
-PrimitiveFunction wrap_member(R (T::*mmbr)(P0, P1)){return FunWrap1_2<T, R, P0, P1>(mmbr);}
+PrimitiveFunction wrap_member(R (T::*mmbr)(P0, P1)){return MemFunWrap1_2<T, R, P0, P1>(mmbr);}
 
 class FunMap{public:
     Value mapv_;
@@ -289,85 +380,5 @@ class FunMap{public:
     Value& map(){return mapv_;}
 };
 
-
-#if 0
-
-template<class R, class O, class B>
-PrimitiveFunction create_shared_funccall(std::function<R(O, B)> func)
-{
-    auto cre = [=func](Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env) -> Value
-    {
-        IObject* obj       = value_object(*arg_starg);
-        if(obj){
-            
-            SharedWrap<O>* wrp = dynamic_cast<SharedWrap<O*>>(obj);
-
-            ++arg_start;
-            if(arg_start != arg_end){
-                B param = value_to<B>(*arg_start);
-                R res = func(&*wrp->t_, param);
-                return value_from_type(res);
-            }
-        } else {
-            throw EvaluationException("First type is not obj");
-        }
-        return Value();
-    }
-    return cre;
-}
-
-#endif
-
-
-
-
-
-
-#if 0
-template<class CLASST, class MEMFUNT>
-void bind_member(Masp& m, MEMFUNT mf){
-    auto fn = std::mem_fn(mf);
-}
-
-#define MASP_BIND_MEMBER(Masp_param, class_param, member_param) \
-    auto fun = std::mem_fn(&class_param :: member_param);        \
-    auto binder = 
-
-template<class T>
-ClassWrapper {
-public:
-    std::map<std::string, PrimitiveFunction> functions_;
-    Masp& m_;
-
-    template<class MF>
-    class BindMember {
-        public:
-        BindMember(MF fn){
-            auto func = std::mem_fn(fn);
-        }
-
-        void operator(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
-        {
-            T* = arg_start;
-           value_to_type()
-         
-        }
-    };
-
-    ClassWrapper(Masp& m):m_(m)
-    {
-        // add factory
-    }
-
-    template<class OUT, class A>
-    add(std::function(T&, ))
-
-    void Load(Masp& m){
-        // add factory
-        for(auto& f : functions_){add_fun()}
-    }
-};
-
-#endif
-
 }//Namespace masp
+

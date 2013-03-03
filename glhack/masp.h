@@ -219,6 +219,9 @@ public:
     /** Return pointer to the environment instance. */
     Env* env();
 
+    /** Return reference to current env map. */
+    Map& env_map();
+
     /** Garbage collect the used data structures.*/
     void gc();
 
@@ -234,6 +237,8 @@ public:
     /** Get handle to output stream.*/
     std::ostream& get_output();
 
+    void set_args(int argc, char* argv[]);
+
 private:
 
     Env* env_;
@@ -241,6 +246,9 @@ private:
 
 
 typedef glh::AnnotatedResult<ValuePtr> masp_result;
+
+masp_result masp_fail(const char* str);
+masp_result masp_fail(const std::string& str);
 
 /** Parse string to value data structure.*/
 masp_result string_to_value(Masp& m, const char* str);
@@ -255,7 +263,7 @@ masp_result read_eval(Masp& m, const char* str);
 // TODO: masp_result readfile(Masp& m, const char* file_path);
 
 /** Return string representation of value. */
-std::string value_to_string(const Value* v);
+std::string value_to_string(const Value& v);
 
 std::ostream& operator<<(std::ostream& os, const Value& v);
 
@@ -327,7 +335,7 @@ Value make_value_number_array();
 Value make_value_boolean(bool b);
 
 /** Evaluation errors will throw a EvaluationException. */ 
-class EvaluationException
+class EvaluationException 
 {
 public:
 
@@ -335,7 +343,7 @@ public:
     EvaluationException(const std::string& msg):msg_(msg){}
     ~EvaluationException(){}
 
-    std::string get_message(){return msg_;}
+    std::string get_message() const {return msg_;}
 
     std::string msg_;
 };

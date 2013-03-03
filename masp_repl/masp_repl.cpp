@@ -1,7 +1,8 @@
+#include "iotools.h"
+#include "masp.h"
 #include<iostream>
 #include<cstring>
 #include <sstream>
-#include "masp.h"
 
 
 void print_help()
@@ -29,7 +30,7 @@ void eval_response(masp::Masp& M, masp::Value* v)
     }
     else
     {
-        std::cout << "Parse error:" << result.message() << std::endl;
+        std::cout << "Error:" << result.message() << std::endl;
     }
 
 }
@@ -50,14 +51,12 @@ void print_memory(std::ostream& os, const char* prefix, size_t live, size_t rese
     os << "(live/reserved): " << memory_string(live) << " / " << memory_string(reserved) << std::endl;
 }
 
-int main(int argc, char* argv[])
+void repl(masp::Masp& M)
 {
     using namespace masp;
     using std::cout;
     using std::cin;
     using std::endl;
-
-    Masp M;
 
     std::cout << "Masp repl\n" << std::endl;
 
@@ -79,6 +78,15 @@ int main(int argc, char* argv[])
         else if(strcmp(line, "help") == 0)
         {
             print_help();
+        }
+        else if(strcmp(line, "envprint") == 0)
+        {
+            Map::iterator i = M.env_map().begin();
+            Map::iterator end = M.env_map().end();
+            for(; i != end; ++i)
+            {
+                cout << value_to_string(i->first) << " : " << value_to_string(i->second) << endl;
+            }
         }
         else if(strcmp(line, "memory") == 0)
         {
@@ -127,6 +135,53 @@ int main(int argc, char* argv[])
                 cout << "Parse error:" << result.message() << endl;
             }
         }
+    }
+}
+
+void eval_file(const char* path, masp::Masp& M)
+{
+
+    using std::cout;
+    using std::cin;
+    using std::endl;
+
+    std::string str;
+    bool        success;
+
+    std::tie(str, success) = file_to_string(path);
+
+    if(success)
+    {
+        using namespace masp;
+
+        masp_result result = string_to_value(M, str.c_str());
+
+        if(result.valid()) {
+            eval_response(M, (*result).get());
+        } else {
+            std::cout << "Parse error:" << result.message() << std::endl;
+        }
+    }
+    else
+    {
+        cout << "Could not read file:" << path << endl;
+    }
+}
+
+int main(int argc, char* argv[])
+{
+
+    masp::Masp M;
+
+    M.set_args(argc, argv);
+
+    if(argc == 1)
+    {
+        repl(M);
+    }
+    else
+    {
+        eval_file(argv[1], M);
     }
 
     return 0;

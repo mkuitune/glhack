@@ -1,9 +1,9 @@
 /** \file masp.cpp
     \author Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)
 */
-#include "masp.h"
+#include "masp_classwrap.h"
 #include "persistent_containers.h"
-
+#include "iotools.h"
 
 #include<stack>
 #include<cstring>
@@ -17,9 +17,13 @@
 #include<utility>
 #include<limits>
 
-
+namespace {
+void local_assert(const char* msg)
+{
+    assert(!msg);
+}
+}
 namespace masp{
-#if 1
 
 bool all_are_float(NumberArray& arr)
 {
@@ -105,7 +109,7 @@ void Value::copy(const Value& v)
     else if(type == NUMBER_ARRAY) COPY_PARAM_V(number_array);
     else if(type == BOOLEAN) value.boolean = v.value.boolean;
     else if(type != NIL)
-        {assert("Faulty param type.");}
+        {local_assert("Faulty param type.");}
 #undef COPY_PARAM_V
 }
 
@@ -426,21 +430,15 @@ public:
 
     void gc()
     {
-        // TODO: fix gc. Now does not collect nested lists on first gc
-        // i.e nested list that's alone ((1 2 3)) has it's inner list still referred to when 
-        // collecting. Is this a problem or not...
-        //
-#if 0
-        map_pool_.gc();
-        list_pool_.gc();
-#else
         collect_map_and_list_pools_with_roots(map_pool_, list_pool_, *env_);
-#endif
     }
 
     void add_fun(const char* name, PrimitiveFunction f);
 
+    void def(const Value& key, const Value& value);
+
     void load_default_env();
+    void load_default_extensions();
 
     Map& get_env(){return *env_;}
 
@@ -932,18 +930,6 @@ static ScopeError check_scope(const char* begin, const char* end, const char* co
     return ScopeError();
 }
 
-class ParseException
-{
-public:
-
-    ParseException(const char* msg):msg_(msg){}
-    ~ParseException(){}
-
-    std::string get_message(){return msg_;}
-
-    std::string msg_;
-};
-
 /** Parse string to atom. Use one instance of AtomParser per string/atom pair. */
 class ValueParser
 {
@@ -1033,6 +1019,29 @@ public:
         return result;
     }
 
+    std::string format_string(const char* begin, const char* end)
+    {
+        std::string result;
+        size_t len = end - begin + 1;
+        result.resize(len);
+        auto i = std::begin(result);
+        bool prevskip = false;
+        while(begin != end){
+            char c = *begin++;
+
+            if(prevskip){
+                *i++ = c;
+                prevskip = false;
+            } else {
+                if(c == '\\') prevskip = true;
+                else *i++ = c;
+            }
+        }
+        result.erase(i, result.end());
+        //*i = '\0';
+        return result;
+    }
+
     Value get_value()
     {
         Number tmp_number;
@@ -1044,7 +1053,8 @@ public:
             const charptr first = c_ + 1;
             const charptr last = parse_string();
             set(last + 1);
-            return make_value_string(first, last);
+            std::string formatted_string = format_string(first, last);
+            return make_value_string(formatted_string);
         }
         else if(is('(')) // Enter list
         {
@@ -1084,14 +1094,14 @@ public:
         }
         else
         {
-            throw ParseException("get_value: Masp parse error.");
+            throw EvaluationException("get_value: Masp parse error.");
             return Value();
         }
     }
 
     void rewrite_defn(std::list<Value>& build_list, List* list_ptr)
     {
-            if(build_list.size() < 4) throw ParseException("recursive_parse: defn must contain at least 3 params.");
+            if(build_list.size() < 4) throw EvaluationException("recursive_parse: defn must contain at least 3 params.");
 
             // Decompose build list to parts
             auto build_iter = build_list.begin(); //build_list := (defn iname ilambda_params)
@@ -1121,7 +1131,7 @@ public:
         // (. fun obj params) :=  (((fnext obj) fun) (first obj) params)
         //                                 map       sym
         //                                    function
-        if(build_list.size() < 3) throw ParseException("recursive_parse: member call must contain at least 3 params.");
+        if(build_list.size() < 3) throw EvaluationException("recursive_parse: member call must contain at least 3 params.");
 
         // Decompose build list to parts
         auto build_iter = build_list.begin(); //build_list := (. funname obj params)
@@ -1160,7 +1170,7 @@ public:
     void recursive_parse(Value& root)
     {
         if(glh::is_not(root.type, LIST))
-            throw ParseException("recursive_parse: root type is not LIST.");
+            throw EvaluationException("recursive_parse: root type is not LIST.");
 
         std::list<Value> build_list;
 
@@ -1214,7 +1224,7 @@ public:
 
         if(next_is_quoted) // Quoted flag was not used.
         {
-            throw ParseException("Quote cannot be empty.");
+            throw EvaluationException("Quote cannot be empty.");
         }
 
 
@@ -1247,7 +1257,7 @@ public:
 
         if(!scope_result.success())
         {
-            return masp_result(scope_result.report());
+            return masp_fail(scope_result.report());
         }
 
         Value* root = make_value_list_alloc(masp_);
@@ -1255,8 +1265,8 @@ public:
         try{
             recursive_parse(*root);
         }
-        catch(ParseException& e){
-            return masp_result(e.get_message());
+        catch(EvaluationException& e){
+            return masp_fail(e.get_message());
         }
 
 
@@ -1283,6 +1293,10 @@ Masp::~Masp()
 
 Masp::Env* Masp::env(){return env_;}
 
+Map& Masp::env_map(){
+    return env_->get_env();
+}
+
 void Masp::gc(){env_->gc();}
 
 size_t Masp::reserved_size_bytes(){return env_->reserved_size_bytes();}
@@ -1294,6 +1308,25 @@ void Masp::set_output(std::ostream* os)
     if(env_) env_->out_ = os;
 }
 
+void Masp::set_args(int argc, char* argv[])
+{
+    Value count = make_value_number(Number::make(argc));
+
+    Value argmap = make_value_map(*this);
+    Map* map     = value_map(argmap);
+
+    *map = map->add(make_value_symbol("count"), count);
+
+    for(int i = 0; i < argc; ++i){
+        *map = map->add(make_value_number(i), make_value_string(argv[i]));
+    }
+
+    env_->def(make_value_symbol("args"), argmap);
+    
+    std::cout << "Args set" << std::endl;
+
+}
+
 /** Get handle to output stream.*/
 std::ostream& Masp::get_output()
 {
@@ -1302,6 +1335,14 @@ std::ostream& Masp::get_output()
 }
 
 ///// Evaluation utilities /////
+
+masp_result masp_fail(const char* str){
+    return masp_result(std::string(str));
+}
+
+masp_result masp_fail(const std::string& str){
+    return masp_result(str);
+}
 
 masp_result string_to_value(Masp& m, const char* str)
 {
@@ -1347,7 +1388,8 @@ static void value_to_string_helper(std::ostream& os, const Value& v, PrefixHelpe
         }
         case STRING:
         {
-            out() << "\"" << *(v.value.string) << "\"";
+            std::string esc("\"");
+            out() << esc << *(v.value.string) << esc;
             break;
         }
         case LIST:
@@ -1400,7 +1442,7 @@ static void value_to_string_helper(std::ostream& os, const Value& v, PrefixHelpe
         // TODO: Number array, lambda, function, object
         default:
         {
-            assert(!"Implement output for type");
+            local_assert("Implement output for type");
         }
     }
 }
@@ -1878,56 +1920,24 @@ Value apply(const Value& v, VRefIterator args_begin, VRefIterator args_end, Map&
 
 } // empty namespace
 
-
-class Evaluator
-{
-public:
-
-    Masp& masp_;
-
-    Map env_;
-
-    bool eval_ok;
-
-    Evaluator(Masp& masp): masp_(masp), env_(masp_.env()->get_env())
-    {
-        eval_ok = true;
-    }
-
-    ~Evaluator()
-    {
-        if(eval_ok)
-        {
-            // Apply generated env back to masp_
-            masp_.env()->get_env() = env_;
-        }
-    }
-    
-    Value eval_value(const Value& v)
-    {
-        return eval(v, env_, masp_);
-    }
-};
-
 masp_result eval(Masp& m, const Value* v)
 {
-    Evaluator e(m);
-
     ValuePtr result(new Value(), ValueDeleter());
-
-    //TODO: Return last result of an expression.
-    //If is unquoted list
 
     try
     {
-        *result = e.eval_value(*v);
-    }catch(EvaluationException& e)
+        *result = eval(*v, m.env()->get_env(), m);
+    }catch(const EvaluationException& e)
     {
-        return masp_result(e.get_message());
+        return masp_fail(e.get_message());
+    }catch(const std::exception& e)
+    {
+        return masp_fail(e.what());
     }
-
-    // value - if not in place, add to value_stack, add reference to ref_stack
-    // add value references to eval stack
+    catch(...)
+    {
+        return masp_fail("Unknown error.");
+    }
 
     return masp_result(result);
 }
@@ -1937,7 +1947,9 @@ masp_result read_eval(Masp& m, const char* str){
     if(parse_result.valid()){
         return eval(m, parse_result.as_value()->get());
     }
-    else{return parse_result;}
+    else{
+        return parse_result;
+    }
 }
 
 const Value* get_value(Masp& m, const char* pathstr)
@@ -2506,6 +2518,38 @@ namespace {
         return Value();
     }
 
+    OPDEF(op_import_file, arg_i, arg_end)
+    {
+        Value* fst = (arg_i != arg_end) ? &*arg_i : 0;
+
+        if(fst && fst->type == STRING)
+        {
+            const char* path = value_string(*fst);
+
+            std::string contents;
+            bool        success;
+            std::tie(contents, success) = file_to_string(path);
+
+            if(success){
+                masp_result res = read_eval(m, contents.c_str());
+
+                if(res.valid()){ 
+                    return *(res.as_value()->get());
+                } else {
+                    throw EvaluationException(res.message());
+                }
+            }
+            else{
+                std::string msg = std::string("op_import_file: Could not read in file:") +
+                                  std::string(path);
+                throw EvaluationException(msg);
+            }
+        }
+        else throw EvaluationException("op_import_file: first value must be string"); 
+
+        return Value();
+    }
+
     // TODO:while  dot cross str
     // map filter range apply count zip
 
@@ -2517,7 +2561,17 @@ namespace {
 
 void Masp::Env::add_fun(const char* name, PrimitiveFunction f)
 {
-    *env_ = env_->add(make_value_symbol(name), make_value_function(f)); // TODO
+    *env_ = env_->add(make_value_symbol(name), make_value_function(f));
+}
+
+void Masp::Env::def(const Value& key, const Value& value)
+{
+    *env_ = env_->add(key, value);
+}
+
+void Masp::Env::load_default_extensions()
+{
+
 }
 
 void Masp::Env::load_default_env()
@@ -2555,16 +2609,18 @@ void Masp::Env::load_default_env()
     add_fun("make-map", op_make_map);
     add_fun("make-vector", op_make_vector);
 
+    add_fun("count", op_count); 
+    add_fun("cons", op_cons);
+
     add_fun("println", op_println);
     add_fun("printf", op_printf);
     add_fun("str", op_str);
 
-    add_fun("count", op_count); 
-    add_fun("cons", op_cons);
+    add_fun("read", wrap_function(file_to_string));
+    add_fun("write", wrap_function(string_to_file));
+    add_fun("import", op_import_file);
 }
 
 void add_fun(Masp& m, const char* name, PrimitiveFunction f) {m.env()->add_fun(name, f);}
 
-
-#endif
 } // Namespace masp ends

@@ -1,0 +1,1 @@
+(println "Running file foo.mp...")(def bar "bar")(println (str "I defined bar as " bar "."))

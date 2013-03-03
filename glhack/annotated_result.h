@@ -20,7 +20,10 @@ public:
         new(as_value())T(value);
     }
 
-    explicit AnnotatedResult(const std::string& message):valid_(false),message_(message){}
+    explicit AnnotatedResult(const std::string& message):valid_(false),message_(message)
+    {
+        message_;
+    }
 
     AnnotatedResult(const AnnotatedResult& r)
     {
@@ -49,7 +52,7 @@ public:
 
     ~AnnotatedResult()
     {
-        if(message_.empty())
+        if(valid_)
         {
             as_value()->~T();
         }
@@ -64,6 +67,7 @@ public:
 private:
     AnnotatedResult& operator=(const AnnotatedResult& a);
 
+    bool is_alloced_;
     bool valid_;
     typename std::aligned_storage <sizeof(T), std::alignment_of<T>::value>::type value_[1];
     std::string message_;

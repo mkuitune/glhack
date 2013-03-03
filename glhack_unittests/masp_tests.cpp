@@ -138,8 +138,9 @@ UTEST(masp, object_interface_fake_input)
     ASSERT_TRUE(masp::value_type(contstring) == masp::STRING, "Type is not string");
     ASSERT_TRUE(strcmp(masp::value_string(*contstring),FAKE_CONTENTS) == 0
         , "Result did not match expected.");
-
 }
+
+
 
 
 UTEST(masp, get_value)
@@ -180,7 +181,7 @@ UTEST(masp, simple_parsing)
         {
             const masp::Value* ptr = (*a).get();
             std::string value_str = masp::value_to_typed_string(ptr);
-            GLH_TEST_LOG(value_str);
+            //GLH_TEST_LOG(value_str);
         }
     };
 

@@ -3,10 +3,55 @@
 */
 #include "iotools.h"
 
+#ifdef WIN32
+#include "win32_dirent.h"
+#else
+#include <cdirent>
+#endif
+
+bool file_exists(const char* path)
+{
+    bool result = false;
+
+    return result;
+}
+
+std::list<std::string> list_dir(const char* path)
+{
+    std::list<std::string> contents;
+
+    return contents;
+}
+
+bool is_file(const char* path)
+{
+    bool result = false;
+
+    return result;
+}
+
+bool is_directory(const char* path)
+{
+     bool result = false;
+
+    return result;
+}
+
 std::tuple<std::string, bool> file_to_string(const char* path)
 {
     InputFile file(path);
     return file.contents_to_string();
+}
+
+bool string_to_file(const char* path, const char* string)
+{
+    bool result = false;
+    OutputFile o(path);
+    if(o.is_open()){
+        o.file() << string;
+        result = true;
+    }
+    return result;
 }
 
 InputFile::InputFile(const char* path):file_(path, std::ios::in|std::ios::binary){}

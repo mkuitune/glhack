@@ -14,6 +14,7 @@ bool is_file(const char* path);
 bool is_directory(const char* path);
 
 std::tuple<std::string, bool> file_to_string(const char* path);
+bool string_to_file(const char* path, const char* string);
 
 class InputFile{
 public:
