@@ -2561,6 +2561,17 @@ namespace {
         return Value();
     }
 
+    OPDEF(op_iter, arg_start, arg_end)
+    {
+        ArgWrap args(arg_start, arg_end); 
+        size_t count = args.size();
+
+        if(count < 3)
+            throw EvaluationException("op_iter: iter needs at least 3 parameters:(iter <syms> collection function) where syms is a sequence of 1 to n quoted symbols such as: (iter 'a lst fun)."); 
+
+        size_t symcount = count - 2; 
+        return Value();
+    }
 
     // System ops
 
@@ -2617,7 +2628,7 @@ void Masp::Env::def(const Value& key, const Value& value)
 
 void Masp::Env::load_default_extensions()
 {
-
+    // TODO: wrap file input and output
 }
 
 void Masp::Env::load_default_env()
@@ -2661,13 +2672,15 @@ void Masp::Env::load_default_env()
     add_fun("cons", op_cons);
     add_fun("conj", op_conj);
 
+    // TODO keys vals add remove
     // TODO map 
-    // TODO iter: (iter (<syms> collection) f) = fill syms sequentially from collection, call f with each 
+    // TODO iter: (iter <syms> collection f) = fill syms sequentially from collection, call f with each 
     //                                           symbol set in turn, ie.
-    //                                           (iter (x y alist) foo) would fill x and y from alist and call
+    //                                           (iter 'x 'y alist foo) would fill x and y from alist and call
     //                                            (foo x y) for each instantiated set
+    //                                           second form: (iter alist foo) will call foo with the number of
+    //                                           arguments in each element of collection (one for lists, two for maps)
 
-    // Fix conj, cons for map
 
     add_fun("println", op_println);
     add_fun("printf", op_printf);

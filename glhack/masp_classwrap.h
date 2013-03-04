@@ -199,6 +199,18 @@ public:
         return count;
     }
 
+    /** Bind parameters to input sequence */
+    template<class T>
+    void bind(T& value_seq) const {
+        VecIterator i(i_);
+        if(size() < value_seq.size()) throw EvaluationException("Incompatible sizes");
+        for(auto& v: value_seq)
+        {
+            v = *i;
+            ++i;
+        }
+    }
+
 };
 
 
