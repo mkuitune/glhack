@@ -7,39 +7,7 @@
 #include <typeinfo>
 namespace masp{
 
-
 /*
-class IObject{
-public:
-    virtual ~IObject(){}
-    virtual std::string to_string() = 0;
-    virtual IObject* copy() = 0;
-};
-
-object := to_string, copy
-
-return
-(list value:obj value:map [funs] )
-
-
-add functions to call wrapped object member funs
-
-    Value <wrapper-for-somefun>(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
-    {
-        obj = art_start->value.object
-        unwrap_n(arg_start, arg_end, a,b,c,...)
-        instance = dynamic_cast<InstanceType>(object)
-        instance->somefun(get_first_param_type(a), get_second_param_type(b), ...)
-
-
-    }
-
-
-objval = make_value_obj
-mapval = make_value_map
-    mapval add objval->to_string (?)
-              {foreach  fun map = map->add(make_value_symbol(name), make_value_function(f))}
-
 
 (. fun obj params) :=  (((fnext obj) fun) (first obj) params)
                            map       sym
@@ -68,6 +36,8 @@ class WrappedObject : public IObject { public:
 
     template<class C0> 
     WrappedObject(C0&& c0):t_(new T(std::forward<C0>(c0))){}
+    template<class C0, class C1> 
+    WrappedObject(C0&& c0, C1&& c1):t_(new T(std::forward<C0>(c0), std::forward<C1>(c1))){}
     //template<class C0, class C1> WrappedObject(const C0&& c0, const C1&& c1):t_(new T(c0, c1)){}
 
     virtual WrappedObject* copy() override {
@@ -162,7 +132,7 @@ TO_TYPE(IObject*){
 
 class FunBase{public:
     virtual ~FunBase(){}
-    virtual Value operator()(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env) = 0;
+    virtual Value operator()(Masp& m, Vector& args, Map& env) = 0;
 };
 
 typedef std::shared_ptr<FunBase> FunBasePtr;
@@ -220,7 +190,9 @@ class FunWrap0_0 : public FunBase{public:
 
     FunWrap0_0(funt fun):fun_(fun){}
 
-    Value operator()(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env) override {
+    Value operator()(Masp& m, Vector& args, Map& env) override {
+        VecIterator arg_start = args.begin();
+        VecIterator arg_end = args.end();
         fun_();
         return Value();
     }
@@ -233,7 +205,9 @@ class FunWrap0_1 : public FunBase{public:
 
     FunWrap0_1(funt fun):fun_(fun){}
 
-    Value operator()(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env) override {
+    Value operator()(Masp& m, Vector& args, Map& env) override {
+        VecIterator arg_start = args.begin();
+        VecIterator arg_end = args.end();
         P0 p0;
         ArgWrap(arg_start, arg_end).wrap(&p0);
         fun_(p0);
@@ -248,7 +222,9 @@ class FunWrap1_0 : public FunBase{public:
 
     FunWrap1_0(funt fun):fun_(fun){}
 
-    Value operator()(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env) override {
+    Value operator()(Masp& m, Vector& args, Map& env) override {
+        VecIterator arg_start = args.begin();
+        VecIterator arg_end = args.end();
         return to_value(m, fun_());
     }
 };
@@ -260,7 +236,9 @@ class FunWrap1_1 : public FunBase{public:
 
     FunWrap1_1(funt fun):fun_(fun){}
 
-    Value operator()(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env) override {
+    Value operator()(Masp& m, Vector& args, Map& env) override {
+        VecIterator arg_start = args.begin();
+        VecIterator arg_end = args.end();
         P0 p0;
         ArgWrap(arg_start, arg_end).wrap(&p0);
         return to_value(m, fun_(p0));
@@ -274,7 +252,9 @@ class FunWrap1_2 : public FunBase{public:
 
     FunWrap1_2(funt fun):fun_(fun){}
 
-    Value operator()(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env) override {
+    Value operator()(Masp& m, Vector& args, Map& env) override {
+        VecIterator arg_start = args.begin();
+        VecIterator arg_end = args.end();
         P0 p0;
         P1 p1;
         ArgWrap(arg_start, arg_end).wrap(&p0, &p1);
@@ -296,102 +276,130 @@ PrimitiveFunction wrap_function(R (*mmbr)(void)){return FunWrap1_0<R>(mmbr);}
 template<class R, class P0, class P1>
 PrimitiveFunction wrap_function(R (*mmbr)(P0, P1)){return FunWrap1_2<R, P0, P1>(mmbr);}
 
+#define CALLMEMBER(object,ptrToMember)  ((object).*(ptrToMember))
 
 template<class CLS>
 class MemFunWrap0_0 : public FunBase{public:
-    typedef std::function<void(CLS)> funt;
+    typedef void (CLS::*funt)(void);
     funt fun_;
 
     MemFunWrap0_0(funt fun):fun_(fun){}
 
-    Value operator()(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env) override {
+    Value operator()(Masp& m, Vector& args, Map& env) override {
+        VecIterator arg_start = args.begin();
+        VecIterator arg_end = args.end();
         IObject* obj;
         ArgWrap(arg_start, arg_end).wrap(&obj);
-        CLS& cls = *get_wrapped<CLS>(obj);
-        fun_(cls);
+        CLS& cls(*get_wrapped<CLS>(obj));
+        CALLMEMBER(cls, fun_)();
         return Value();
     }
 };
 
 template<class CLS, class P0>
 class MemFunWrap0_1 : public FunBase{public:
-    typedef std::function<void(CLS, P0)> funt;
+    typedef void (CLS::*funt)(P0);
     funt fun_;
 
     MemFunWrap0_1(funt fun):fun_(fun){}
 
-    Value operator()(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env) override {
+    Value operator()(Masp& m, Vector& args, Map& env) override {
+        VecIterator arg_start = args.begin();
+        VecIterator arg_end = args.end();
         IObject* obj;
         P0 p0;
         ArgWrap(arg_start, arg_end).wrap(&obj, &p0);
-        CLS& cls = *get_wrapped<CLS>(obj);
-        fun_(cls, p0);
+
+        CLS& cls(*get_wrapped<CLS>(obj));
+        CALLMEMBER(cls, fun_)(p0);
+
         return Value();
     }
 };
 
+
 template<class CLS, class R>
 class MemFunWrap1_0 : public FunBase{public:
-    typedef std::function<R(CLS)> funt;
+    typedef R (CLS::*funt)(void);
     funt fun_;
 
     MemFunWrap1_0(funt fun):fun_(fun){}
 
-    Value operator()(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env) override {
+    Value operator()(Masp& m, Vector& args, Map& env) override {
+        VecIterator arg_start = args.begin();
+        VecIterator arg_end = args.end();
         IObject* obj;
         ArgWrap(arg_start, arg_end).wrap(&obj);
-        CLS& cls = *get_wrapped<CLS>(obj);
-        return to_value(m, fun_(cls));
+        CLS& cls(*get_wrapped<CLS>(obj));
+        return to_value(m, CALLMEMBER(cls, fun_)());
     }
 };
 
 template<class CLS, class R, class P0>
 class MemFunWrap1_1 : public FunBase{public:
-    typedef std::function<R(CLS, P0)> funt;
+    typedef R (CLS::*funt)(P0);
+
     funt fun_;
 
     MemFunWrap1_1(funt fun):fun_(fun){}
 
-    Value operator()(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env) override {
+    Value operator()(Masp& m, Vector& args, Map& env) override {
+        VecIterator arg_start = args.begin();
+        VecIterator arg_end = args.end();
         IObject* obj;
         P0 p0;
         ArgWrap(arg_start, arg_end).wrap(&obj, &p0);
-        CLS& cls = *get_wrapped<CLS>(obj);
-        return to_value(m, fun_(cls, p0));
+
+        CLS& cls(*get_wrapped<CLS>(obj));
+        return to_value(m, CALLMEMBER(cls, fun_)(p0));
     }
 };
 
 template<class CLS, class R, class P0, class P1>
 class MemFunWrap1_2 : public FunBase{public:
-    typedef std::function<R(CLS, P0, P1)> funt;
+    typedef R (CLS::*funt)(P0, P1);
+
     funt fun_;
 
     MemFunWrap1_2(funt fun):fun_(fun){}
 
-    Value operator()(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env) override {
+    Value operator()(Masp& m, Vector& args, Map& env) override {
+        VecIterator arg_start = args.begin();
+        VecIterator arg_end = args.end();
         IObject* obj;
         P0 p0;
         P1 p1;
         ArgWrap(arg_start, arg_end).wrap(&obj, &p0, &p1);
-        CLS& cls = *get_wrapped<CLS>(obj);
-        return to_value(m, fun_(cls, p0, p1));
+
+        CLS& cls(*get_wrapped<CLS>(obj));
+        return to_value(m, CALLMEMBER(cls, fun_)(p0, p1));
     }
 };
 
 template<class T>
-PrimitiveFunction wrap_member(void (T::*mmbr)(void)){return MemFunWrap0_0<T>(mmbr);}
+PrimitiveFunction wrap_member(void (T::*mmbr)(void)){
+    return  MemFunWrap0_0<T>(mmbr);
+}
 
 template<class T, class P0>
-PrimitiveFunction wrap_member(void (T::*mmbr)(P0)){return MemFunWrap0_1<T, P0>(mmbr);}
+PrimitiveFunction wrap_member(void (T::*mmbr)(P0)){
+    return MemFunWrap0_1<T, P0>(mmbr);
+}
 
 template<class T, class R, class P0>
-PrimitiveFunction wrap_member(R (T::*mmbr)(P0)){return MemFunWrap1_1<T, R, P0>(mmbr);}
+PrimitiveFunction wrap_member(R (T::*mmbr)(P0)){
+    return MemFunWrap1_1<T, R, P0>(mmbr);
+}
 
 template<class T, class R>
-PrimitiveFunction wrap_member(R (T::*mmbr)(void)){return MemFunWrap1_0<T, R>(mmbr);}
+PrimitiveFunction wrap_member(R (T::*mmbr)(void)){
+    return MemFunWrap1_0<T, R>(mmbr);
+}
 
 template<class T, class R, class P0, class P1>
-PrimitiveFunction wrap_member(R (T::*mmbr)(P0, P1)){return MemFunWrap1_2<T, R, P0, P1>(mmbr);}
+PrimitiveFunction wrap_member(R (T::*mmbr)(P0, P1)){
+    return MemFunWrap1_2<T, R, P0, P1>(mmbr);
+}
 
 class FunMap{public:
     Value mapv_;
@@ -404,6 +412,8 @@ class FunMap{public:
     }
     Value& map(){return mapv_;}
 };
+
+Value object_data_to_list(FunMap&fmap, Value& obj, Masp& m);
 
 }//Namespace masp
 

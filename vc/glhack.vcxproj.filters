@@ -21,6 +21,8 @@
     <ClCompile Include="..\glhack\glh_image.cpp" />
     <ClCompile Include="..\glhack\asset_manager.cpp" />
     <ClCompile Include="..\glhack\iotools.cpp" />
+    <ClCompile Include="..\glhack\masp_extensions.cpp" />
+    <ClCompile Include="..\glhack\masp_classwrap.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\glhack\glbase.h" />
@@ -46,5 +48,6 @@
     <ClInclude Include="..\glhack\asset_manager.h" />
     <ClInclude Include="..\glhack\iotools.h" />
     <ClInclude Include="..\glhack\masp_classwrap.h" />
+    <ClInclude Include="..\glhack\masp_extensions.h" />
   </ItemGroup>
 </Project>

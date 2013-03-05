@@ -47,11 +47,7 @@ bool string_to_file(const char* path, const char* string)
 {
     bool result = false;
     OutputFile o(path);
-    if(o.is_open()){
-        o.file() << string;
-        result = true;
-    }
-    return result;
+    return o.write(string);
 }
 
 InputFile::InputFile(const char* path):file_(path, std::ios::in|std::ios::binary){}
@@ -91,7 +87,7 @@ OutputFile::OutputFile(const char* path)
 OutputFile::OutputFile(const char* path, bool append)
 {
     auto openflags = append ? std::ios::out | std::ios::app | std::ios::binary : std::ios::out | std::ios::binary;
-    file_.open(path, std::ios::out | std::ios::binary);
+    file_.open(path, openflags);
 }
 
 OutputFile::~OutputFile(){if(file_) file_.close();}
@@ -99,5 +95,20 @@ OutputFile::~OutputFile(){if(file_) file_.close();}
 bool OutputFile::is_open(){if(file_) return true; else return false;}
 
 void OutputFile::close(){file_.close();}
+
+bool OutputFile::write_str(std::string& str)
+{
+    return write(str.c_str());
+}
+
+bool OutputFile::write(const char* str)
+{
+    bool result;
+    if(is_open()){
+        file_ << str;
+        result = true;
+    }
+    return result;
+}
 
 std::ofstream& OutputFile::file(){return file_;}

@@ -186,7 +186,7 @@ class Masp;
 
 typedef Value::Vector Vector;
 typedef Vector::iterator VecIterator;
-typedef std::function<Value(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)> PrimitiveFunction;
+typedef std::function<Value(Masp& m, Vector& args, Map& env)> PrimitiveFunction;
 
 
 void free_value(Value* v);

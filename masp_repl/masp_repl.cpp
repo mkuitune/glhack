@@ -1,5 +1,6 @@
 #include "iotools.h"
 #include "masp.h"
+#include "masp_extensions.h"
 #include<iostream>
 #include<cstring>
 #include <sstream>
@@ -172,7 +173,7 @@ int main(int argc, char* argv[])
 {
 
     masp::Masp M;
-
+    masp::load_masp_unsafe_extensions(M);
     M.set_args(argc, argv);
 
     if(argc == 1)

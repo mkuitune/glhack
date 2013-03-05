@@ -1026,11 +1026,17 @@ public:
         result.resize(len);
         auto i = std::begin(result);
         bool prevskip = false;
+
         while(begin != end){
             char c = *begin++;
 
             if(prevskip){
-                *i++ = c;
+                     if(c == 'n') *i++ = '\n';
+                else if(c == 'r') *i++ = '\r';
+                else if(c == 't') *i++ = '\t';
+                else if(c == 'b') *i++ = '\b';
+                else if(c == 'f') *i++ = '\f';
+                else *i++ = c;
                 prevskip = false;
             } else {
                 if(c == '\\') prevskip = true;
@@ -1431,7 +1437,15 @@ static void value_to_string_helper(std::ostream& os, const Value& v, PrefixHelpe
             out() << "<function>" ; // TODO: add function name to Function member.
             break;
         }
-        // TODO: Number array, lambda, function, object
+        case OBJECT:
+        {
+            //const std::type_info& funtype(v.value.function->fun.target_type());
+            //const char* fun_type_name = funtype.name();
+
+            out() << "<object>" ; // TODO: add function name to Function member.
+            break;
+        }
+        // TODO: Number array
         default:
         {
             local_assert("Implement output for type");
@@ -1825,16 +1839,8 @@ void list_decompose(const List& l, const Value** first, const Value** second, co
 
 }
 
-Value apply(const Value& v, VRefIterator args_begin, VRefIterator args_end, Map& env, Masp& masp)
+Value eval_compound_procedure(const Value& v, Vector& params, Masp& masp)
 {
-    Vector params = eval_list_to_vector(args_begin, args_end, env, masp);
-
-    if(is_primitive_procedure(v))
-    {
-        return value_function(v)(masp, params.begin(), params.end(), env);
-    }
-    else if(is_compound_procedure(v))
-    {
         // Eval sequence. #1 : Extract params, body and env from procedure list.
         const Value* proc_params = 0;
         const Value* proc_body   = 0;
@@ -1868,6 +1874,55 @@ Value apply(const Value& v, VRefIterator args_begin, VRefIterator args_end, Map&
         Map seq_env = proc_env_map->add(params_list->begin(), params_list->end(), params.begin(), params.end());
 
         return eval_sequence(*value_list(*proc_body), seq_env, masp);
+}
+
+Value apply(const Value& v, VRefIterator args_begin, VRefIterator args_end, Map& env, Masp& masp)
+{
+    Vector params = eval_list_to_vector(args_begin, args_end, env, masp);
+
+    if(is_primitive_procedure(v))
+    {
+        return value_function(v)(masp, params, env);
+    }
+    else if(is_compound_procedure(v))
+    {
+        return eval_compound_procedure(v, params, masp);
+
+#if 0
+        // Eval sequence. #1 : Extract params, body and env from procedure list.
+        const Value* proc_params = 0;
+        const Value* proc_body   = 0;
+        const Value* proc_env    = 0;
+
+        List* l = value_list(v);
+
+        list_decompose(*l, 0, &proc_params, &proc_body, &proc_env);
+
+        if(!proc_params) throw EvaluationException(std::string("apply: Malformed compound procedure. Could not find procedure parameters."));
+        if(!proc_body) throw EvaluationException(std::string("apply: Malformed compound procedure. Could not find procedure body."));
+        if(!proc_env) throw EvaluationException(std::string("apply: Malformed compound procedure. Could not find procedure environment."));
+
+        List* params_list = value_list(*proc_params);
+        List* body_list   = value_list(*proc_body);
+        Map* proc_env_map = value_map(*proc_env);
+
+        if(proc_params->type != LIST)
+            throw EvaluationException(std::string("apply: Malformed compound procedure. Proc_params was not a list but:") + value_to_string(*proc_params));
+        
+        if(proc_body->type != LIST)
+            throw EvaluationException(std::string("apply: Malformed compound procedure. Proc_body was not a list but:") + value_to_string(*proc_body));
+
+        if(proc_env->type != MAP)
+            throw EvaluationException(std::string("apply: Malformed compound procedure. Proc_env was not a map but:") + value_to_string(*proc_env));
+
+        if(!params_list) throw EvaluationException(std::string("apply: params_list is null."));
+        if(!body_list) throw EvaluationException(std::string("apply: body_list is null."));
+        if(!proc_env_map) throw EvaluationException(std::string("apply: env_map is null."));
+
+        Map seq_env = proc_env_map->add(params_list->begin(), params_list->end(), params.begin(), params.end());
+
+        return eval_sequence(*value_list(*proc_body), seq_env, masp);
+#endif
     }
     else if(v.type == MAP)
     {
@@ -2023,12 +2078,13 @@ Number get_value_number(const Value* v)
 
 namespace {
 
-#define OPDEF(name_param, i_start_param, i_end_param) Value name_param(Masp& m, VecIterator i_start_param, VecIterator i_end_param, Map& env)
+#define OPDEF(name_param, i_start_param, i_end_param) Value name_param(Masp& m, Vector& args, Map& env){\
+            VecIterator i_start_param = args.begin(); VecIterator i_end_param = args.end();
 
     // Arithmetic operators
 
     OPDEF(op_add, arg_start, arg_end)
-    {
+
         Number n = Number::make(0);
         if(!all_are_of_type(arg_start, arg_end, NUMBER, 0)) throw EvaluationException("op_add: value's type is not NUMBER");
         while(arg_start != arg_end)
@@ -2041,7 +2097,7 @@ namespace {
     }
 
     OPDEF(op_sub, arg_start, arg_end)
-    {
+
         Number n = Number::make(0);
         size_t size = 0;
         if(!all_are_of_type(arg_start, arg_end, NUMBER, &size)) throw EvaluationException("op_sub: value's type is not NUMBER");
@@ -2065,7 +2121,7 @@ namespace {
     }
 
     OPDEF(op_mul, arg_start, arg_end)
-    {
+
         Number n = Number::make(1);
         if(!all_are_of_type(arg_start, arg_end, NUMBER, 0)) throw EvaluationException("op_mul: value's type is not NUMBER");
         while(arg_start != arg_end)
@@ -2078,7 +2134,7 @@ namespace {
     }
 
     OPDEF(op_div, arg_start, arg_end)
-    {
+
         Number n = Number::make(1);
         size_t size = 0;
         if(!all_are_of_type(arg_start, arg_end, NUMBER, &size)) throw EvaluationException("op_sub: value's type is not NUMBER");
@@ -2102,8 +2158,8 @@ namespace {
     }
 
     OPDEF(op_make_range, arg_start, arg_end)
-    {
-        ArgWrap args(arg_start, arg_end); 
+
+        ArgWrap wrapper(arg_start, arg_end); 
 
         size_t count = args.size();
         
@@ -2112,12 +2168,12 @@ namespace {
         Number increment;
          
         if(args.size() == 1){
-            args.wrap(&end);
+            wrapper.wrap(&end);
             if(end.type == Number::FLOAT){start.set(0.0); increment.set(1.0);}
             else                         {start.set(0); increment.set(1);}
         }
         else if(args.size() == 2){
-            args.wrap(&start, &end);
+            wrapper.wrap(&start, &end);
             if(glh::any_of(Number::FLOAT, start.type, end.type)){
                 start.set(start.to_float());
                 end.set(end.to_float());
@@ -2128,7 +2184,7 @@ namespace {
             }
         }
         else if(args.size() == 3){
-            args.wrap(&start, &increment, &end);
+            wrapper.wrap(&start, &increment, &end);
             if(glh::any_of(Number::FLOAT, start.type, end.type, increment.type)){
                 start.set(start.to_float());
                 end.set(end.to_float());
@@ -2157,7 +2213,7 @@ namespace {
 #define ITER_TO_PTR(iter_param, end_param) ((iter_param != end_param) ? (&(*iter_param)) : 0)
 
     OPDEF(op_equal, arg_start, arg_end)
-    {
+
         bool Result = true;
 
         const Value* first;
@@ -2179,8 +2235,9 @@ namespace {
         return make_value_boolean(Result);
     }
 
-    Value op_not_equal(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
-    {
+    Value op_not_equal(Masp& m, Vector& args, Map& env){
+        VecIterator arg_start = args.begin();
+        VecIterator arg_end = args.end();
         bool Result = true;
 
         const Value* first;
@@ -2232,26 +2289,30 @@ namespace {
         return Result;
     }
 
-    Value op_less_or_eq(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
-    {
+    Value op_less_or_eq(Masp& m, Vector& args, Map& env){
+        VecIterator arg_start = args.begin();
+        VecIterator arg_end = args.end();
         bool Result = num_op_loop<NumLeq>(arg_start, arg_end);
         return make_value_boolean(Result);
     }
 
-    Value op_less(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
-    {
+    Value op_less(Masp& m, Vector& args, Map& env){
+        VecIterator arg_start = args.begin();
+        VecIterator arg_end = args.end();
         bool Result = num_op_loop<NumLess>(arg_start, arg_end);
         return make_value_boolean(Result);
     }
 
-    Value op_gt(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
-    {
+    Value op_gt(Masp& m, Vector& args, Map& env){
+        VecIterator arg_start = args.begin();
+        VecIterator arg_end = args.end();
         bool Result = num_op_loop<NumGt>(arg_start, arg_end);
         return make_value_boolean(Result);
     }
 
-    Value op_gt_or_eq(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
-    {
+    Value op_gt_or_eq(Masp& m, Vector& args, Map& env){
+        VecIterator arg_start = args.begin();
+        VecIterator arg_end = args.end();
         bool Result = num_op_loop<NumGeq>(arg_start, arg_end);
         return make_value_boolean(Result);
     }
@@ -2297,8 +2358,9 @@ namespace {
         return first;
     }
 
-    Value op_first(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
-    {
+    Value op_first(Masp& m, Vector& args, Map& env){
+        VecIterator arg_start = args.begin();
+        VecIterator arg_end = args.end();
         const Value* first = 0;
         if(arg_start != arg_end)
         {
@@ -2308,8 +2370,9 @@ namespace {
         return first ? *first : Value();
     }
 
-    Value op_next(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
-    {
+    Value op_next(Masp& m, Vector& args, Map& env){
+        VecIterator arg_start = args.begin();
+        VecIterator arg_end = args.end();
         if(arg_start != arg_end)
         {
             Value* v =  &(*arg_start);
@@ -2318,8 +2381,9 @@ namespace {
         return Value();
     }
 
-    Value op_fnext(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
-    {
+    Value op_fnext(Masp& m, Vector& args, Map& env){
+        VecIterator arg_start = args.begin();
+        VecIterator arg_end = args.end();
         if(arg_start != arg_end)
         {
             if(arg_start->type == LIST)
@@ -2342,8 +2406,9 @@ namespace {
         return Value();
     }
 
-    Value op_nnext(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
-    {
+    Value op_nnext(Masp& m, Vector& args, Map& env){
+        VecIterator arg_start = args.begin();
+        VecIterator arg_end = args.end();
         if(arg_start != arg_end)
         {
             if(arg_start->type == LIST)
@@ -2369,8 +2434,9 @@ namespace {
         return Value();
     }
 
-    Value op_nfirst(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
-    {
+    Value op_nfirst(Masp& m, Vector& args, Map& env){
+        VecIterator arg_start = args.begin();
+        VecIterator arg_end = args.end();
         const Value* first = 0;
         if(arg_start != arg_end)
         {
@@ -2392,8 +2458,9 @@ namespace {
         return Value();
     }
 
-    Value op_ffirst(Masp& m, VecIterator arg_start, VecIterator arg_end, Map& env)
-    {
+    Value op_ffirst(Masp& m, Vector& args, Map& env){
+        VecIterator arg_start = args.begin();
+        VecIterator arg_end = args.end();
         const Value* ffirst = 0;
         if(arg_start != arg_end)
         {
@@ -2407,8 +2474,8 @@ namespace {
 
     // Type query operations
 
-#define OP_1_DEFN(opval_param, i_param)    Value opval_param(Masp& m, VecIterator i_param, VecIterator arg_end, Map& env) \
-    {if(i_param != arg_end){
+#define OP_1_DEFN(opval_param, i_param)    Value opval_param(Masp& m, Vector& args, Map& env) \
+    {VecIterator i_param = args.begin(); VecIterator arg_end = args.end(); if(i_param != arg_end){
 
     OP_1_DEFN(op_value_is_integer, vi)
         if(vi->type == NUMBER && vi->value.number.type == Number::INT) return make_value_boolean(true);
@@ -2453,14 +2520,14 @@ namespace {
     // Container constructors
 
     OPDEF(op_make_map, arg_start, arg_end)
-    {
+
         Map map = new_map(m);
         MapPool* pool = &map_pool(m);
         return make_value_map(pool->add(map, arg_start, arg_end));
     }
 
     OPDEF(op_make_vector, arg_start, arg_end)
-    {
+
         return make_value_vector(arg_start, arg_end);
     }
 
@@ -2480,19 +2547,19 @@ namespace {
     }
 
     OPDEF(op_str, arg_start, arg_end)
-    {
+
         return make_value_string(value_iters_to_string(arg_start, arg_end, ""));
     }
 
     OPDEF(op_println, arg_start, arg_end)
-    {
+
         m.get_output() << value_iters_to_string(arg_start, arg_end, " ");
         m.get_output() << "\n";
         return Value();
     }
 
     OPDEF(op_printf, arg_start, arg_end)
-    {
+
         m.get_output() << value_iters_to_string(arg_start, arg_end, " ");
         return Value();
     }
@@ -2500,7 +2567,7 @@ namespace {
     // Container operations
 
     OPDEF(op_count, arg_i, arg_end)
-    {
+
         int count = 0;
         if(arg_i != arg_end)
         {
@@ -2511,7 +2578,7 @@ namespace {
     } return make_value_number(Number::make(count));}
 
     OPDEF(op_cons, arg_i, arg_end) 
-    {
+
         Value* fst;
         Value* snd;
 
@@ -2536,7 +2603,7 @@ namespace {
     }
 
     OPDEF(op_conj, arg_i, arg_end) 
-    {
+
         Value* fst;
         Value* snd;
 
@@ -2561,22 +2628,242 @@ namespace {
         return Value();
     }
 
-    OPDEF(op_iter, arg_start, arg_end)
+    struct IterContext{
+        Vector& args;
+        size_t count;
+        size_t symcount;
+        Value& collection;
+        Value& fun;
+         
+        IterContext(Vector& arguments)
+            :args(arguments), count(args.size()),symcount(count - 2), collection(args[count - 2]), fun(args[count - 1]){
+        }
+
+        Value apply(Vector& params, Map& env, Masp& masp)
+        {
+            if(is_primitive_procedure(fun))
+            {
+                return value_function(fun)(masp, params, env);
+            }
+            else if(is_compound_procedure(fun))
+            {
+                return eval_compound_procedure(fun, params, masp);
+            }
+            else throw EvaluationException("IterContext::apply: malformed call, attempting call non-callable value."); 
+        }
+    };
+
+    template<class T>
+    Value extract_apply(T begin, T end, IterContext& ic, Map& env, Masp& masp)
     {
-        ArgWrap args(arg_start, arg_end); 
+        Vector args;
+        bool done = begin == end;
+
+        while(!done)
+        {
+            size_t load = 0;
+            args.clear();
+            while(begin != end && load < ic.symcount)
+            {
+                args.push_back(*begin); ++begin;
+                ++load;
+            }
+            while(load < ic.symcount) args.push_back(Value());
+            ic.apply(args, env, masp);
+
+            if(begin == end) done = true;
+        }
+
+        return Value();
+    }
+
+    // TODO: raise exception or unify: iter for map takes only from 1 to 2 parameters. Make explicit.
+    Value extract_apply_map(Map::iterator begin, Map::iterator end, IterContext& ic, Map& env, Masp& masp)
+    {
+        if(ic.symcount > 2) throw EvaluationException("op_iter: for map, number of binding symbols must be 1 or 2."); 
+
+        Vector args;
+        bool done = begin == end;
+
+        bool apply_first = value_string(ic.args[0])[0] != '_';
+        bool apply_second = ic.symcount > 1 ? value_string(ic.args[1])[0] != '_' : false;
+
+        while(!done)
+        {
+            args.clear();
+            while(begin != end)
+            {
+                if(apply_first) args.push_back(begin->first);
+                if(apply_second) args.push_back(begin->second);
+                ++begin;
+            }
+
+            ic.apply(args, env, masp);
+
+            if(begin == end) done = true;
+        }
+
+        return Value();
+    }
+
+    Value do_iter_list(Masp& m, Vector& args, Map& env){
+        IterContext ic(args);
+        List* list = value_list(ic.collection);
+        return extract_apply(list->begin(), list->end(), ic, env, m);
+    }
+    
+    Value do_iter_vector(Masp& m, Vector& args, Map& env){
+        IterContext ic(args);
+        Vector* vector = value_vector(ic.collection);
+        return extract_apply(vector->begin(), vector->end(), ic, env, m);
+    }
+    
+    Value do_iter_map(Masp& m, Vector& args, Map& env){
+        IterContext ic(args);
+        Map* map = value_map(ic.collection);
+       return extract_apply_map(map->begin(), map->end(), ic, env, m);
+    }
+
+    // iter: (iter <syms> collection f)
+    OPDEF(op_iter, arg_start, arg_end)
         size_t count = args.size();
 
         if(count < 3)
             throw EvaluationException("op_iter: iter needs at least 3 parameters:(iter <syms> collection function) where syms is a sequence of 1 to n quoted symbols such as: (iter 'a lst fun)."); 
 
         size_t symcount = count - 2; 
+
+        bool all_are_syms = true;
+        for(size_t i = 0; i < symcount; ++i)
+            all_are_syms = all_are_syms && (args[i].type == SYMBOL);
+
+        if(!all_are_syms)
+            throw EvaluationException("op_iter: parameters prior to collection must be symbols."); 
+      
+        Value& collection(args[count - 2]);
+        Value& fun(args[count - 1]);
+        
+        if(glh::none_of(collection.type, VECTOR, LIST, MAP))
+            throw EvaluationException("op_iter: second to last parameter must be a collection (list, vector or map)."); 
+       
+        if(!(is_primitive_procedure(fun) || is_compound_procedure(fun)))
+            throw EvaluationException("op_iter: last parameter must be a function."); 
+
+        if(collection.type == VECTOR)    return do_iter_vector(m, args ,env);
+        else if(collection.type == LIST) return do_iter_list(m, args ,env);
+        else if(collection.type == MAP)  return do_iter_map(m, args ,env);
+
         return Value();
     }
 
+
+    template<class T>
+    Value extract_apply_collect(T begin, T end, IterContext& ic, Map& env, Masp& masp)
+    {
+        Vector args;
+        bool done = begin == end;
+
+        while(!done)
+        {
+            size_t load = 0;
+            args.clear();
+            while(begin != end && load < ic.symcount)
+            {
+                args.push_back(*begin); ++begin;
+                ++load;
+            }
+            while(load < ic.symcount) args.push_back(Value());
+            ic.apply(args, env, masp);
+
+            if(begin == end) done = true;
+        }
+
+        return Value();
+    }
+
+    // TODO: raise exception or unify: iter for map takes only from 1 to 2 parameters. Make explicit.
+    Value extract_apply_map_collect(Map::iterator begin, Map::iterator end, IterContext& ic, Map& env, Masp& masp)
+    {
+        if(ic.symcount > 2) throw EvaluationException("op_iter: for map, number of binding symbols must be 1 or 2."); 
+
+        Vector args;
+        bool done = begin == end;
+
+        bool apply_first = value_string(ic.args[0])[0] != '_';
+        bool apply_second = ic.symcount > 1 ? value_string(ic.args[1])[0] != '_' : false;
+
+        while(!done)
+        {
+            args.clear();
+            while(begin != end)
+            {
+                if(apply_first) args.push_back(begin->first);
+                if(apply_second) args.push_back(begin->second);
+                ++begin;
+            }
+
+            ic.apply(args, env, masp);
+
+            if(begin == end) done = true;
+        }
+
+        return Value();
+    }
+
+    Value do_map_list(Masp& m, Vector& args, Map& env){
+        IterContext ic(args);
+        List* list = value_list(ic.collection);
+        return extract_apply_collect(list->begin(), list->end(), ic, env, m);
+    }
+    
+    Value do_map_vector(Masp& m, Vector& args, Map& env){
+        IterContext ic(args);
+        Vector* vector = value_vector(ic.collection);
+        return extract_apply_collect(vector->begin(), vector->end(), ic, env, m);
+    }
+    
+    Value do_map_map(Masp& m, Vector& args, Map& env){
+        IterContext ic(args);
+        Map* map = value_map(ic.collection);
+       return extract_apply_map_collect(map->begin(), map->end(), ic, env, m);
+    }
+
+    // TODO
+    // map: (map <syms> collection f)
+    OPDEF(op_map, arg_start, arg_end)
+        size_t count = args.size();
+
+        if(count < 3)
+            throw EvaluationException("op_iter: iter needs at least 3 parameters:(iter <syms> collection function) where syms is a sequence of 1 to n quoted symbols such as: (iter 'a lst fun)."); 
+
+        size_t symcount = count - 2; 
+
+        bool all_are_syms = true;
+        for(size_t i = 0; i < symcount; ++i)
+            all_are_syms = all_are_syms && (args[i].type == SYMBOL);
+
+        if(!all_are_syms)
+            throw EvaluationException("op_iter: parameters prior to collection must be symbols."); 
+      
+        Value& collection(args[count - 2]);
+        Value& fun(args[count - 1]);
+        
+        if(glh::none_of(collection.type, VECTOR, LIST, MAP))
+            throw EvaluationException("op_iter: second to last parameter must be a collection (list, vector or map)."); 
+       
+        if(!(is_primitive_procedure(fun) || is_compound_procedure(fun)))
+            throw EvaluationException("op_iter: last parameter must be a function."); 
+
+        if(collection.type == VECTOR)    return do_map_vector(m, args ,env);
+        else if(collection.type == LIST) return do_map_list(m, args ,env);
+        else if(collection.type == MAP)  return do_map_map(m, args ,env);
+
+        return Value();
+    }
     // System ops
 
     OPDEF(op_import_file, arg_i, arg_end)
-    {
+
         Value* fst = (arg_i != arg_end) ? &*arg_i : 0;
 
         if(fst && fst->type == STRING)
@@ -2626,11 +2913,6 @@ void Masp::Env::def(const Value& key, const Value& value)
     *env_ = env_->add(key, value);
 }
 
-void Masp::Env::load_default_extensions()
-{
-    // TODO: wrap file input and output
-}
-
 void Masp::Env::load_default_env()
 {
     add_fun("+", op_add);
@@ -2671,15 +2953,11 @@ void Masp::Env::load_default_env()
     add_fun("count", op_count); 
     add_fun("cons", op_cons);
     add_fun("conj", op_conj);
+    add_fun("iter", op_iter);
+    add_fun("map", op_map);
 
     // TODO keys vals add remove
-    // TODO map 
-    // TODO iter: (iter <syms> collection f) = fill syms sequentially from collection, call f with each 
-    //                                           symbol set in turn, ie.
-    //                                           (iter 'x 'y alist foo) would fill x and y from alist and call
-    //                                            (foo x y) for each instantiated set
-    //                                           second form: (iter alist foo) will call foo with the number of
-    //                                           arguments in each element of collection (one for lists, two for maps)
+    // TODO map fold
 
 
     add_fun("println", op_println);

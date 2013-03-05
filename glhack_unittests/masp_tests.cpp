@@ -55,6 +55,7 @@ bool compare_parsing(masp::Masp& m, const char* str, std::function<T(const masp:
 
     return result;
 }
+
 #define FAKE_CONTENTS "Fake!"
 class FakeInputFile{
 public:
@@ -77,9 +78,9 @@ public:
 typedef masp::WrappedObject<FakeInputFile> WrappedInput;
 
 
-masp::Value make_FakeInputFile(masp::Masp& m,
-                         masp::VecIterator arg_start,
-                         masp::VecIterator arg_end, masp::Map& env){
+masp::Value make_FakeInputFile(masp::Masp& m, masp::Vector& args, masp::Map& env){
+    masp::VecIterator arg_start = args.begin();
+    masp::VecIterator arg_end = args.end();
 
     std::string path;
     masp::ArgWrap(arg_start, arg_end).wrap(&path);

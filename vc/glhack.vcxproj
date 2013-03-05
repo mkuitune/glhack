@@ -26,6 +26,8 @@
     <ClCompile Include="..\glhack\iotools.cpp" />
     <ClCompile Include="..\glhack\managed_structures.cpp" />
     <ClCompile Include="..\glhack\masp.cpp" />
+    <ClCompile Include="..\glhack\masp_classwrap.cpp" />
+    <ClCompile Include="..\glhack\masp_extensions.cpp" />
     <ClCompile Include="..\glhack\math_tools.cpp" />
     <ClCompile Include="..\glhack\persistent_containers.cpp" />
     <ClCompile Include="..\glhack\shims_and_types.cpp" />
@@ -57,6 +59,7 @@
     <ClInclude Include="..\glhack\managed_structures.h" />
     <ClInclude Include="..\glhack\masp.h" />
     <ClInclude Include="..\glhack\masp_classwrap.h" />
+    <ClInclude Include="..\glhack\masp_extensions.h" />
     <ClInclude Include="..\glhack\math_tools.h" />
     <ClInclude Include="..\glhack\persistent_containers.h" />
     <ClInclude Include="..\glhack\shims_and_types.h" />

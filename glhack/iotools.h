@@ -17,6 +17,8 @@ std::tuple<std::string, bool> file_to_string(const char* path);
 bool string_to_file(const char* path, const char* string);
 
 class InputFile{
+private:
+    InputFile(const InputFile& i){}
 public:
     InputFile(const char* path);
     ~InputFile();
@@ -29,14 +31,18 @@ public:
 };
 
 class OutputFile{
+private:
+    OutputFile(const OutputFile& o){}
 public:
     OutputFile(const char* path);
     OutputFile(const char* path, bool append);
     ~OutputFile();
     bool is_open();
     void close();
-    std::ofstream& file();
+    bool write_str(std::string& str);
+    bool write(const char* str);
 
+    std::ofstream& file();
 
     std::ofstream file_;
 };
