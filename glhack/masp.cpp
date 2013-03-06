@@ -16,6 +16,7 @@
 #include<tuple>
 #include<utility>
 #include<limits>
+#include<type_traits>
 
 namespace {
 void local_assert(const char* msg)
@@ -2628,6 +2629,99 @@ namespace {
         return Value();
     }
 
+    // Add keyvalue pair to map
+    OPDEF(op_insert_data, arg_i, arg_end)
+        // Signature (add map key value key value key value ...)
+
+        if(args.size() < 3 && args.size() % 2 == 0) throw EvaluationException("op_insert_data: wrong number of input arguments. Signature is (add map key value key value ...).");
+
+        Map* map = value_map(args[0]);
+
+        if(!map){
+            std::string first_str = value_to_typed_string(&args[0]);
+            throw EvaluationException("op_insert_data: first argument must be a map. You entered:" + first_str);
+        }
+
+        Value result = make_value_map(*map);
+
+        ++arg_i;
+
+        Map* resmap = value_map(result);
+
+        while(arg_i != arg_end)
+        {
+            auto key = arg_i;
+            ++arg_i;
+            auto value = arg_i;
+            ++arg_i;
+            *resmap = resmap->add(*key, *value);
+        }
+
+        return result;
+    }
+
+    // Remove keyvalue pair from map
+    OPDEF(op_remove_data, arg_i, arg_end) 
+                // Signature (add map key value key value key value ...)
+        if(args.size() < 2) throw EvaluationException("op_remove_data: wrong number of input arguments. Signature is (remove map key key...");
+        Map* map = value_map(args[0]);
+        if(!map){
+            std::string first_str = value_to_typed_string(&args[0]);
+            throw EvaluationException("op_remove_data: first argument must be a map. You entered:" + first_str);
+        }
+
+        Value result = make_value_map(*map);
+
+        ++arg_i;
+
+        Map* resmap = value_map(result);
+
+        while(arg_i != arg_end)
+        {
+            auto key = arg_i;
+            ++arg_i;
+            *resmap = resmap->remove(*key);
+        }
+
+        return result;
+    }
+
+    OPDEF(op_map_keys, arg_i, arg_end)
+        if(args.size() != 1) throw EvaluationException("op_map_keys: wrong number of input arguments. Signature is (keys map)");
+        Map* map = value_map(*arg_i);
+        if(!map){
+            std::string value_type = value_type_to_string(*arg_i);
+            throw EvaluationException("op_map_keys: argument must be a map. Type was:" + value_type  + ".");
+        }
+
+        Value result = make_value_list(m);
+        List* lst = value_list(result);
+
+        for(auto &kv : *map){
+            *lst = lst->add(kv.first);
+        }
+
+        return result;
+    }
+
+    OPDEF(op_map_vals, arg_i, arg_end)
+        if(args.size() != 1) throw EvaluationException("op_map_vals: wrong number of input arguments. Signature is (vals map)");
+        Map* map = value_map(*arg_i);
+        if(!map){
+            std::string value_type = value_type_to_string(*arg_i);
+            throw EvaluationException("op_map_vals: argument must be a map. Type was:" + value_type  + ".");
+        }
+
+        Value result = make_value_list(m);
+        List* lst = value_list(result);
+
+        for(auto &kv : *map){
+            *lst = lst->add(kv.second);
+        }
+
+        return result;
+    }
+
     struct IterContext{
         Vector& args;
         size_t count;
@@ -2659,6 +2753,8 @@ namespace {
         Vector args;
         bool done = begin == end;
 
+        if(ic.symcount == 0) ic.symcount = 1;
+
         while(!done)
         {
             size_t load = 0;
@@ -2677,30 +2773,20 @@ namespace {
         return Value();
     }
 
-    // TODO: raise exception or unify: iter for map takes only from 1 to 2 parameters. Make explicit.
+    // TODO: raise exception or unify: iter for map takes only 2 parameters. Make explicit.
     Value extract_apply_map(Map::iterator begin, Map::iterator end, IterContext& ic, Map& env, Masp& masp)
     {
-        if(ic.symcount > 2) throw EvaluationException("op_iter: for map, number of binding symbols must be 1 or 2."); 
+        if(ic.symcount != 0) throw EvaluationException("op_iter: map does not accept decomposition symbols. call as (map mapref fun)."); 
 
         Vector args;
-        bool done = begin == end;
 
-        bool apply_first = value_string(ic.args[0])[0] != '_';
-        bool apply_second = ic.symcount > 1 ? value_string(ic.args[1])[0] != '_' : false;
-
-        while(!done)
+        while(begin != end)
         {
             args.clear();
-            while(begin != end)
-            {
-                if(apply_first) args.push_back(begin->first);
-                if(apply_second) args.push_back(begin->second);
-                ++begin;
-            }
-
+            args.push_back(begin->first);
+            args.push_back(begin->second);
             ic.apply(args, env, masp);
-
-            if(begin == end) done = true;
+            ++begin;
         }
 
         return Value();
@@ -2728,8 +2814,8 @@ namespace {
     OPDEF(op_iter, arg_start, arg_end)
         size_t count = args.size();
 
-        if(count < 3)
-            throw EvaluationException("op_iter: iter needs at least 3 parameters:(iter <syms> collection function) where syms is a sequence of 1 to n quoted symbols such as: (iter 'a lst fun)."); 
+        if(count < 2)
+            throw EvaluationException("op_iter: iter needs at least 2 parameters:(iter <syms> collection function) or (iter collection function) without decomposition."); 
 
         size_t symcount = count - 2; 
 
@@ -2756,70 +2842,113 @@ namespace {
         return Value();
     }
 
-
-    template<class T>
-    Value extract_apply_collect(T begin, T end, IterContext& ic, Map& env, Masp& masp)
+    template<class COL, class T>
+    Value extract_apply_collect(T begin, T end, IterContext& ic, Map& env, Masp& m)
     {
         Vector args;
         bool done = begin == end;
 
+        Vector result_vec;
+
+        if(ic.symcount == 0) ic.symcount = 1;
+
         while(!done)
         {
             size_t load = 0;
+
             args.clear();
+
             while(begin != end && load < ic.symcount)
             {
                 args.push_back(*begin); ++begin;
                 ++load;
             }
+
             while(load < ic.symcount) args.push_back(Value());
-            ic.apply(args, env, masp);
+
+            result_vec.push_back(ic.apply(args, env, m));
 
             if(begin == end) done = true;
+        }
+
+        if(std::is_same<List, COL>::value){
+            Value result = make_value_list(m);
+            List* reslist = value_list(result);
+            *reslist = reslist->add_end(result_vec.begin(), result_vec.end());
+            return result;
+        }
+        else{
+            return make_value_vector(result_vec.begin(), result_vec.end());
         }
 
         return Value();
     }
 
-    // TODO: raise exception or unify: iter for map takes only from 1 to 2 parameters. Make explicit.
-    Value extract_apply_map_collect(Map::iterator begin, Map::iterator end, IterContext& ic, Map& env, Masp& masp)
+    // Raise exception or unify: iter for map takes only  2 parameters. Make explicit.
+    Value extract_apply_map_collect(Map::iterator begin, Map::iterator end, IterContext& ic, Map& env, Masp& m)
     {
-        if(ic.symcount > 2) throw EvaluationException("op_iter: for map, number of binding symbols must be 1 or 2."); 
+        if(ic.symcount != 0) throw EvaluationException("op_iter: iter for map does not accept decomposition symbols. call as (iter mapref fun) "); 
 
         Vector args;
+
         bool done = begin == end;
 
-        bool apply_first = value_string(ic.args[0])[0] != '_';
-        bool apply_second = ic.symcount > 1 ? value_string(ic.args[1])[0] != '_' : false;
+        Value result = make_value_map(m);
+        Map* resmap = value_map(result);
 
         while(!done)
         {
             args.clear();
-            while(begin != end)
-            {
-                if(apply_first) args.push_back(begin->first);
-                if(apply_second) args.push_back(begin->second);
-                ++begin;
-            }
 
-            ic.apply(args, env, masp);
+            args.push_back(begin->first);
+            args.push_back(begin->second);
+            ++begin;
+
+            Value applied = ic.apply(args, env, m);
+
+            if(applied.type == LIST)
+            {
+                List* lst = value_list(applied);
+                const Value* key = lst->first();
+                const Value* value = lst->second();
+                if(key && value) *resmap = resmap->add(*key, *value);
+                else throw EvaluationException("map :: map Result list did not contain two elements."); 
+            }
+            else if(applied.type == VECTOR)
+            {
+                Vector& vec(*value_vector(applied));
+                size_t size = vec.size();
+                if(size != 2) throw EvaluationException("map :: map Result vector did not contain 2 elements. "); 
+                *resmap = resmap->add(vec[0], vec[1]);
+            }
+            else if(applied.type == MAP)
+            {
+                Map* map = value_map(applied);
+                for(auto& kv : *map){
+                    *resmap = resmap->add(kv.first, kv.second);
+                }
+            }
+            else{
+                std::string valstr = value_to_typed_string(&applied);
+                throw EvaluationException("map :: map: Function does not return a mappable sequence (list, vector or map) but a " + valstr + "." ); 
+            }
 
             if(begin == end) done = true;
         }
 
-        return Value();
+        return result;
     }
 
     Value do_map_list(Masp& m, Vector& args, Map& env){
         IterContext ic(args);
         List* list = value_list(ic.collection);
-        return extract_apply_collect(list->begin(), list->end(), ic, env, m);
+        return extract_apply_collect<List, List::iterator>(list->begin(), list->end(), ic, env, m);
     }
     
     Value do_map_vector(Masp& m, Vector& args, Map& env){
         IterContext ic(args);
         Vector* vector = value_vector(ic.collection);
-        return extract_apply_collect(vector->begin(), vector->end(), ic, env, m);
+        return extract_apply_collect<Vector, Vector::iterator>(vector->begin(), vector->end(), ic, env, m);
     }
     
     Value do_map_map(Masp& m, Vector& args, Map& env){
@@ -2833,21 +2962,22 @@ namespace {
     OPDEF(op_map, arg_start, arg_end)
         size_t count = args.size();
 
-        if(count < 3)
-            throw EvaluationException("op_iter: iter needs at least 3 parameters:(iter <syms> collection function) where syms is a sequence of 1 to n quoted symbols such as: (iter 'a lst fun)."); 
+        if(count < 2)
+            throw EvaluationException("op_iter: Not enough parameters"); 
 
         size_t symcount = count - 2; 
 
         bool all_are_syms = true;
+
         for(size_t i = 0; i < symcount; ++i)
             all_are_syms = all_are_syms && (args[i].type == SYMBOL);
 
         if(!all_are_syms)
             throw EvaluationException("op_iter: parameters prior to collection must be symbols."); 
-      
+ 
         Value& collection(args[count - 2]);
         Value& fun(args[count - 1]);
-        
+ 
         if(glh::none_of(collection.type, VECTOR, LIST, MAP))
             throw EvaluationException("op_iter: second to last parameter must be a collection (list, vector or map)."); 
        
@@ -2956,9 +3086,12 @@ void Masp::Env::load_default_env()
     add_fun("iter", op_iter);
     add_fun("map", op_map);
 
-    // TODO keys vals add remove
-    // TODO map fold
+    add_fun("insert", op_insert_data);
+    add_fun("remove", op_remove_data);
+    add_fun("keys", op_map_keys);
+    add_fun("vals", op_map_vals);
 
+    // TODO fold
 
     add_fun("println", op_println);
     add_fun("printf", op_printf);
