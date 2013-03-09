@@ -131,11 +131,11 @@ void load_image()
 
     texture = std::make_shared<glh::Texture>();
 
-    const char* image_test_path = "test_512.png";
-    const char* image_buble_path = "bubble.png";
+    const char* image_test_path = "bitmaps/test_512.png";
+    const char* image_buble_path = "bitmaps/bubble.png";
 
-    image_test   = manager->load_image_gl("test_512.png");
-    image_bubble = manager->load_image_gl("bubble.png");
+    image_test   = manager->load_image_gl(image_test_path);
+    image_bubble = manager->load_image_gl(image_buble_path);
 
     write_image_png(image_test, "out.png");
 

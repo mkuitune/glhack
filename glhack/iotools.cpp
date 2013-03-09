@@ -50,6 +50,20 @@ bool string_to_file(const char* path, const char* string)
     return o.write(string);
 }
 
+std::string path_join(const std::string& head, const std::string& tail)
+{
+    return std::string("TODO IMPLEMENT");
+}
+
+std::list<std::string> path_split(const std::string& path)
+{
+    std::list<std::string> segments;
+    segments.push_back(std::string("TODO IMPLEMENT"));
+    return segments;
+}
+
+//////////// InputFile //////////////////
+
 InputFile::InputFile(const char* path):file_(path, std::ios::in|std::ios::binary){}
 
 InputFile::~InputFile(){if(file_) file_.close();}
@@ -103,7 +117,7 @@ bool OutputFile::write_str(std::string& str)
 
 bool OutputFile::write(const char* str)
 {
-    bool result;
+    bool result = false;
     if(is_open()){
         file_ << str;
         result = true;

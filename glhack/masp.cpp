@@ -1316,8 +1316,27 @@ void Masp::set_args(int argc, char* argv[])
     Value argmap = make_value_map(*this);
     Map* map     = value_map(argmap);
 
+    std::list<std::string> fixed_args;
+
     for(int i = 0; i < argc; ++i){
-        *map = map->add(make_value_number(i), make_value_string(argv[i]));
+        std::string arg(argv[i]);
+        size_t pos = std::string::npos;
+        pos = arg.find('\\');
+        while(pos != std::string::npos){
+            if((arg.size() > (pos + 1)) && arg[pos + 1] == '\\'){
+                pos = pos + 1;
+            } else {
+                arg = arg.replace(pos, 1, "/");
+                pos = pos + 1;
+            }
+            pos = arg.find('\\', pos);
+        } 
+        fixed_args.push_back(arg);
+    }
+
+    int order = 0;
+    for(auto &f : fixed_args){
+        *map = map->add(make_value_number(order++), make_value_string(f));
     }
 
     env_->def(make_value_symbol("sys/args"), argmap);

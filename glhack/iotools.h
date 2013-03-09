@@ -16,6 +16,13 @@ bool is_directory(const char* path);
 std::tuple<std::string, bool> file_to_string(const char* path);
 bool string_to_file(const char* path, const char* string);
 
+// All internal path operations expect '/' separator for paths
+
+/** Join two file system paths together */
+std::string path_join(const std::string& head, const std::string& tail);
+/** Split path on '/ ' - to segments.*/
+std::list<std::string> path_split(const std::string& path);
+
 class InputFile{
 private:
     InputFile(const InputFile& i){}
