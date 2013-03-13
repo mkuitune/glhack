@@ -53,5 +53,7 @@ Image8 load_image(const char* path);
 bool   write_image_png(const Image8& image, const char* path);
 void   flip_vertical(Image8& img);
 
+void image_fill(Image8& img);
+
 }
 

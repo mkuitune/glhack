@@ -27,6 +27,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "masp-unittest", "masp-unitt
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pcontainers-unittest", "pcontainers-unittest.vcxproj", "{484D0F21-025A-49A7-B2F2-5AB59B789BA3}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "compofonts", "compofonts.vcxproj", "{C6831A6C-A6FC-4684-9E46-8B0ADD350998}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -61,6 +63,10 @@ Global
 		{484D0F21-025A-49A7-B2F2-5AB59B789BA3}.Debug|Win32.Build.0 = Debug|Win32
 		{484D0F21-025A-49A7-B2F2-5AB59B789BA3}.Release|Win32.ActiveCfg = Release|Win32
 		{484D0F21-025A-49A7-B2F2-5AB59B789BA3}.Release|Win32.Build.0 = Release|Win32
+		{C6831A6C-A6FC-4684-9E46-8B0ADD350998}.Debug|Win32.ActiveCfg = Debug|Win32
+		{C6831A6C-A6FC-4684-9E46-8B0ADD350998}.Debug|Win32.Build.0 = Debug|Win32
+		{C6831A6C-A6FC-4684-9E46-8B0ADD350998}.Release|Win32.ActiveCfg = Release|Win32
+		{C6831A6C-A6FC-4684-9E46-8B0ADD350998}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

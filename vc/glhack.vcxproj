@@ -17,6 +17,8 @@
     <ClCompile Include="..\glhack\glbase.cpp" />
     <ClCompile Include="..\glhack\glbuffers.cpp" />
     <ClCompile Include="..\glhack\glhack.cpp" />
+    <ClCompile Include="..\glhack\glh_font.cpp" />
+    <ClCompile Include="..\glhack\glh_generators.cpp" />
     <ClCompile Include="..\glhack\glh_image.cpp" />
     <ClCompile Include="..\glhack\glh_index.cpp" />
     <ClCompile Include="..\glhack\glh_mesh.cpp" />
@@ -48,6 +50,8 @@
     <ClInclude Include="..\glhack\glbase.h" />
     <ClInclude Include="..\glhack\glbuffers.h" />
     <ClInclude Include="..\glhack\glhack.h" />
+    <ClInclude Include="..\glhack\glh_font.h" />
+    <ClInclude Include="..\glhack\glh_generators.h" />
     <ClInclude Include="..\glhack\glh_image.h" />
     <ClInclude Include="..\glhack\glh_index.h" />
     <ClInclude Include="..\glhack\glh_mesh.h" />

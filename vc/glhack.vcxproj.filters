@@ -23,6 +23,8 @@
     <ClCompile Include="..\glhack\iotools.cpp" />
     <ClCompile Include="..\glhack\masp_extensions.cpp" />
     <ClCompile Include="..\glhack\masp_classwrap.cpp" />
+    <ClCompile Include="..\glhack\glh_font.cpp" />
+    <ClCompile Include="..\glhack\glh_generators.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\glhack\glbase.h" />
@@ -49,5 +51,7 @@
     <ClInclude Include="..\glhack\iotools.h" />
     <ClInclude Include="..\glhack\masp_classwrap.h" />
     <ClInclude Include="..\glhack\masp_extensions.h" />
+    <ClInclude Include="..\glhack\glh_font.h" />
+    <ClInclude Include="..\glhack\glh_generators.h" />
   </ItemGroup>
 </Project>

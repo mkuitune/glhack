@@ -11,7 +11,8 @@
 #include <cmath>
 #include <cstdint>
 #include <list>
-
+#include<array>
+#include<map>
 
 #define PIf 3.141592846f
 
@@ -38,12 +39,23 @@ R to_number(P in){return (R) in;}
 
 namespace glh{
 
+/////////////// Types //////////////
+
 typedef Eigen::Vector4f vec4;
 typedef Eigen::Vector3f vec3;
 typedef Eigen::Vector2f vec2;
 typedef Eigen::Vector2i vec2i;
 
 typedef Eigen::Matrix4f mat4;
+
+template<class T>
+class Math
+{
+public:
+    typedef std::array<T,2> span_t;
+
+    static span_t null_span(){return span_t(T(0), T(0));}
+};
 
 
 /////////////// Bit operations //////////////
@@ -84,6 +96,92 @@ inline bool bit_is_on(const uint32_t field, const uint32_t bit)
 {
     return  (field & 1 << bit) != 0;
 }
+
+
+//////////////////// Geometric entities ///////////////////////////
+
+
+/** All points in box are min + s * (max - min) where 0 <= s <= 1*/
+template<class T, int N>
+struct Box
+{
+    typedef Eigen::Matrix<T, N, 1> corner;
+    corner min;
+    corner max;
+
+    Box(const corner& min_, const corner& max_):min(min_), max(max_){}
+    Box(){}
+};
+
+typedef Box<int, 2> Box2i;
+
+/** If s is in range (a,b) return true. */
+template<class T>
+inline bool in_range(const T& a, const T& b, const T& s)
+{
+    return (s >= a) && (s <= b);
+}
+
+/* check intersections of spans (a[0],a[1]) and (b[0],b[1])
+ * */
+
+template<class T>
+typename Math<T>::span_t intersect_spans(const typename Math<T>::span_t& a, const typename Math<T>::span_t& b)
+{
+    typedef typename Math<T>::span_t span_t;
+    span_t span(0,0); // This is the null-span
+
+    if(b[0] < a[0])
+    {
+        if(a[1] < b[1]) span = span_t(a[0], a[1]);
+        else
+        {
+            if(a[0] < b[1]) span = span_t(a[0],b[1]);
+        }
+    }
+    else
+    {
+        if(b[1] < a[1]) span = span_t(b[0], b[1]);
+        else
+        {
+            if(b[0] < a[1]) span = span_t(b[0], a[1]);
+        }
+    }
+
+    return span;
+}
+
+template<class T>
+bool span_is_empty(const typename Math<T>::span_t& span){return span[0] >= span[1];}
+
+/**
+ * @return (box, boxHasVolume) - in case of n = 2 this means the area of course
+ */
+template<class T, int N>
+std::tuple<Box<T,N>, bool> intersect(const Box<T,N>& a, const Box<T,N>& b)
+{
+    typedef Math<T>::span_t span_t;
+
+    bool has_volume = true;
+    Box<T,N> box;
+
+    for(int i = 0; i < N; ++i)
+    {
+        span_t spanA(a.min[i], a.max[i]);
+        span_t spanB(b.min[i], b.max[i]);
+
+        span_t span = intersect_spans(spanA, spanB);
+
+        if(span_is_empty(span)) has_volume = false;
+
+        box.min[i] = span[0];
+        box.max[i] = span[1];
+
+    }
+
+    return std::make_tuple(box, has_volume);
+}
+
 
 //////////////////// Generators ///////////////////////////
 
@@ -132,6 +230,7 @@ public:
 
 template<class T>
 Range<T> make_range(T begin, T end){return Range<T>(begin, end);}
+
 
 ///////////// Generators: Random number ///////////
 
@@ -226,6 +325,61 @@ struct RandomRange<float>
     float rand()
     {
         return start + offset * tinymt32_generate_float(&random.state);
+    }
+};
+
+////////////////// Mappings /////////////////////
+
+/** Given value within [begin, end], map it's position to range [0,1] */
+template<class T> inline T interval_range(const T value, const T begin, const T end){return (value - begin)/(end - begin;)}
+
+/** Smoothstep polynomial between [0,1] range. */
+inline float smoothstep(const float x){return (1.0f - 2.0f*(-1.0f + x))* x * x;}
+inline double smoothstep(const double x){return (1.0 - 2.0*(-1.0 + x))* x * x;}
+
+/** Linear interpolation between [a,b] range (range of x goes from 0 to 1). */
+template<class I, class G> inline G lerp(const I x, const G& a, const G& b){return a + x * (b - a);}
+
+// Interpolators
+template<class I, class G> class Lerp{public: 
+    static G interpolate(const I x, const G& a, const G& b){
+        return lerp(x,a,b);
+    }
+};
+
+// Interpolating map, useful for e.g. color gradients
+template<class Key, class Value, class Interp = Lerp>
+class InterpolatingMap{
+public:
+    typedef std::map<Key,Value> map_t;
+
+    map_t map_;
+
+    void insert(const Value& value, const Key& key){
+        map_[value] = key;
+    }
+
+    Value interpolate(const Key& key) const {
+        // Three possibilities: key in [min_key, max_key], key < min_key, key > max_key
+
+        map_t::const_iterator lower = map_.lower_bound(key); // first element before key
+        map_t::const_iterator upper = map_.upper_bound(key); // first element after key
+        map_t::const_iterator end   = map_.end();
+
+        if(lower == end){
+            // No elements before key 
+            return map_.begin()->second;
+        }
+        else if(upper == end){
+           // No elements after key
+            return map_.rbegin()->second;
+        } else
+        {
+            const Key low(lower->second);
+            const Key high(upper->second);
+            Key interp = interval_range(low, high);
+            return Interp::interpolate(interp, low, high);
+        }
     }
 };
 
