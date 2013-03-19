@@ -46,6 +46,13 @@ public:
         VertexChunk   = 2,
         ShaderVar     = 3,
         ShaderProgram = 4,
+        ProgramHandle = 5,
+        BufferSet     = 6,
+        DefaultMesh   = 7,
+        Vec4          = 8,
+        Mat4          = 9,
+        Image8        = 10,
+        Image32       = 11,
         LAST_TYPE
     };
 

@@ -132,6 +132,7 @@ public:
     virtual const char* name() override {return name_.c_str();}
 
     virtual const ShaderVarList& inputs() override {return vertex_input_vars;}
+    virtual const ShaderVarList& uniforms() override {return uniform_vars;}
 
     void use() {glUseProgram(program_handle);}
 
@@ -251,6 +252,11 @@ void ActiveProgram::bind_uniform(const std::string& name, const mat4& mat){
 void ActiveProgram::bind_uniform(const std::string& name, const vec4& vec){
     ShaderProgram* sp = shader_program(handle_);
     if(sp->has_uniform(name, ShaderVar::Vec4)) assign(sp->program_handle, name.c_str(), vec);
+}
+
+void ActiveProgram::bind_uniform(const std::string& name, const vec3& vec){
+    ShaderProgram* sp = shader_program(handle_);
+    if(sp->has_uniform(name, ShaderVar::Vec3)) assign(sp->program_handle, name.c_str(), vec);
 }
 
 void ActiveProgram::bind_uniform(const std::string& name, const Texture& tex){
@@ -473,8 +479,30 @@ ShaderProgram* create_shader_program(cstring& name, cstring& geometry_shader, cs
     return program;
 }
 
-//////////// Graphics context /////////////
 
+//////////// Environment /////////////
+
+vec4&    RenderEnvironment::get_vec4(cstring name){return vec4_[name];}
+mat4&    RenderEnvironment::get_mat4(cstring name){return mat4_[name];}
+Texture& RenderEnvironment::get_texture2d(cstring name){
+    return *texture2d_[name];
+}
+
+void program_params_from_env(ActiveProgram& program, RenderEnvironment& env){
+    for(auto& input: program.handle_->uniforms()){
+        if(env.has(input.name, input.type)) {
+            if(input.type == ShaderVar::Vec4)
+                program.bind_uniform(input.name, env.get_vec4(input.name));
+            else if(input.type == ShaderVar::Mat4)
+                program.bind_uniform(input.name, env.get_mat4(input.name));
+            else if(input.type == ShaderVar::Sampler2D)
+                program.bind_uniform(input.name, env.get_texture2d(input.name));
+        }
+    }
+}
+
+
+//////////// Graphics context /////////////
 
 class GraphicsManagerInt : public GraphicsManager
 {

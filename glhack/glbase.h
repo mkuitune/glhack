@@ -225,4 +225,17 @@ void add_mouse_wheel_callback(App& app, const UserInput::MouseWheelCallback& cb)
 /** Execute a minimal scene. Test that everything builds and runs etc.*/
 void minimal_scene();
 
+double progtime();
+
+class Autotimer{
+public:
+    double t;
+    Autotimer(){t = progtime();}
+    void stop(const char* msg)
+    {
+        double delta = progtime() - t;
+        std::cout << msg << " Duration:"  << delta << std::endl;
+    }
+};
+
 } // namespace glh

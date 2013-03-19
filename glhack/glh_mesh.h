@@ -8,33 +8,22 @@
 
 namespace glh{
 
-typedef std::map<ChannelType::s, std::shared_ptr<VertexChunk>> ChunkMap;
+typedef std::map<ChannelType::s, VertexChunk> ChunkMap;
 
 
 class DefaultMesh {
 public:
     ChunkMap chunks_;
 
-    DefaultMesh(){load_defaults(*this);}
+    DefaultMesh();
 
-    VertexChunk& get(const ChannelType::s& s){return *chunks_[s];}
+    VertexChunk& get(const ChannelType::s& s);
+    //void         update_normals();
 
-    void update_normals()
-    {
-        //Set normalbuffer based on position buffer
-        VertexChunk &normals(*chunks_[ChannelType::Normal]);
-        VertexChunk &pos(*chunks_[ChannelType::Position]);
-        // TODO
-
-    }
-
-    static void load_defaults(DefaultMesh& d)
-    {
-        d.chunks_[ChannelType::Position] = std::make_shared<VertexChunk>(glh::BufferSignature(glh::TypeId::Float32, 3));
-        d.chunks_[ChannelType::Normal]   = std::make_shared<VertexChunk>(glh::BufferSignature(glh::TypeId::Float32, 3));
-        d.chunks_[ChannelType::Color]    = std::make_shared<VertexChunk>(glh::BufferSignature(glh::TypeId::Float32, 3));
-        d.chunks_[ChannelType::Texture]  = std::make_shared<VertexChunk>(glh::BufferSignature(glh::TypeId::Float32, 3));
-    }
+    static void load_defaults(DefaultMesh& d);
 };
+
+/** Load screenquad data to mesh using default channels. */
+void mesh_load_screenquad(glh::DefaultMesh& mesh);
 
 }

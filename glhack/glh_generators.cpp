@@ -15,7 +15,7 @@ Simplex noise:
 namespace glh {
 
 /** Simplex noise (portable c++11, just rip it off if needed.)
-   A direct translation of SimplexNoise.java by Stefan Gustavson (stegu@itn.liu.se).*/
+   A direct translation from SimplexNoise.java by Stefan Gustavson (stegu@itn.liu.se).*/
 struct SimplexNoise
 {
     struct Grad
@@ -298,18 +298,22 @@ struct SimplexNoise
             double y1 = y0 - j1 + G4;
             double z1 = z0 - k1 + G4;
             double w1 = w0 - l1 + G4;
+
             double x2 = x0 - i2 + 2.0*G4; // Offsets for third corner in (x,y,z,w) coords
             double y2 = y0 - j2 + 2.0*G4;
             double z2 = z0 - k2 + 2.0*G4;
             double w2 = w0 - l2 + 2.0*G4;
+
             double x3 = x0 - i3 + 3.0*G4; // Offsets for fourth corner in (x,y,z,w) coords
             double y3 = y0 - j3 + 3.0*G4;
             double z3 = z0 - k3 + 3.0*G4;
             double w3 = w0 - l3 + 3.0*G4;
+
             double x4 = x0 - 1.0 + 4.0*G4; // Offsets for last corner in (x,y,z,w) coords
             double y4 = y0 - 1.0 + 4.0*G4;
             double z4 = z0 - 1.0 + 4.0*G4;
             double w4 = w0 - 1.0 + 4.0*G4;
+
             // Work out the hashed gradient indices of the five simplex corners
             int ii = i & 255;
             int jj = j & 255;
@@ -356,9 +360,10 @@ struct SimplexNoise
         }
     }; 
 
-    static const Impl_s impl;
+    static Impl_s impl;
 
 };
+SimplexNoise::Impl_s SimplexNoise::impl;
 
 double simplex_noise(double x, double y)
 {

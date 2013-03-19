@@ -28,6 +28,7 @@ typedef std::list<ShaderVar> ShaderVarList;
 DeclInterface(ProgramHandle,
     virtual const char* name() = 0;
     virtual const ShaderVarList& inputs() = 0;
+    virtual const ShaderVarList& uniforms() = 0;
     //virtual void use() = 0;
     //virtual void bind_vertex_input(NamedBufferHandles& buffers) = 0;
     //virtual void bind_uniforms(VarMap& vmap) = 0;
@@ -52,16 +53,97 @@ public:
     void draw();
     void bind_uniform(const std::string& name, const mat4& mat);
     void bind_uniform(const std::string& name, const vec4& vec);
+    void bind_uniform(const std::string& name, const vec3& vec);
     void bind_uniform(const std::string& name, const Texture& tex);
 
     template<class T> void bind_uniform(const NamedVar<T>& named_var){bind_uniform(named_var.name_, named_var.var_);}
 
     ProgramHandle* handle_;
 private:
-    int32_t        component_count_; 
+    int32_t        component_count_;
 };
 
 ActiveProgram make_active(ProgramHandle& h);
+
+
+//////////// Environment ////////////
+
+class RenderEnvironment{
+public:
+    std::map<std::string, mat4, std::less<std::string>, Eigen::aligned_allocator<std::pair<std::string, mat4> >> mat4_;
+    std::map<std::string, vec4,  std::less<std::string>, Eigen::aligned_allocator<std::pair<std::string, vec4> >> vec4_;
+    std::map<std::string, std::shared_ptr<Texture> > texture2d_;
+
+    bool has(cstring name, ShaderVar::Type type){
+        if(type == ShaderVar::Vec4)           return has_key(vec4_, name);
+        else if(type == ShaderVar::Mat4)      return has_key(mat4_, name);
+        else if(type == ShaderVar::Sampler2D) return has_key(texture2d_, name);
+        return false;
+    }
+
+    vec4&    get_vec4(cstring name);
+    mat4&    get_mat4(cstring name);
+    Texture& get_texture2d(cstring name);
+
+    void set_vec4(cstring name, const vec4& vec){vec4_[name] = vec;}
+    void set_mat4(cstring name, const mat4& mat){mat4_[name] = mat;}
+    void set_texture2d(cstring name, std::shared_ptr<Texture> tex){texture2d_[name] = tex;}
+};
+
+void program_params_from_env(ActiveProgram& program, RenderEnvironment& env);
+
+//////////// Renderable settings //////////////
+
+DeclInterface(Renderable,
+    virtual void render(RenderEnvironment& env) = 0;
+);
+
+class FullRenderable: public Renderable {
+public:
+
+    typedef std::shared_ptr<DefaultMesh> MeshPtr;
+
+    ProgramHandle*    program_;
+    RenderEnvironment material_;
+    BufferSet         device_buffers_;
+    MeshPtr           mesh_;
+
+    bool meshdata_on_gpu_;
+
+    FullRenderable():meshdata_on_gpu_(false){}
+
+    void bind_program(ProgramHandle& program){
+        program_ = &program;
+        glh::init_bufferset_from_program(device_buffers_, program_);
+    }
+
+    void transfer_vertexdata_to_gpu(){
+        if(mesh_.get()){
+            glh::assign_by_guessing_names(device_buffers_, *mesh_); // Assign mesh data to buffers
+            meshdata_on_gpu_ = true;
+        }
+    }
+
+    void set_mesh(MeshPtr& mesh){
+        mesh_ = mesh;
+    }
+
+    virtual void render(RenderEnvironment& env) override {
+
+        if(!mesh_.get()) throw GraphicsException("FullRenderable: trying to render without bound mesh.");
+
+        if(!meshdata_on_gpu_) transfer_vertexdata_to_gpu();
+
+        auto active = glh::make_active(*program_);
+        active.bind_vertex_input(device_buffers_.buffers_);
+
+        program_params_from_env(active, env);
+        program_params_from_env(active, material_);
+
+        active.draw();
+    }
+};
+
 
 //////////// Graphics context /////////////
 

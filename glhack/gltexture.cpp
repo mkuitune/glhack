@@ -62,6 +62,10 @@ void Texture::get_params_from_image(const Image8& image)
         type.channels = TextureType::RGBA;
     }
     else assert("Unsupported number of channels");
+
+    width = image.width_;
+    height = image.height_;
+
 }
 
 static void activate_texture_unit(int texture_unit){
@@ -82,7 +86,7 @@ void Texture::assign(const Image8& image, int texture_unit) {
     GLenum textype            = type.gl_pixeltype();
 
     glBindTexture(textarget, handle_);
-    glTexImage2D(textarget, 0, texinternal_format, image.width_, image.height_, 0, texformat, textype, image.data_);
+    glTexImage2D(textarget, 0, texinternal_format, width, height, 0, texformat, textype, image.data_);
     glTexParameterf(textarget, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameterf(textarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     on_gpu_ = true;

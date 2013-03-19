@@ -13,6 +13,8 @@
 #include <list>
 #include<array>
 #include<map>
+#include<cstdarg>
+#include<vector>
 
 #define PIf 3.141592846f
 
@@ -55,8 +57,13 @@ public:
     typedef std::array<T,2> span_t;
 
     static span_t null_span(){return span_t(T(0), T(0));}
+    template<class NUM>
+    static T to_type(const NUM& n){return static_cast<T>(n);}
 };
 
+inline uint8_t to_ubyte(const float f){return static_cast<uint8_t>(f);}
+inline float   to_float(const uint8_t u){return static_cast<float>(u);}
+inline int     to_int(const double d){return static_cast<int>(d);}
 
 /////////////// Bit operations //////////////
 
@@ -236,6 +243,14 @@ Range<T> make_range(T begin, T end){return Range<T>(begin, end);}
 
 #define GLH_RAND_SEED 7894321
 
+// Minimal PRNG of Park & Miller
+inline uint32_t minrandu(uint32_t a) {
+    return ((uint64_t)a * 279470273UL) % 4294967291UL;
+}
+inline int32_t minrand(int32_t a) {
+    return (int32_t) minrandu(*((uint32_t*)&a));
+}
+
 /** PRN generator. */
 template<class T>
 struct Random{
@@ -331,7 +346,7 @@ struct RandomRange<float>
 ////////////////// Mappings /////////////////////
 
 /** Given value within [begin, end], map it's position to range [0,1] */
-template<class T> inline T interval_range(const T value, const T begin, const T end){return (value - begin)/(end - begin;)}
+template<class T> inline T interval_range(const T value, const T begin, const T end){return (value - begin)/(end - begin);}
 
 /** Smoothstep polynomial between [0,1] range. */
 inline float smoothstep(const float x){return (1.0f - 2.0f*(-1.0f + x))* x * x;}
@@ -341,48 +356,126 @@ inline double smoothstep(const double x){return (1.0 - 2.0*(-1.0 + x))* x * x;}
 template<class I, class G> inline G lerp(const I x, const G& a, const G& b){return a + x * (b - a);}
 
 // Interpolators
-template<class I, class G> class Lerp{public: 
+template<class I, class G> class Lerp { public: 
     static G interpolate(const I x, const G& a, const G& b){
         return lerp(x,a,b);
     }
 };
+// Interpolators
+template<class I, class G> class Smoothstep { public: 
+    static G interpolate(const I x, const G& a, const G& b){
+        return lerp(smoothstep(x),a,b);
+    }
+};
 
 // Interpolating map, useful for e.g. color gradients
-template<class Key, class Value, class Interp = Lerp>
+template<class Key, class Value, class Interp = Lerp<Key, Value>>
 class InterpolatingMap{
 public:
+    typedef Key                 key_t;
+    typedef Value               value_t;
     typedef std::map<Key,Value> map_t;
+    
 
     map_t map_;
 
-    void insert(const Value& value, const Key& key){
-        map_[value] = key;
+    void insert(const Key& key, const Value& value){
+        map_[key] = value;
     }
 
     Value interpolate(const Key& key) const {
         // Three possibilities: key in [min_key, max_key], key < min_key, key > max_key
 
-        map_t::const_iterator lower = map_.lower_bound(key); // first element before key
-        map_t::const_iterator upper = map_.upper_bound(key); // first element after key
+        map_t::const_iterator upper = map_.lower_bound(key); // first equivalent or larger than key
+                                                             // if not found key is largest
+                                                             // if is begin then key is smallest
         map_t::const_iterator end   = map_.end();
+        map_t::const_iterator begin   = map_.begin();
 
-        if(lower == end){
+        if(upper == end) {
+            // No elements after key
+            return map_.rbegin()->second;
+        } else if(upper == begin) {
             // No elements before key 
             return map_.begin()->second;
-        }
-        else if(upper == end){
-           // No elements after key
-            return map_.rbegin()->second;
-        } else
-        {
-            const Key low(lower->second);
-            const Key high(upper->second);
-            Key interp = interval_range(low, high);
+        } else {
+            map_t::const_iterator lower = upper;
+            lower--;
+            const Value low(lower->second);
+            const Value high(upper->second);
+            Key interp = interval_range(key, lower->first, upper->first);
             return Interp::interpolate(interp, low, high);
         }
     }
 };
 
+class InterpolationType{ public:
+    enum t{Nearest, Linear};
+};
+
+/** 1D array of samples that can be accessed on the span [0,1] with chosen interpolation between samples. */
+template<class Value, class Interp = Lerp<double, Value>> class Sampler1D {
+public:
+    InterpolationType::t interpolation_technique_;
+    int                  sample_count_;
+    std::vector<Value>   samples_;
+
+    Sampler1D(int sample_count):sample_count_(sample_count), samples_(sample_count_),
+        interpolation_technique_(InterpolationType::Linear){}
+
+    Sampler1D():interpolation_technique_(InterpolationType::Linear), sample_count_(0){}
+
+    Sampler1D(Sampler1D&& sampler){
+        interpolation_technique_ = sampler.interpolation_technique_;
+        sample_count_            = sampler.sample_count_;
+        samples_                 = std::move(sampler.samples_);
+    }
+
+    void technique(InterpolationType::t t) {interpolation_technique_ = t;}
+
+    Value get(double key){
+        key = key > 1.0 ? 1.0 : ( key < 0.0 ? 0.0 : key);
+
+        double sample_coord = key * sample_count_;
+        double first_sample = floor(sample_coord);
+        double dx           = sample_coord - first_sample;
+        int    first        = to_int(sample_coord);
+
+        return (interpolation_technique_ == InterpolationType::Linear) ? 
+                    lerp(dx, samples_[first], samples_[first + 1]) :
+                    (dx > 0.5 ? samples_[first + 1] : samples_[first]);
+    }
+
+    Value get(float key){
+        key = key > 1.0f ? 1.0f : ( key < 0.0f ? 0.0f : key);
+
+        float sample_coord = key * sample_count_;
+        float first_sample = floorf(sample_coord);
+        float dx           = sample_coord - first_sample;
+        int   first        = to_int(sample_coord);
+
+        return (interpolation_technique_ == InterpolationType::Linear) ? 
+                    lerp(dx, samples_[first], samples_[first + 1]) :
+                    (dx > 0.5 ? samples_[first + 1] : samples_[first]);
+    }
+
+
+};
+
+template<class Key, class Value, class Interp>
+Sampler1D<Value> sample_interpolating_map(const InterpolatingMap<Key, Value, Interp>& map, const int sample_count)
+{
+    Sampler1D<Value> sampler(sample_count);
+
+    double value = 0.0;
+    double dv    = 1.0 / (sample_count - 1);
+
+    for(auto& s : sampler.samples_) {
+        s = map.interpolate(Math<Key>::to_type(value));
+        value += dv;
+    }
+    return sampler;
+}
 
 ////////////////// Combinatorial stuff /////////////////////
 

@@ -16,12 +16,12 @@
 namespace glh{
 
 
-
 struct BufferSignature {
     int32_t   components_; //> Number of components.I.e 2 for vec2, 3 for vec3 etc.
     TypeId::t type_;       //> Type of data held.
     ptrdiff_t size_bytes_; //> Size of data in bytes.
 
+    BufferSignature():components_(0), size_bytes_(0){}
     BufferSignature(const TypeId::t type, const int32_t components):type_(type), components_(components), size_bytes_(0){}
 
     BufferSignature& operator=(const BufferSignature& sig){
@@ -37,7 +37,27 @@ struct BufferSignature {
 
 class VertexChunk {
 public:
+    VertexChunk(){}
     VertexChunk(const BufferSignature& t):sig_(t){}
+
+    VertexChunk(const VertexChunk& vc):sig_(vc.sig_), data_(vc.data_){}
+
+    VertexChunk(VertexChunk&& vc):sig_(vc.sig_), data_(std::move(vc.data_)){}
+
+
+    VertexChunk& operator=(const VertexChunk& vc){
+        data_ = vc.data_;
+        sig_ = vc.sig_;
+        return *this;
+    }
+
+     VertexChunk& operator=(VertexChunk&& vc){
+        if(this != &vc){
+            data_ = std::move(vc.data_);
+            sig_ = vc.sig_;
+        }
+        return *this;
+    }
 
     /** @param data:  any data to store to buffer
         @param count: number of elements of type T total in buffer

@@ -10,6 +10,7 @@
 namespace glh{
 
 
+/** Manage external assets. */
 DeclInterface(AssetManager,
         virtual bool        exists(const char* path) = 0;
         virtual Image8      load_image_gl(const char* path)  = 0;

@@ -68,6 +68,7 @@ typedef BiMap<ShaderVar::Mapping, std::string> ShaderMappingTokens;
 ShaderTypeTokens    shader_type_tokens();
 ShaderMappingTokens shader_mapping_tokens();
 
+void assign(const GLuint program, const char* name, const vec3& vec);
 void assign(const GLuint program, const char* name, const vec4& vec);
 void assign(const GLuint program, const char* name, const mat4& mat);
 void assign(const GLuint program, const char* name, const Texture& tex);

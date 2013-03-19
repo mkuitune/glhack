@@ -367,4 +367,6 @@ void minimal_scene()
     glh::default_main(app);
 }
 
+double progtime(){return glfwGetTime();}
+
 } // namespace glh

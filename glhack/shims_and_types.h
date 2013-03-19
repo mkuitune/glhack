@@ -276,6 +276,15 @@ public:
         *this = old;
     }
 
+    AlignedArray(AlignedArray&& old){
+        data_ = old.data_;
+        capacity_ = old.capacity_;
+        size_ = old.size_;
+        old.data_  = 0;
+        old.capacity_  = 0;
+        old.size_  = 0;
+    }
+
     ~AlignedArray()
     {
         if(data_) aligned_free(data_);
@@ -286,6 +295,20 @@ public:
         realloc_data(old.capacity());
         unsafe_copy(old.begin(), old.end(), data_);
         size_ = old.size();
+    }
+
+    AlignedArray& operator=(AlignedArray&& old)
+    {
+        if(this != &old)
+        {
+            data_ = old.data_;
+            capacity_ = old.capacity_;
+            size_ = old.size_;
+            old.data_  = 0;
+            old.capacity_  = 0;
+            old.size_  = 0;
+        }
+        return *this;
     }
 
     T& operator[](size_t index){ return data_[index];}
@@ -738,6 +761,11 @@ template<class M, class KEY>
 bool has_key(M& map, KEY key)
 {
     return map.count(key) > 0;
+}
+
+template<class KEY, class VAL>
+bool has_key(const std::map<KEY, VAL>& map, KEY key){
+    return map.find(key) != map.end();
 }
 
 /** Try to find value matching key. */ 

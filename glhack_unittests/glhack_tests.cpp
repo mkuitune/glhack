@@ -3,6 +3,7 @@
 
 #include "glhack.h"
 #include "persistent_containers.h"
+#include "glh_image.h"
 #include<string>
 #include "unittester.h"
 
@@ -16,6 +17,20 @@ UTEST(basic, test_test)
     ut_test_out() << "Test test" << std::endl;
     ASSERT_TRUE(true, "Statement was not true!");
     ASSERT_FALSE(false, "Statement was not false!");
+}
+
+/////////// Image ops /////////////
+
+UTEST(image_ops, float_to_byte_min)
+{
+    using namespace glh;
+    ASSERT_TRUE(float_to_ubyte(0.f) == 0x0, "float_to_byte_linear failed");
+}
+
+UTEST(image_ops, float_to_byte_max)
+{
+    using namespace glh;
+    ASSERT_TRUE(float_to_ubyte(1.f) == 0xff, "float_to_byte_linear failed");
 }
 
 /////////// Math ops /////////////
