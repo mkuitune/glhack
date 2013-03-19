@@ -53,6 +53,9 @@ public:
     int    texture_unit_;
 
     Texture();
+
+    void apply_settings();
+
     void get_params_from_image(const Image8& image);
 
     // TODO: Init from shader program. On assignment verify image matches

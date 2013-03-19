@@ -68,6 +68,11 @@ void Texture::get_params_from_image(const Image8& image)
 
 }
 
+void Texture::apply_settings(){
+    // TODO: store sampler settings in texture.
+
+}
+
 static void activate_texture_unit(int texture_unit){
     glActiveTexture(GL_TEXTURE0 + texture_unit);
 }

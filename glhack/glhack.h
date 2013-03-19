@@ -166,13 +166,38 @@ class RenderPassSettings
 {
 public:
 
+    struct BlendSettings{
+        bool blend_active_;
+        GLenum  source_factor_;
+        GLenum  dest_factor_;
+
+        BlendSettings():blend_active_(false){}
+        BlendSettings(GLenum  source_factor, GLenum  dest_factor):
+            blend_active_(true), source_factor_(source_factor), dest_factor_(dest_factor){}
+
+        void apply() const {
+            if(blend_active_){
+                glEnable(GL_BLEND);
+                glBlendFunc(source_factor_, dest_factor_);
+            }
+            else{
+                glDisable(GL_BLEND);
+            }
+        }
+    };
+
     enum Buffer{Color = GL_COLOR_BUFFER_BIT, Depth = GL_DEPTH_BUFFER_BIT, Stencil = GL_STENCIL_BUFFER_BIT};
 
     GLuint   clear_mask;
-    vec4     clear_color;
-    GLclampd clear_depth;
+    vec4     clear_color; bool clear_color_set;
+    GLclampd clear_depth; bool clear_depth_set;
+    BlendSettings blend;  bool blend_set;
+
 
     RenderPassSettings(const GLuint clear_mask, const vec4& clear_color, const GLclampd clear_depth);
+    RenderPassSettings(BlendSettings& blend_settings);
+
+
     void set_buffer_clear(Buffer buffer);
 };
 

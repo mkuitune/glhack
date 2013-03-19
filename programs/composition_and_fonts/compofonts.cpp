@@ -105,6 +105,7 @@ std::shared_ptr<glh::Texture> texture;
 
 glh::RenderPassSettings g_renderpass_settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT,
                                             glh::vec4(0.76f,0.71f,0.5f,1.0f), 1);
+glh::RenderPassSettings g_blend_settings(glh::RenderPassSettings::BlendSettings(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
 bool g_run = true;
 
@@ -204,12 +205,6 @@ void load_image()
     //write_image_png(noise_target, "noise.png");
 
     texture->assign(image_test, 0);
-
-    // TODO: wrap blending on per drawable basis
-    // drawable: program, mesh + uniforms - texture properties - render settings, overloads
-    // TODO: RenderPassSettings as RenderSettings, stackable and overloadable
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // TODO to texture parameters.
 }
 
 void init_uniform_data(){
@@ -254,7 +249,7 @@ bool update(glh::App* app)
 void render_textured(glh::App* app)
 {
     apply(g_renderpass_settings);
-
+    apply(g_blend_settings);
     screenquad_image.render(env);
 }
 

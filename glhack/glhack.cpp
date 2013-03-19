@@ -496,7 +496,11 @@ void program_params_from_env(ActiveProgram& program, RenderEnvironment& env){
             else if(input.type == ShaderVar::Mat4)
                 program.bind_uniform(input.name, env.get_mat4(input.name));
             else if(input.type == ShaderVar::Sampler2D)
-                program.bind_uniform(input.name, env.get_texture2d(input.name));
+            {
+                Texture& tex(env.get_texture2d(input.name));
+                tex.apply_settings();
+                program.bind_uniform(input.name, tex);
+            }
         }
     }
 }
@@ -550,8 +554,13 @@ GraphicsManager* make_graphics_manager()
 
 // TODO: writemask and glStencilMask, glDepthMask and glColorMask
 RenderPassSettings::RenderPassSettings(const GLuint clear_mask, const vec4& color, const GLclampd depth)
-:clear_mask(clear_mask), clear_color(color), clear_depth(depth)
+:clear_mask(clear_mask), clear_color(color), clear_depth(depth),
+clear_color_set(true), clear_depth_set(true), blend_set(false)
 {}
+
+RenderPassSettings::RenderPassSettings(BlendSettings& blend_settings)
+    :blend(blend_settings), clear_color_set(false), clear_depth_set(false), blend_set(true), clear_mask(0) {
+}
 
 void RenderPassSettings::set_buffer_clear(Buffer buffer)
 {
@@ -567,12 +576,13 @@ void RenderPassSettings::set_buffer_clear(Buffer buffer)
 void apply(const RenderPassSettings& pass)
 {
     const vec4& cc(pass.clear_color); 
-    glClearColor(cc[0], cc[1], cc[2], cc[3]);
-    glClearDepth(pass.clear_depth);
-    if(pass.clear_mask)
-    {
-        glClear(pass.clear_mask);
-    }
+
+    if(pass.clear_color_set) glClearColor(cc[0], cc[1], cc[2], cc[3]);
+    if(pass.clear_depth_set) glClearDepth(pass.clear_depth);
+    if(pass.clear_mask) glClear(pass.clear_mask);
+    if(pass.blend_set) pass.blend.apply();
 }
+
+
 
 } // namespace glh
