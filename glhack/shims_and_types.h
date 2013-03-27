@@ -773,9 +773,10 @@ template<class M>
 typename M::mapped_type* try_get_value(M& map, typename const M::key_type& key)
 {
     typename M::mapped_type* result = nullptr;
-    if(map.find(key) != map.end())
+    auto mapiter = map.find(key);
+    if(mapiter != map.end())
     {
-        result = &map[key];
+        result = &mapiter->second;
     }
     return result;
 }

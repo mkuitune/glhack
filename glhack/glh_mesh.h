@@ -25,5 +25,6 @@ public:
 
 /** Load screenquad data to mesh using default channels. */
 void mesh_load_screenquad(glh::DefaultMesh& mesh);
+void mesh_load_screenquad_pixelcoords(float w, float h, glh::DefaultMesh& mesh);
 
 }

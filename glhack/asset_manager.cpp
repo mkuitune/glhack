@@ -13,12 +13,6 @@ namespace glh{
 const char* g_asset_path_name = "asset_path";
 
 
-std::string fix_win32_path(const std::string& path)
-{
-    std::string out(path);
-    for(auto& c : out) if(c == '/') c = '\\';
-    return out;
-}
 
 class DefaultAssetManager : public AssetManager {
 public:
@@ -96,13 +90,13 @@ public:
             filepath = std::string(path);
         }
 
-#ifdef WIN32
-        return fix_win32_path(filepath);
-#else
-        return filepath;
-#endif
+        return path_to_platform_string(filepath);
+
     }
 
+    std::string fontpath() override {
+        return path_join(asset_path, "fonts");
+    }
 
     std::string asset_path;
     std::string config_file_path;

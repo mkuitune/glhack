@@ -9,6 +9,7 @@
 #include "glh_generators.h"
 #include "glh_image.h"
 #include "glh_typedefs.h"
+#include "glh_font.h"
 #include "shims_and_types.h"
 
 
@@ -52,13 +53,11 @@ const char* sh_vertex_obj_tex   =
 "#version 150               \n"
 "uniform mat4 ObjectToWorld;"
 "in vec3      VertexPosition;    "
-"in vec3      VertexColor;       "
 "in vec3      TexCoord;"
 "out vec3 v_color;            "
 "out vec2 v_texcoord;"
 "void main()                "
 "{                          "
-"    v_color = VertexColor;   "
 "    v_texcoord = TexCoord.xy;"
 "    gl_Position = ObjectToWorld * vec4( VertexPosition, 1.0 );"
 "}";
@@ -83,11 +82,22 @@ const char* sh_fragment_fix_color =
 const char* sh_fragment_tex = 
 "#version 150                  \n"
 "uniform sampler2D Sampler;    "
-"in vec3 Color;                "
 "in vec2 v_texcoord;           "
 "out vec4 FragColor;           "
 "void main() {                 "
 "    vec4 texColor = texture( Sampler, v_texcoord );"
+"    FragColor = texColor;"
+//"    FragColor = vec4(Color, 1.0); "
+"}";
+
+const char* sh_fragment_tex_alpha = 
+"#version 150                  \n"
+"uniform sampler2D Sampler;    "
+"uniform vec4      Albedo;    "
+"in vec2 v_texcoord;           "
+"out vec4 FragColor;           "
+"void main() {                 "
+"    vec4 texColor = vec4(Albedo.rgb, Albedo.a * texture( Sampler, v_texcoord ).r);"
 "    FragColor = texColor;"
 //"    FragColor = vec4(Color, 1.0); "
 "}";
@@ -97,9 +107,11 @@ const char* sh_geometry = "";
 glh::ProgramHandle* sp_vcolor_handle;
 glh::ProgramHandle* sp_vcolor_rot_handle;
 glh::ProgramHandle* sp_tex_handle;
+glh::ProgramHandle* sp_fonts_handle;
 glh::ProgramHandle* sp_colorcoded;
 
 std::shared_ptr<glh::Texture> texture;
+std::shared_ptr<glh::Texture> fonttexture;
 
 // App state
 
@@ -115,6 +127,7 @@ std::shared_ptr<glh::DefaultMesh> mesh(new glh::DefaultMesh()); // ram vertex da
 const char* sp_vcolors = "screen";
 const char* sp_obj     = "screen_obj";
 const char* sp_obj_tex = "screen_obj_tex";
+const char* sp_obj_font = "screen_obj_font";
 const char* sp_obj_colored = "screen_obj_colored";
 
 float tprev = 0;
@@ -132,6 +145,19 @@ glh::RenderEnvironment env;
 
 glh::FullRenderable screenquad_image;
 glh::FullRenderable screenquad_color;
+
+glh::FullRenderable font_renderable;
+
+std::shared_ptr<glh::FontContext> fontcontext;
+
+int g_tex_unit_no = 0;
+int gen_texture_unit()
+{
+    return g_tex_unit_no++;
+}
+
+int g_width;
+int g_height;
 
 // TODO: create texture set from shader program. Assign 
 // default checker pattern prior to having loaded texture data.
@@ -193,6 +219,7 @@ void load_image()
 {
     texture = std::make_shared<glh::Texture>();
 
+
     const char* image_test_path = "bitmaps/test_512.png";
     const char* image_buble_path = "bitmaps/bubble.png";
 
@@ -204,12 +231,100 @@ void load_image()
     //noise_target = make_noise_texture(512);
     //write_image_png(noise_target, "noise.png");
 
-    texture->assign(image_test, 0);
+    texture->assign(image_test, gen_texture_unit());
+}
+
+void load_font_image()
+{
+    using namespace glh;
+
+    fonttexture = std::make_shared<glh::Texture>();
+
+    std::string old_goudy("OFLGoudyStMTT.ttf");
+    std::string junction("Junction-webfont.ttf");
+
+    std::string fontpath = manager->fontpath();
+
+    fontcontext.reset(new glh::FontContext(fontpath));
+
+    int texsize     = 1024;
+    float fontsize = 15.0f;
+
+    BakedFontHandle handle;
+    glh::Image8* fontimage;
+
+    try{
+        handle = fontcontext->render_bitmap(junction, fontsize, texsize);
+        fontimage = fontcontext->get_font_map(handle);
+        // TODO: write font image to file.
+        write_image_png(*fontimage, "font.png");
+    }
+    catch(glh::GraphicsException& e){
+        GLH_LOG_EXPR(e.get_message());
+    }
+
+    std::string msg("Hello, world.");
+    std::string msg2("A");
+    std::vector<std::tuple<vec2, vec2>> text_coords;
+    //float x = 0.f;
+    //float y = 0.f;
+    float x = 100.f;
+    float y = 100.f;
+    float line_height = fontsize;
+
+    fontcontext->write_pixel_coords_for_string(msg, handle, x, y, text_coords);
+    fontcontext->write_pixel_coords_for_string("This should be another line, then", handle, x, y + line_height, text_coords);
+
+
+    // Create font material and renderable.
+    FullRenderable::MeshPtr fontmesh(new DefaultMesh);
+
+    fonttexture->assign(*fontimage, gen_texture_unit());
+
+    font_renderable.bind_program(*sp_fonts_handle);
+    font_renderable.set_mesh(fontmesh);
+    //font_renderable.material_.set_texture2d("Sampler", fonttexture);
+
+    std::vector<float> posdata;
+    std::vector<float> texdata;
+    // transfer tex_coords to mesh
+    for(auto& pt : text_coords){
+        vec2 pos;
+        vec2 tex;
+        std::tie(pos,tex) = pt;
+        posdata.push_back(pos[0]);
+        posdata.push_back(pos[1]);
+        posdata.push_back(0.f);
+
+        texdata.push_back(tex[0]);
+        texdata.push_back(tex[1]);
+        texdata.push_back(0.f);
+    }
+
+    fontmesh->get(glh::ChannelType::Position).set(&posdata[0], posdata.size());
+    fontmesh->get(glh::ChannelType::Texture).set(&texdata[0], texdata.size());
+
+
+
+    // font renderable, with texture unit bound to env, 
+    // and font image to texture unit
+    // and mesh also.
+    //
+    // font render text takes in the font system data and the renderable, and writes per character squareds to 
+    // the mesh.
+    //
+    // gen font-texture, to material env
+    // bind font-image to font-texture
+    // new material, program
+    // bind font-texture to program
+    // 
 }
 
 void init_uniform_data(){
     env.set_vec4("ObjColor", glh::vec4(0.f, 1.f, 0.f, 1.f));
-    env.set_texture2d("Sampler", texture);
+    env.set_vec4("Albedo", glh::vec4(0.28f, 0.024f, 0.024f, 1.0));
+    //env.set_texture2d("Sampler", texture);
+    env.set_texture2d("Sampler", fonttexture);
 }
 
 bool init(glh::App* app)
@@ -220,9 +335,18 @@ bool init(glh::App* app)
     sp_tex_handle        = gm->create_program(sp_obj_tex, sh_geometry, sh_vertex_obj_tex, sh_fragment_tex);
     sp_colorcoded        = gm->create_program(sp_obj_colored, sh_geometry, sh_vertex_obj_pos, sh_fragment_fix_color);
 
-    mesh_load_screenquad(*mesh);
+    sp_fonts_handle        = gm->create_program(sp_obj_font, sh_geometry, sh_vertex_obj_tex, sh_fragment_tex_alpha);
+    
+
+   // mesh_load_screenquad(*mesh);
+    mesh_load_screenquad_pixelcoords((float) g_width, (float) g_height, *mesh);
+
+    //mesh_load_screenquad_pixelcoords(0.5f, 0.5f, *mesh);
+
     load_image();
+    load_font_image();
     init_uniform_data();
+
 
     screenquad_color.bind_program(*sp_colorcoded);
     screenquad_color.set_mesh(mesh);
@@ -233,15 +357,37 @@ bool init(glh::App* app)
     return true;
 }
 
+
 bool update(glh::App* app)
 {
+    using namespace glh;
+
     float t = (float) app->time();
     angle += (t - tprev) * radial_speed;
     tprev = t;
     Eigen::Affine3f transform;
     transform = Eigen::AngleAxis<float>(angle, glh::vec3(0.f, 0.f, 1.f));
 
-    env.set_mat4(OBJ2WORLD, transform.matrix());
+    mat4 screen_to_view;
+    screen_to_view  = mat4::Identity();
+
+    // TODO app->get_ortho_pixel_projection: Origin at top left corner. Good or bad?
+
+    screen_to_view(0,0) = 2.0f / g_width;
+    screen_to_view(1,1) = 2.0f / g_height;
+    screen_to_view(0,3) = -1.f;
+    screen_to_view(1,3) = -1.f;
+
+    Eigen::Transform<float, 3, Eigen::Affine> flip_y;
+    flip_y.setIdentity();
+    flip_y.scale(vec3(1.f, -1.f, 1.f));
+    screen_to_view =  flip_y.matrix() * screen_to_view; 
+
+    //env.set_mat4(OBJ2WORLD, transform.matrix());
+    env.set_mat4(OBJ2WORLD, screen_to_view);
+
+    float albedo_alpha = 1.0f - (t - floor(t));
+    env.set_vec4("Albedo", glh::vec4(0.28f, 0.024f, 0.024f,albedo_alpha));
 
     return g_run;
 }
@@ -253,6 +399,14 @@ void render_textured(glh::App* app)
     screenquad_image.render(env);
 }
 
+void render_font(glh::App* app)
+{
+    apply(g_renderpass_settings);
+    apply(g_blend_settings);
+    font_renderable.render(env);
+}
+
+
 void render_colorcoded(glh::App* app)
 {
     apply(g_renderpass_settings);
@@ -262,11 +416,15 @@ void render_colorcoded(glh::App* app)
 
 //std::function<void(glh::App*)> render = render_textured;
 //std::function<void(glh::App*)> render = render_colorcoded;
-std::function<void(glh::App*)> render = render_textured;
+//std::function<void(glh::App*)> render = render_textured;
+std::function<void(glh::App*)> render = render_font;
+
 
 void resize(glh::App* app, int width, int height)
 {
     std::cout << "Resize:" << width << " " << height << std::endl;
+    g_width = width;
+    g_height = height;
 }
 
 void print_mouse_position()
@@ -300,6 +458,9 @@ int main(int arch, char* argv)
 
     config.width = 1024;
     config.height = 640;
+
+    g_width = config.width;
+    g_height = config.height;
 
     const char* config_file = "config.mp";
 

@@ -53,8 +53,9 @@ public:
     /** Return size of horizontal row in bytes. */
     int stride() const {return width_ * channels_;}
     bool empty() const {return data_ == 0;}
-
-    uint8_t* at(int x, int y){return data_ + y * stride_ + x * channels_;}
+    
+    uint8_t*       data(){return data_;}
+    uint8_t*       at(int x, int y){return data_ + y * stride_ + x * channels_;}
     const uint8_t* cat(int x, int y) const {return data_ + y * stride_ + x * channels_;}
 
     static void set(uint8_t* data, int channels, uint8_t* sample);

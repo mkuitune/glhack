@@ -63,6 +63,7 @@ public:
 
 inline uint8_t to_ubyte(const float f){return static_cast<uint8_t>(f);}
 inline float   to_float(const uint8_t u){return static_cast<float>(u);}
+inline float   to_float(const double d){return static_cast<float>(d);}
 inline int     to_int(const double d){return static_cast<int>(d);}
 
 /////////////// Bit operations //////////////

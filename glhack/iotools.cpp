@@ -3,11 +3,28 @@
 */
 #include "iotools.h"
 
+
 #ifdef WIN32
 #include "win32_dirent.h"
 #else
 #include <cdirent>
 #endif
+
+
+namespace {
+std::string fix_path_to_win32_path(const std::string& path)
+{
+    std::string out(path);
+    for(auto& c : out) if(c == '/') c = '\\';
+    return out;
+}
+std::string fix_path_to_posix_path(const std::string& path)
+{
+    std::string out(path);
+    for(auto& c : out) if(c == '\\') c = '/';
+    return out;
+}
+} // end anonymous namespace
 
 bool file_exists(const char* path)
 {
@@ -43,6 +60,12 @@ std::tuple<std::string, bool> file_to_string(const char* path)
     return file.contents_to_string();
 }
 
+std::tuple<std::vector<uint8_t>, bool> file_to_bytes(const char* path)
+{
+    InputFile file(path);
+    return file.contents_to_bytes();
+}
+
 bool string_to_file(const char* path, const char* string)
 {
     bool result = false;
@@ -52,7 +75,16 @@ bool string_to_file(const char* path, const char* string)
 
 std::string path_join(const std::string& head, const std::string& tail)
 {
-    return std::string("TODO IMPLEMENT");
+    char separator = platform_separator();
+
+    std::string normalized_head = path_to_platform_string(head);
+    std::string normalized_tail = path_to_platform_string(tail);
+
+    if(head.size() > 0){
+        if(*head.rbegin() != separator) return normalized_head + separator + normalized_tail;
+        else                          return normalized_head + normalized_tail;
+    }
+    else return normalized_tail;
 }
 
 std::list<std::string> path_split(const std::string& path)
@@ -60,6 +92,23 @@ std::list<std::string> path_split(const std::string& path)
     std::list<std::string> segments;
     segments.push_back(std::string("TODO IMPLEMENT"));
     return segments;
+}
+
+char platform_separator(){
+#ifdef WIN32
+    return '\\';
+#else
+    return return '/';
+#endif
+}
+
+std::string path_to_platform_string(const std::string& path)
+{
+#ifdef WIN32
+    return fix_path_to_win32_path(path);
+#else
+    return fix_path_to_posix_path(path);
+#endif
 }
 
 //////////// InputFile //////////////////
@@ -85,6 +134,24 @@ std::tuple<std::string, bool> InputFile::contents_to_string()
         contents.resize(filesize);
         file_.seekg(0, std::ios::beg);
         file_.read(&contents[0], contents.size());
+        success = true;
+    }
+
+    return std::make_tuple(contents, success);
+}
+
+std::tuple<std::vector<uint8_t>, bool> InputFile::contents_to_bytes()
+{
+    std::vector<uint8_t> contents;
+
+    bool success = false;
+    if(file_)
+    {
+        file_.seekg(0, std::ios::end);
+        const size_t filesize = (size_t) file_.tellg();
+        contents.resize(filesize);
+        file_.seekg(0, std::ios::beg);
+        file_.read(reinterpret_cast<char*>(&contents[0]), contents.size());
         success = true;
     }
 

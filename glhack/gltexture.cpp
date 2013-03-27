@@ -12,21 +12,23 @@ namespace glh{
 GLenum TextureType::gl_pixeltype() const {
     if(pixel == UnsignedByte) return GL_UNSIGNED_BYTE;
     else if(pixel == Float)   return GL_FLOAT;
-    assert("Type not found");
+    assert(!"Type not found");
     return 0;
 }
 
 GLint TextureType::gl_internal_format() const {
-    if(format == RGB8)       return GL_RGB8;
+    if(format == R8)         return GL_R8;
+    else if(format == RGB8)  return GL_RGB8;
     else if(format == RGBA8) return GL_RGBA8;
-    assert("Type not found");
+    assert(!"Type not found");
     return 0;
 }
 
 GLenum TextureType::gl_format() const {
-    if(channels == RGB)       return GL_RGB;
+    if(channels == R)         return GL_RED;
+    else if(channels == RGB)  return GL_RGB;
     else if(channels == RGBA) return GL_RGBA;
-    assert("Type not found");
+    assert(!"Type not found");
     return 0;
 }
 
@@ -38,7 +40,7 @@ GLenum TextureType::gl_target() const {
     else if(target == NegY) return GL_TEXTURE_CUBE_MAP_NEGATIVE_Y;
     else if(target == PosZ) return GL_TEXTURE_CUBE_MAP_POSITIVE_Z;
     else if(target == NegZ) return GL_TEXTURE_CUBE_MAP_NEGATIVE_Z;
-    assert("Type not found");
+    assert(!"Type not found");
     return 0;
 }
 
@@ -53,7 +55,11 @@ void Texture::get_params_from_image(const Image8& image)
 {
     type.pixel = TextureType::UnsignedByte;
 
-    if(image.channels_ == 3){
+    if(image.channels_ == 1){
+        type.format = TextureType::R8;
+        type.channels = TextureType::R;
+    }
+    else if(image.channels_ == 3){
         type.format = TextureType::RGB8;
         type.channels = TextureType::RGB;
     }
@@ -61,7 +67,7 @@ void Texture::get_params_from_image(const Image8& image)
         type.format = TextureType::RGBA8;
         type.channels = TextureType::RGBA;
     }
-    else assert("Unsupported number of channels");
+    else assert(!"Unsupported number of channels");
 
     width = image.width_;
     height = image.height_;
@@ -77,11 +83,14 @@ static void activate_texture_unit(int texture_unit){
     glActiveTexture(GL_TEXTURE0 + texture_unit);
 }
 
-// TODO: Parametrize sampler settings.
+// TODO: Parametrize sampler settings. 
+// TODO: Externally index and manage texture_unit:s. Texture is actually a wrapper for sampler settings...
 void Texture::assign(const Image8& image, int texture_unit) {
     get_params_from_image(image);
     type.target = TextureType::Texture2D;
     texture_unit_ = texture_unit;
+
+    // TODO Transfer to GPU separate. Manage texture units as part of material (to avoid texture unit collisions).
 
     activate_texture_unit(texture_unit_);
 

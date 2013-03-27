@@ -9,6 +9,7 @@ Targeted OpenGL version: 3.2. Targeted GLSL version: 1.5.
 #include "glprogramvars.h"
 #include "glh_mesh.h"
 #include "gltexture.h"
+#include "glh_font.h"
 
 #include <list>
 #include <string>
@@ -144,6 +145,31 @@ public:
     }
 };
 
+/** Interface state for one text field. 
+    // TODO: instantiate font textures to a single cache, share texture
+    // instances between all text-fields.
+*/
+class TextRenderable {
+public:
+    FullRenderable renderable_;
+
+    std::list<TextLine> text_;
+
+    float ppu; // Pixels per display unit.
+                // Fonts are rasterized in pixel coords. Use screen coord system
+                // units for textfield alignment ()
+    mat4  to_screen_;
+    Box2i pixel_bounds_; // bounds of the display area on viewspace in sample coordinates
+
+    // TOOD - how to calculate bounds etc. Display only complete lines? (would make sense)
+    // TODO IMP just show from beginning of text for start
+    // TODO IMP add support for multiline editing.
+
+    FontContext* font_context_;
+
+    //1: 
+
+};
 
 //////////// Graphics context /////////////
 

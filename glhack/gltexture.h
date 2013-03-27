@@ -19,9 +19,9 @@ class TextureType {
 public:
     enum Pixel{UnsignedByte, Float};
 
-    enum InternalFormat{RGB8, RGBA8}; // TODO: add rest as needed (srgb, rgb32f etc.)
+    enum InternalFormat{R8, RGB8, RGBA8}; // TODO: add rest as needed (srgb, rgb32f etc.)
 
-    enum Channels{RGB, RGBA};
+    enum Channels{R, RGB, RGBA};
 
     enum Target{Texture2D,
                 // Cube map targets
