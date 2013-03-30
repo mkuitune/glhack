@@ -110,8 +110,8 @@ glh::ProgramHandle* sp_tex_handle;
 glh::ProgramHandle* sp_fonts_handle;
 glh::ProgramHandle* sp_colorcoded;
 
-std::shared_ptr<glh::Texture> texture;
-std::shared_ptr<glh::Texture> fonttexture;
+glh::Texture* texture;
+glh::Texture* fonttexture;
 
 // App state
 
@@ -155,9 +155,6 @@ int gen_texture_unit()
 {
     return g_tex_unit_no++;
 }
-
-int g_width;
-int g_height;
 
 // TODO: create texture set from shader program. Assign 
 // default checker pattern prior to having loaded texture data.
@@ -217,9 +214,6 @@ glh::Image8 make_noise_texture(int dimension)
 
 void load_image()
 {
-    texture = std::make_shared<glh::Texture>();
-
-
     const char* image_test_path = "bitmaps/test_512.png";
     const char* image_buble_path = "bitmaps/bubble.png";
 
@@ -237,8 +231,6 @@ void load_image()
 void load_font_image()
 {
     using namespace glh;
-
-    fonttexture = std::make_shared<glh::Texture>();
 
     std::string old_goudy("OFLGoudyStMTT.ttf");
     std::string junction("Junction-webfont.ttf");
@@ -331,22 +323,25 @@ bool init(glh::App* app)
 {
     glh::GraphicsManager* gm = app->graphics_manager();
 
+    texture = gm->create_texture();
+    fonttexture = gm->create_texture();
+
     sp_vcolor_rot_handle = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment);
     sp_tex_handle        = gm->create_program(sp_obj_tex, sh_geometry, sh_vertex_obj_tex, sh_fragment_tex);
     sp_colorcoded        = gm->create_program(sp_obj_colored, sh_geometry, sh_vertex_obj_pos, sh_fragment_fix_color);
 
-    sp_fonts_handle        = gm->create_program(sp_obj_font, sh_geometry, sh_vertex_obj_tex, sh_fragment_tex_alpha);
-    
+    sp_fonts_handle      = gm->create_program(sp_obj_font, sh_geometry, sh_vertex_obj_tex, sh_fragment_tex_alpha);
 
    // mesh_load_screenquad(*mesh);
-    mesh_load_screenquad_pixelcoords((float) g_width, (float) g_height, *mesh);
+    int width = app->config().width;
+    int height = app->config().height;
+    mesh_load_screenquad_pixelcoords((float) width, (float) height, *mesh);
 
     //mesh_load_screenquad_pixelcoords(0.5f, 0.5f, *mesh);
 
     load_image();
     load_font_image();
     init_uniform_data();
-
 
     screenquad_color.bind_program(*sp_colorcoded);
     screenquad_color.set_mesh(mesh);
@@ -368,22 +363,8 @@ bool update(glh::App* app)
     Eigen::Affine3f transform;
     transform = Eigen::AngleAxis<float>(angle, glh::vec3(0.f, 0.f, 1.f));
 
-    mat4 screen_to_view;
-    screen_to_view  = mat4::Identity();
+    mat4 screen_to_view = app_orthographic_pixel_projection(app);
 
-    // TODO app->get_ortho_pixel_projection: Origin at top left corner. Good or bad?
-
-    screen_to_view(0,0) = 2.0f / g_width;
-    screen_to_view(1,1) = 2.0f / g_height;
-    screen_to_view(0,3) = -1.f;
-    screen_to_view(1,3) = -1.f;
-
-    Eigen::Transform<float, 3, Eigen::Affine> flip_y;
-    flip_y.setIdentity();
-    flip_y.scale(vec3(1.f, -1.f, 1.f));
-    screen_to_view =  flip_y.matrix() * screen_to_view; 
-
-    //env.set_mat4(OBJ2WORLD, transform.matrix());
     env.set_mat4(OBJ2WORLD, screen_to_view);
 
     float albedo_alpha = 1.0f - (t - floor(t));
@@ -423,8 +404,6 @@ std::function<void(glh::App*)> render = render_font;
 void resize(glh::App* app, int width, int height)
 {
     std::cout << "Resize:" << width << " " << height << std::endl;
-    g_width = width;
-    g_height = height;
 }
 
 void print_mouse_position()
@@ -458,9 +437,6 @@ int main(int arch, char* argv)
 
     config.width = 1024;
     config.height = 640;
-
-    g_width = config.width;
-    g_height = config.height;
 
     const char* config_file = "config.mp";
 

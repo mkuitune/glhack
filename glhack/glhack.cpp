@@ -514,12 +514,13 @@ public:
 
     typedef std::shared_ptr<ShaderProgram> ShaderProgramPtr;
     typedef std::shared_ptr<BufferHandle>  BufferHandlePtr;
-
+    typedef std::shared_ptr<Texture>       TexturePtr;
 
     // TODO: Bind entities to obj_id and name, boost::multi-index
 
     std::map<std::string, ShaderProgramPtr> programs_;
     std::list<BufferHandlePtr>              bufferhandles_;
+    std::list<TexturePtr>                   textures_;
 
     ~GraphicsManagerInt(){}
 
@@ -540,6 +541,12 @@ public:
          ProgramHandle* p = 0;
          if(pi != programs_.end()) p = pi->second.get();
          return p;
+     }
+
+     virtual Texture* create_texture() override
+     {
+         textures_.push_back(std::make_shared<glh::Texture>());
+         return textures_.rbegin()->get();
      }
 
 };

@@ -199,7 +199,7 @@ public:
     double time();
 
     /** Return config. */
-    AppConfig& config(){return config_;}
+    const AppConfig& config() const {return config_;}
 
     /** Return reference to user input manager. */
     UserInput& user_input();
@@ -219,6 +219,11 @@ void add_key_callback(App& app, const UserInput::KeyCallback& cb);
 void add_mouse_button_callback(App& app, const UserInput::KeyCallback& cb);
 void add_mouse_move_callback(App& app, const UserInput::MouseMoveCallback& cb);
 void add_mouse_wheel_callback(App& app, const UserInput::MouseWheelCallback& cb);
+
+/** Return orthographic projection for pixel coordinates.
+ *  Origin is located at top left corner.
+*/
+mat4 app_orthographic_pixel_projection(const App* app);
 
 ///////////// Misc ///////////////
 

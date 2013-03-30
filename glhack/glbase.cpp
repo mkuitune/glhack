@@ -298,6 +298,8 @@ void App::resize(int width, int height)
 {
     glViewport(0, 0, width, height);
     if(config_.resize) config_.resize(this, width, height);
+    config_.width = width;
+    config_.height = height;
 }
 
 GraphicsManager* App::graphics_manager(){return manager_.get();}
@@ -317,6 +319,27 @@ void add_mouse_wheel_callback(App& app, const UserInput::MouseWheelCallback& cb)
     add(app.user_input().mouse_wheel_callbacks, cb);
 }
 
+mat4 app_orthographic_pixel_projection(const App* app){
+    int width = app->config().width;
+    int height = app->config().height;
+
+    mat4 screen_to_view;
+    screen_to_view  = mat4::Identity();
+
+    // TODO: Origin at top left corner. Good or bad?
+
+    screen_to_view(0,0) = 2.0f / width;
+    screen_to_view(1,1) = 2.0f / height;
+    screen_to_view(0,3) = -1.f;
+    screen_to_view(1,3) = -1.f;
+
+    Eigen::Transform<float, 3, Eigen::Affine> flip_y;
+    flip_y.setIdentity();
+    flip_y.scale(vec3(1.f, -1.f, 1.f));
+    screen_to_view =  flip_y.matrix() * screen_to_view;
+
+    return screen_to_view;
+}
 
 /////////////////////// Minimal app callbacks ///////////////////////
 

@@ -73,7 +73,7 @@ class RenderEnvironment{
 public:
     std::map<std::string, mat4, std::less<std::string>, Eigen::aligned_allocator<std::pair<std::string, mat4> >> mat4_;
     std::map<std::string, vec4,  std::less<std::string>, Eigen::aligned_allocator<std::pair<std::string, vec4> >> vec4_;
-    std::map<std::string, std::shared_ptr<Texture> > texture2d_;
+    std::map<std::string, Texture*> texture2d_;
 
     bool has(cstring name, ShaderVar::Type type){
         if(type == ShaderVar::Vec4)           return has_key(vec4_, name);
@@ -88,7 +88,7 @@ public:
 
     void set_vec4(cstring name, const vec4& vec){vec4_[name] = vec;}
     void set_mat4(cstring name, const mat4& mat){mat4_[name] = mat;}
-    void set_texture2d(cstring name, std::shared_ptr<Texture> tex){texture2d_[name] = tex;}
+    void set_texture2d(cstring name, Texture* tex){texture2d_[name] = tex;}
 };
 
 void program_params_from_env(ActiveProgram& program, RenderEnvironment& env);
@@ -173,13 +173,20 @@ public:
 
 //////////// Graphics context /////////////
 
+/** GraphicsManager handles opengl assets and instances of adapter classes that
+ *  require a global state to function (that e.g. require an initialized GL context,
+ *  need to synchronize resource usage and so on.)*/
 DeclInterface(GraphicsManager,
+
     /** This function will create a shader program based on the source files passed to it*/
     virtual ProgramHandle* create_program(cstring& name, cstring& geometry, cstring& vertex, cstring& fragment) = 0;
+    
     /** Find shader program by name. If not found return empty handle. */
     virtual ProgramHandle* program(cstring& name) = 0;
     // TODO: Add create buffer handle (so gl functions are not used before possible)
 
+    /** Allocate texture unit interface.*/
+    virtual Texture* create_texture() = 0;
 );
 
 GraphicsManager* make_graphics_manager();
