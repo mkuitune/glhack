@@ -105,6 +105,8 @@ glh::RenderEnvironment env;
 // TODO: create texture set from shader program. Assign 
 // default checker pattern prior to having loaded texture data.
 
+glh::RenderPassSettings g_blend_settings(glh::RenderPassSettings::BlendSettings(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+
 void load_image()
 {
     const char* image_test_path = "bitmaps/test_512.png";
@@ -116,11 +118,6 @@ void load_image()
     write_image_png(image_test, "out.png");
 
     texture->attach_image(image_test);
-
-    // TODO: wrap blending on per drawable basis
-    // drawable: program, mesh + uniforms
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
 void init_vertex_data()
@@ -198,6 +195,7 @@ void render(glh::App* app)
 {
     glh::GraphicsManager* gm = app->graphics_manager();
     apply(g_renderpass_settings);
+    apply(g_blend_settings);
 
     gm->render(triren, env);
 }
