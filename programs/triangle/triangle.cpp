@@ -1,27 +1,5 @@
 /** 
-Todo:
-- rendertarget onscreen rendering
-- mesh rendering
-- hiddenlines rendering
-- mesh edgelines rendering
-
-
-
-class Texture
-{
-public:
-    std::vector<uint8_t> data_;
-};
-
-
-class SamplerHandle
-{
-public:
-    union{
-    }
-};
-
-
+Render a textured triangle.
 */
 
 #include "glbase.h"
@@ -94,7 +72,7 @@ glh::ProgramHandle* sp_vcolor_handle;
 glh::ProgramHandle* sp_vcolor_rot_handle;
 glh::ProgramHandle* sp_tex_handle;
 
-std::shared_ptr<glh::Texture> texture;
+glh::Texture* texture;
 
 // App state
 
@@ -103,9 +81,7 @@ glh::RenderPassSettings g_renderpass_settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFE
 
 bool g_run = true;
 
-glh::BufferSet bufs;
-
-glh::DefaultMesh mesh;
+std::shared_ptr<glh::DefaultMesh> mesh(new glh::DefaultMesh()); // ram vertex data
 
 // Screen quad shader
 const char* sp_vcolors = "screen";
@@ -123,14 +99,14 @@ glh::Image8 image_bubble;
 
 glh::AssetManagerPtr manager;
 
+glh::FullRenderable triren;
+
+glh::RenderEnvironment env;
 // TODO: create texture set from shader program. Assign 
 // default checker pattern prior to having loaded texture data.
 
 void load_image()
 {
-
-    texture = std::make_shared<glh::Texture>();
-
     const char* image_test_path = "bitmaps/test_512.png";
     const char* image_buble_path = "bitmaps/bubble.png";
 
@@ -177,15 +153,18 @@ void init_vertex_data()
     };
     size_t texdatasize = static_array_size(texdata);
 
-    mesh.get(glh::ChannelType::Position).set(posdata, posdatasize);
-    mesh.get(glh::ChannelType::Color).set(coldata, coldatasize);
-    mesh.get(glh::ChannelType::Normal).set(normaldata, normaldatasize);
-    mesh.get(glh::ChannelType::Texture).set(texdata, texdatasize);
+    mesh->get(glh::ChannelType::Position).set(posdata, posdatasize);
+    mesh->get(glh::ChannelType::Color).set(coldata, coldatasize);
+    mesh->get(glh::ChannelType::Normal).set(normaldata, normaldatasize);
+    mesh->get(glh::ChannelType::Texture).set(texdata, texdatasize);
 }
 
 bool init(glh::App* app)
 {
     glh::GraphicsManager* gm = app->graphics_manager();
+
+    texture = gm->create_texture();
+
     sp_vcolor_handle     = gm->create_program(sp_vcolors, sh_geometry, sh_vertex, sh_fragment);
     sp_vcolor_rot_handle = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment);
     sp_tex_handle        = gm->create_program(sp_obj_tex, sh_geometry, sh_vertex_obj_tex, sh_fragment_tex);
@@ -194,8 +173,8 @@ bool init(glh::App* app)
 
     load_image();
 
-    glh::init_bufferset_from_program(bufs, sp_tex_handle);
-    glh::assign_by_guessing_names(bufs, mesh);
+    triren.bind_program(*sp_tex_handle);
+    triren.set_mesh(mesh);
 
     return true;
 }
@@ -208,20 +187,19 @@ bool update(glh::App* app)
     Eigen::Affine3f transform;
     transform = Eigen::AngleAxis<float>(angle, glh::vec3(0.f, 0.f, 1.f));
     obj2world = transform.matrix();
+
+    env.set_mat4(OBJ2WORLD, obj2world);
+    env.set_texture2d("Sampler", texture);
+
     return g_run;
 }
 
 void render(glh::App* app)
 {
+    glh::GraphicsManager* gm = app->graphics_manager();
     apply(g_renderpass_settings);
 
-    glh::ActiveProgram active = glh::make_active(*sp_tex_handle);
-
-    active.bind_vertex_input(bufs.buffers_);
-    active.bind_uniform(OBJ2WORLD, obj2world);
-    active.bind_uniform("Sampler", *texture);
-
-    active.draw();
+    gm->render(triren, env);
 }
 
 void resize(glh::App* app, int width, int height)

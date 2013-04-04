@@ -296,6 +296,25 @@ void assign_sampler_uniform(const GLuint program, const char* name, int texture_
 
 const int g_component_max_count = INT32_MAX;
 
+
+/** Reference to a bound program.
+    The lifetime of ActiveProgram may not exceed that of the bound program handle. */
+class ActiveProgram {
+public:
+    ActiveProgram();
+    void bind_vertex_input(NamedBufferHandles& buffers);
+    void draw();
+    void bind_uniform(const std::string& name, const mat4& mat);
+    void bind_uniform(const std::string& name, const vec4& vec);
+    void bind_uniform(const std::string& name, const vec3& vec);
+    void bind_uniform(const std::string& name, Texture& tex); // TODO: Defer texture upload. Upload only at draw() command.
+
+    ProgramHandle* handle_;
+private:
+    int32_t        component_count_;
+};
+
+
 ActiveProgram::ActiveProgram():component_count_(g_component_max_count){}
 
 void ActiveProgram::bind_vertex_input(NamedBufferHandles& buffers){
@@ -335,14 +354,6 @@ void ActiveProgram::bind_uniform(const std::string& name, Texture& tex){
 
 void ActiveProgram::draw(){
     if(component_count_ != g_component_max_count) glDrawArrays(GL_TRIANGLES, 0, component_count_);
-}
-
-ActiveProgram make_active(ProgramHandle& handle){
-    ActiveProgram a;
-    ShaderProgram* sp = shader_program(&handle);
-    sp->use();
-    a.handle_ = &handle;
-    return a;
 }
 
 
@@ -591,6 +602,8 @@ public:
     std::list<BufferHandlePtr>              bufferhandles_;
     std::list<TexturePtr>                   textures_;
 
+    ShaderProgram* current_program_;
+
 //////// Internal: Texture unit stuff //////// 
 
     GLuint gen_texture_object(){
@@ -603,7 +616,7 @@ public:
         glDeleteTextures(1, &handle);
     }
 
-    GraphicsManagerInt(){}
+    GraphicsManagerInt():current_program_(0){}
     ~GraphicsManagerInt(){}
 
     virtual ProgramHandle* create_program(cstring& name, cstring& geometry, cstring& vertex, cstring& fragment) override
@@ -630,6 +643,40 @@ public:
          textures_.push_back(std::make_shared<glh::Texture>());
          return textures_.rbegin()->get();
      }
+
+    ActiveProgram GraphicsManagerInt::make_active(ProgramHandle* handle){
+
+        ActiveProgram a;
+
+        ShaderProgram* sp = shader_program(handle);
+        // TODO: cache current program, do not change program if current is in use.
+        if(current_program_ != sp) {
+            sp->use();
+            current_program_ = sp;
+        }
+
+        a.handle_ = handle;
+        return a;
+    }
+
+    virtual void GraphicsManagerInt::render(FullRenderable& r, RenderEnvironment& env) override {
+
+        if(!r.mesh_.get()) throw GraphicsException("FullRenderable: trying to render without bound mesh.");
+
+        if(!r.meshdata_on_gpu_) r.transfer_vertexdata_to_gpu(); // TODO MUSTFIX: Store on-gpu status in buffers
+                                                                // So that FullRenderables may instantiate
+                                                                // meshes in stead of transferring them to gpu.
+
+        // TODO: Should here be transfer_texture_data_to_gpu
+
+        auto active = make_active(r.program_);
+        active.bind_vertex_input(r.device_buffers_.buffers_);
+
+        program_params_from_env(active, env);
+        program_params_from_env(active, r.material_);
+
+        active.draw();
+    }
 
      virtual void remove_from_gpu(Texture* t) override {
          bool on_gpu;

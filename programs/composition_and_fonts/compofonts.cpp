@@ -370,31 +370,32 @@ bool update(glh::App* app)
 
 void render_textured(glh::App* app)
 {
+    glh::GraphicsManager* gm = app->graphics_manager();
     apply(g_renderpass_settings);
     apply(g_blend_settings);
-    screenquad_image.render(env);
+    gm->render(screenquad_image, env);
 }
 
 void render_font(glh::App* app)
 {
+    glh::GraphicsManager* gm = app->graphics_manager();
     apply(g_renderpass_settings);
     apply(g_blend_settings);
-    font_renderable.render(env);
+    gm->render(font_renderable, env);
 }
 
 
 void render_colorcoded(glh::App* app)
 {
+    glh::GraphicsManager* gm = app->graphics_manager();
     apply(g_renderpass_settings);
-
-    screenquad_color.render(env);
+    gm->render(screenquad_color, env);
 }
 
 //std::function<void(glh::App*)> render = render_textured;
 //std::function<void(glh::App*)> render = render_colorcoded;
 //std::function<void(glh::App*)> render = render_textured;
 std::function<void(glh::App*)> render = render_font;
-
 
 void resize(glh::App* app, int width, int height)
 {

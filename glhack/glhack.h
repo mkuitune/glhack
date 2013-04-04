@@ -45,25 +45,6 @@ void init_bufferset_from_program(BufferSet& bufs, ProgramHandle* h);
  *  First three digits of <name> match with any position in 'name'.*/
 void assign_by_guessing_names(BufferSet& bufs, DefaultMesh& mesh);
 
-/** Reference to a bound program.
-    The lifetime of ActiveProgram may not exceed that of the bound program handle. */
-class ActiveProgram {
-public:
-    ActiveProgram();
-    void bind_vertex_input(NamedBufferHandles& buffers);
-    void draw();
-    void bind_uniform(const std::string& name, const mat4& mat);
-    void bind_uniform(const std::string& name, const vec4& vec);
-    void bind_uniform(const std::string& name, const vec3& vec);
-    void bind_uniform(const std::string& name, Texture& tex); // TODO: Defer texture upload. Upload only at draw() command.
-
-    ProgramHandle* handle_;
-private:
-    int32_t        component_count_;
-};
-
-ActiveProgram make_active(ProgramHandle& h);
-
 
 //////////// Environment ////////////
 
@@ -89,15 +70,10 @@ public:
     void set_texture2d(cstring name, Texture* tex){texture2d_[name] = tex;}
 };
 
-void program_params_from_env(ActiveProgram& program, RenderEnvironment& env);
-
 //////////// Renderable settings //////////////
 
-DeclInterface(Renderable,
-    virtual void render(RenderEnvironment& env) = 0;
-);
-
-class FullRenderable: public Renderable {
+// TODO: Need to wrap in interface?
+class FullRenderable {
 public:
 
     typedef std::shared_ptr<DefaultMesh> MeshPtr;
@@ -125,23 +101,6 @@ public:
 
     void set_mesh(MeshPtr& mesh){
         mesh_ = mesh;
-    }
-
-    virtual void render(RenderEnvironment& env) override {
-
-        if(!mesh_.get()) throw GraphicsException("FullRenderable: trying to render without bound mesh.");
-
-        if(!meshdata_on_gpu_) transfer_vertexdata_to_gpu();
-
-        // TODO: Should here be transfer_texture_data_to_gpu
-
-        auto active = glh::make_active(*program_);
-        active.bind_vertex_input(device_buffers_.buffers_);
-
-        program_params_from_env(active, env);
-        program_params_from_env(active, material_);
-
-        active.draw();
     }
 };
 
@@ -184,6 +143,9 @@ DeclInterface(GraphicsManager,
     /** Find shader program by name. If not found return empty handle. */
     virtual ProgramHandle* program(cstring& name) = 0;
     // TODO: Add create buffer handle (so gl functions are not used before possible)
+
+    /** Activate program. */
+    virtual void render(FullRenderable& r, RenderEnvironment& env) = 0;
 
     /** Allocate texture unit interface.*/
     virtual Texture* create_texture() = 0;
