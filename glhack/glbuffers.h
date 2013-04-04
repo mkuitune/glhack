@@ -123,7 +123,8 @@ private:
     bool       on_gpu_;
 };
 
-typedef std::map<std::string, std::shared_ptr<BufferHandle> > NamedBufferHandles;
+typedef std::shared_ptr<BufferHandle>  BufferHandlePtr;
+typedef std::map<std::string, BufferHandlePtr > NamedBufferHandles;
 
 
 

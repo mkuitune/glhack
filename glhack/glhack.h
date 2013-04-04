@@ -55,9 +55,7 @@ public:
     void bind_uniform(const std::string& name, const mat4& mat);
     void bind_uniform(const std::string& name, const vec4& vec);
     void bind_uniform(const std::string& name, const vec3& vec);
-    void bind_uniform(const std::string& name, const Texture& tex);
-
-    template<class T> void bind_uniform(const NamedVar<T>& named_var){bind_uniform(named_var.name_, named_var.var_);}
+    void bind_uniform(const std::string& name, Texture& tex); // TODO: Defer texture upload. Upload only at draw() command.
 
     ProgramHandle* handle_;
 private:
@@ -135,6 +133,8 @@ public:
 
         if(!meshdata_on_gpu_) transfer_vertexdata_to_gpu();
 
+        // TODO: Should here be transfer_texture_data_to_gpu
+
         auto active = glh::make_active(*program_);
         active.bind_vertex_input(device_buffers_.buffers_);
 
@@ -187,6 +187,10 @@ DeclInterface(GraphicsManager,
 
     /** Allocate texture unit interface.*/
     virtual Texture* create_texture() = 0;
+
+    virtual void remove_from_gpu(Texture* t) = 0;
+    /** Mark asset dirty. */
+    // TODO: Need this? virtual void image8_data_modified(int texture_unit, Image8& image);
 );
 
 GraphicsManager* make_graphics_manager();

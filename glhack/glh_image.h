@@ -55,6 +55,7 @@ public:
     bool empty() const {return data_ == 0;}
     
     uint8_t*       data(){return data_;}
+    const uint8_t* data() const {return data_;}
     uint8_t*       at(int x, int y){return data_ + y * stride_ + x * channels_;}
     const uint8_t* cat(int x, int y) const {return data_ + y * stride_ + x * channels_;}
 

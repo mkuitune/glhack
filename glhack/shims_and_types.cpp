@@ -55,6 +55,10 @@ std::list<TextLine> string_split(const char* str, const char* delim)
     return lines_out;
 }
 
+bool elements_are_ordered(const std::string& first, const std::string& second){
+    return first.compare(second) <= 0;
+}
+
 //////////////////////// Hashing /////////////////////////////
 
 

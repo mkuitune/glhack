@@ -6,8 +6,14 @@
 #include "glh_image.h"
 #include "glsystem.h"
 
+#include <memory>
+
+
 namespace glh{
 
+class Texture;
+
+struct TextureUnitData{const uint8_t* bound_image; Texture* bound_texture; size_t stored_size;};
 
 class Sampler{
 public:
@@ -42,29 +48,39 @@ public:
 
 /** On-device buffers: textures, rendertargets etc. */
 class Texture {
+private:
+    GLuint handle_;
+
+    bool   on_gpu_;
+    GLuint bound_texture_object_;
+
 public:
 
     TextureType type;
     GLsizei width;
     GLsizei height;
 
-    GLuint handle_;
-    bool   on_gpu_;
-    int    texture_unit_;
+    bool   dirty_;
+
+    const Image8* image_;
+
 
     Texture();
 
-    void apply_settings();
-
     void get_params_from_image(const Image8& image);
 
-    // TODO: Init from shader program. On assignment verify image matches
-    // with preconfigured values.
-    // TODO: Parametrize sampler settings.
-    void assign(const Image8& image, int texture_unit);
+    void attach_image(const Image8& image);
 
+    std::tuple<bool, GLuint> gpu_status() const {return std::make_tuple(on_gpu_, bound_texture_object_);}
+    void gpu_status(bool ongpu, GLuint texture_object){on_gpu_ = ongpu; bound_texture_object_ = texture_object;}
+
+    void bind();
+    void upload_image_data(GLuint texture_object);
+
+    void upload_sampler_parameters();
 };
 
+typedef std::shared_ptr<Texture> TexturePtr;
 
 
 }

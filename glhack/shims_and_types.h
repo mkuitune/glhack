@@ -111,6 +111,8 @@ bool contains(const std::string& str, const T& t){
     return str.find(t) != std::string::npos;
 }
 
+/** String sorting comparator.*/
+bool elements_are_ordered(const std::string& first, const std::string& second);
 ///////////// Container operations ////////////////
 
 template<class Container, class Function>

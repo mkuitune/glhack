@@ -33,6 +33,7 @@ public:
     std::string name;
 
     GLuint program_location;
+    int texture_unit_; //> Texture unit to use, specific for a program.
 
     ShaderVar(Mapping m, Type t, cstring& varname):mapping(m), type(t), name(varname), program_location(0){}
 
@@ -57,6 +58,7 @@ public:
             default:  assert(!"Unsupported type"); return std::make_tuple<TypeId::t, int32_t>(TypeId::Float32, 0);
         }
     }
+
 };
 
 
@@ -67,20 +69,5 @@ typedef BiMap<ShaderVar::Mapping, std::string> ShaderMappingTokens;
 
 ShaderTypeTokens    shader_type_tokens();
 ShaderMappingTokens shader_mapping_tokens();
-
-void assign(const GLuint program, const char* name, const vec3& vec);
-void assign(const GLuint program, const char* name, const vec4& vec);
-void assign(const GLuint program, const char* name, const mat4& mat);
-void assign(const GLuint program, const char* name, const Texture& tex);
-
-
-template<class T> struct NamedVar{
-    const std::string name_;
-    T                 var_;
-    NamedVar(const char* name):name_(name){}
-    T& operator=(const T& t){var_ = t; return var_;}
-};
-
-template<class T> void named_assign(const GLuint program, const T& named_var){assign(program, named_var.name_.c_str(), named_var.var_);}
 
 } // namespace glh

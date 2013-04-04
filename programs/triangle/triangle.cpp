@@ -116,7 +116,7 @@ float tprev = 0;
 float angle = 0.f;
 float radial_speed = 1.0f * PIf;
 
-glh::NamedVar<glh::mat4> obj2world(OBJ2WORLD);
+glh::mat4 obj2world;
 
 glh::Image8 image_test;
 glh::Image8 image_bubble;
@@ -139,7 +139,7 @@ void load_image()
 
     write_image_png(image_test, "out.png");
 
-    texture->assign(image_test, 0);
+    texture->attach_image(image_test);
 
     // TODO: wrap blending on per drawable basis
     // drawable: program, mesh + uniforms
@@ -215,11 +215,10 @@ void render(glh::App* app)
 {
     apply(g_renderpass_settings);
 
-
-    auto active = glh::make_active(*sp_tex_handle);
+    glh::ActiveProgram active = glh::make_active(*sp_tex_handle);
 
     active.bind_vertex_input(bufs.buffers_);
-    active.bind_uniform(obj2world);
+    active.bind_uniform(OBJ2WORLD, obj2world);
     active.bind_uniform("Sampler", *texture);
 
     active.draw();
@@ -236,9 +235,11 @@ void key_callback(int key, const glh::Input::ButtonState& s)
          if(key == Input::Esc) { g_run = false;}
     else if(key == Input::Left){ radial_speed -= 0.1f * PIf;}
     else if(key == Input::Right){ radial_speed += 0.1f * PIf;}
-    else if(key == 'T'){ texture->assign(image_test, 0);}
-    else if(key == 'B'){ texture->assign(image_bubble, 0);}
+    else if(key == 'T'){ texture->attach_image(image_test);} 
+    else if(key == 'B'){ texture->attach_image(image_bubble);}
 }
+
+// TODO use envs for assigning uniforms
 
 int main(int arch, char* argv)
 {

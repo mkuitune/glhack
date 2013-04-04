@@ -150,63 +150,10 @@ glh::FullRenderable font_renderable;
 
 std::shared_ptr<glh::FontContext> fontcontext;
 
-int tex_unit_0 = 0;
-int tex_unit_1 = 1;
-
-// TODO: create texture set from shader program. Assign 
-// default checker pattern prior to having loaded texture data.
-
-glh::Image8 make_noise_texture(int dimension)
+int g_tex_unit_no = 0;
+int gen_texture_unit()
 {
-    using namespace glh;
-
-    int w = dimension;
-    int h = dimension;
-
-    typedef InterpolatingMap<float, vec3, Smoothstep<float, vec3>> ColorMap;
-    ColorMap colormap;
-
-
-    vec3 black(0.f, 0.f, 0.f);
-    vec3 white(1.f, 1.f, 1.f);
-
-    //colormap.insert(0.0f, white);
-    //colormap.insert(0.1f, black);
-    //colormap.insert(0.2f, white);
-    //colormap.insert(1.0f, white);
-
-    colormap.insert(0.0f, white);
-    colormap.insert(0.1f, black);
-    colormap.insert(1.0f, white);
-
-    Image8 image(h,w,3);
-    uint8_t usample[3];
-
-    int sample_count = 1024;
-    Sampler1D<vec3> sampler = sample_interpolating_map(colormap, sample_count);
-    sampler.technique(InterpolationType::Nearest);
-
-    Autotimer timer;
-    for_pixels(image, [&](uint8_t* pix, int xx, int yy){
-        //double scale = 0.001;
-        //std::cout << xx << " " << yy << std::endl;
-        double scale = 0.01;
-        double nx = scale * xx;
-        double ny = scale * yy;
-        
-        float s = (float) simplex_noise(nx, ny);
-
-        vec3 color = sampler.get(s);
-
-        usample[0] = float_to_ubyte(color.x());
-        usample[1] = float_to_ubyte(color.y());
-        usample[2] = float_to_ubyte(color.z());
-        Image8::set(pix, image.channels_, usample);
-    });
-
-    timer.stop("Generated in ");
-
-    return image;
+    return g_tex_unit_no++;
 }
 
 void load_image()
@@ -222,7 +169,7 @@ void load_image()
     //noise_target = make_noise_texture(512);
     //write_image_png(noise_target, "noise.png");
 
-    texture->attach_image(image_test);
+    texture->assign(image_test, gen_texture_unit());
 }
 
 void load_font_image()
@@ -264,9 +211,11 @@ void load_font_image()
     fontcontext->write_pixel_coords_for_string(msg, handle, x, y, text_coords);
     fontcontext->write_pixel_coords_for_string("This should be another line, then", handle, x, y + line_height, text_coords);
 
+
     // Create font material and renderable.
     FullRenderable::MeshPtr fontmesh(new DefaultMesh);
-    fonttexture->attach_image(*fontimage);
+
+    fonttexture->assign(*fontimage, gen_texture_unit());
 
     font_renderable.bind_program(*sp_fonts_handle);
     font_renderable.set_mesh(fontmesh);
@@ -419,12 +368,11 @@ void mouse_move_callback(int x, int y)
 void key_callback(int key, const glh::Input::ButtonState& s)
 {
     using namespace glh;
-
-    if(key == Input::Esc) { g_run = false;}
+         if(key == Input::Esc) { g_run = false;}
     else if(key == Input::Left){ radial_speed -= 0.1f * PIf;}
     else if(key == Input::Right){ radial_speed += 0.1f * PIf;}
-    else if(key == 'T'){ texture->attach_image(image_test);}
-    else if(key == 'B'){ texture->attach_image(image_bubble);}
+    else if(key == 'T'){ texture->assign(image_test, 0);}
+    else if(key == 'B'){ texture->assign(image_bubble, 0);}
 }
 
 int main(int arch, char* argv)

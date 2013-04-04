@@ -42,26 +42,6 @@ ShaderMappingTokens shader_mapping_tokens()
     return map;
 }
 
-void assign(const GLuint program, const char* name, const vec3& vec){
-    GLint location = glGetUniformLocation(program, name);
-    if(location != -1) glUniform3fv(location, 1, vec.data());
-    //else               assert("Applying to non-existing location");
-}
-void assign(const GLuint program, const char* name, const vec4& vec){
-    GLint location = glGetUniformLocation(program, name);
-    if(location != -1) glUniform4fv(location, 1, vec.data());
-    //else               assert("Applying to non-existing location");
-}
-void assign(const GLuint program, const char* name, const mat4& mat){
-    GLint location = glGetUniformLocation(program, name);
-    if(location != -1) glUniformMatrix4fv(location, 1, GL_FALSE, mat.data());
-    //else               assert("Applying to non-existing location");
-}
-void assign(const GLuint program, const char* name, const Texture& tex){
-    GLint location = glGetUniformLocation(program, name);
-    if(location != -1) glUniform1i(location,  tex.texture_unit_);
-    //else               assert("Applying to non-existing location");
-}
 
 
 } // namespace glh

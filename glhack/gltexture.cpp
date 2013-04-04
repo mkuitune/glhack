@@ -47,8 +47,7 @@ GLenum TextureType::gl_target() const {
 
 ///////////////////// Texture ///////////////////////////
 
-Texture::Texture():on_gpu_(false){
-    glGenTextures(1, &handle_);
+Texture::Texture():on_gpu_(false), bound_texture_object_(0),image_(0), dirty_(true){
 }
 
 void Texture::get_params_from_image(const Image8& image)
@@ -69,41 +68,49 @@ void Texture::get_params_from_image(const Image8& image)
     }
     else assert(!"Unsupported number of channels");
 
+    // TODO: cube textures might need to touch this logic.
+    type.target = TextureType::Texture2D;
+
     width = image.width_;
     height = image.height_;
 
 }
 
-void Texture::apply_settings(){
-    // TODO: store sampler settings in texture.
-
-}
-
-static void activate_texture_unit(int texture_unit){
-    glActiveTexture(GL_TEXTURE0 + texture_unit);
-}
-
-// TODO: Parametrize sampler settings. 
-// TODO: Externally index and manage texture_unit:s. Texture is actually a wrapper for sampler settings...
-void Texture::assign(const Image8& image, int texture_unit) {
+void Texture::attach_image(const Image8& image){
+    image_ = &image;
     get_params_from_image(image);
-    type.target = TextureType::Texture2D;
-    texture_unit_ = texture_unit;
+    dirty_ = true;
+}
 
-    // TODO Transfer to GPU separate. Manage texture units as part of material (to avoid texture unit collisions).
+void Texture::bind(){
+    if(on_gpu_){
+        GLenum textarget = type.gl_target();
+        glBindTexture(textarget, bound_texture_object_);
+    } else {
+        throw GraphicsException("Texture::bind: No texture object attached.");
+    }
+}
 
-    activate_texture_unit(texture_unit_);
-
+void Texture::upload_image_data(GLuint texture_object){
     GLenum textarget          = type.gl_target();
-    GLint  texinternal_format = type.gl_internal_format(); 
+    GLint  texinternal_format = type.gl_internal_format();
     GLenum texformat          = type.gl_format();
     GLenum textype            = type.gl_pixeltype();
 
-    glBindTexture(textarget, handle_);
-    glTexImage2D(textarget, 0, texinternal_format, width, height, 0, texformat, textype, image.data_);
+    gpu_status(true, texture_object);
+
+    bind();
+
+    glTexImage2D(textarget, 0, texinternal_format, width, height, 0, texformat, textype, image_->data_);
+
+    dirty_ = false;
+}
+
+void Texture::upload_sampler_parameters(){
+    GLenum textarget = type.gl_target();
+
     glTexParameterf(textarget, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameterf(textarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    on_gpu_ = true;
 }
 
 }

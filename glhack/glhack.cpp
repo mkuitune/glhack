@@ -5,6 +5,7 @@
 #include "shims_and_types.h"
 #include "glbase.h"
 
+#include <stack>
 #include <list>
 #include <sstream>
 #include <iostream>
@@ -18,8 +19,14 @@ namespace glh
 
 
 ShaderVarList parse_shader_vars(cstring& shader);
+class GraphicsManagerInt;
 
-
+/** Synchronize texture data to GPU. Return handle to texture object to which the texture is bound to. If
+    texture cannot be activated will throw a GraphicsException.
+    @param texture_unit Texture unit to which the texture will be bound to.
+    @param t            Texture to use.
+*/
+void graphics_manager_use_texture(GraphicsManagerInt& manager, int texture_unit, Texture& t);
 
 ///////////// Shaders ///////////////
 
@@ -104,6 +111,8 @@ GLenum buffertype_to_gltype(TypeId::t t){
 */
 class ShaderProgram : public ProgramHandle{
 public:
+    GraphicsManagerInt* manager_;
+
     std::string name_;
 
     ShaderVarList vertex_input_vars;
@@ -118,7 +127,7 @@ public:
     GLuint vertex_handle;
     GLuint geometry_handle;
 
-    ShaderProgram(cstring& program_name):name_(program_name), program_handle(0),
+    ShaderProgram(GraphicsManagerInt* manager, cstring& program_name):manager_(manager), name_(program_name), program_handle(0),
         fragment_handle(0), vertex_handle(0), geometry_handle(0)
     {}
 
@@ -168,6 +177,32 @@ public:
          return false;
     }
 
+    ShaderVar* get_uniform(const std::string& name, const ShaderVar::Type t){
+        ShaderVar* result = 0;
+        for(auto &u: uniform_vars){
+            if(t == u.type && u.name == name){
+                result = &u;
+                break;
+            }
+        }
+        return result;
+    }
+
+    void allocate_texture_units(){
+        int first_index = GL_TEXTURE0 + 0;
+        std::list<ShaderVar*> rvars;
+        for(auto &u:uniform_vars) if(u.type == ShaderVar::Sampler2D) rvars.push_back(&u);
+        rvars.sort([](ShaderVar* a, ShaderVar* b){return elements_are_ordered(a->name, b->name);});
+        for(auto &u:rvars) u->texture_unit_ = first_index++;
+    }
+
+    void assign_uniform_locations()
+    {
+        for(auto& u: uniform_vars){
+            u.program_location = glGetUniformLocation(program_handle, u.name.c_str());
+        }
+    }
+
 
 #if 0
     void bind_uniforms(VarMap& vmap)
@@ -192,6 +227,7 @@ public:
 #endif
 };
 
+typedef std::shared_ptr<ShaderProgram> ShaderProgramPtr;
 
 ShaderProgram* shader_program(ProgramHandle* handle){return static_cast<ShaderProgram*>(handle);}
 const ShaderProgram* shader_program(const ProgramHandle* handle){return static_cast<const ShaderProgram*>(handle);}
@@ -231,7 +267,32 @@ void assign_by_guessing_names(BufferSet& bufs, DefaultMesh& mesh)
 
 
 //////////////////// ActiveProgram ///////////////////
+namespace {
 
+// TODO: Use stored location ShaderVar::program_location.
+
+void assign(const GLuint program, const char* name, const vec3& vec){
+    GLint location = glGetUniformLocation(program, name);
+    if(location != -1) glUniform3fv(location, 1, vec.data());
+    //else               assert("Applying to non-existing location");
+}
+void assign(const GLuint program, const char* name, const vec4& vec){
+    GLint location = glGetUniformLocation(program, name);
+    if(location != -1) glUniform4fv(location, 1, vec.data());
+    //else               assert("Applying to non-existing location");
+}
+void assign(const GLuint program, const char* name, const mat4& mat){
+    GLint location = glGetUniformLocation(program, name);
+    if(location != -1) glUniformMatrix4fv(location, 1, GL_FALSE, mat.data());
+    //else               assert("Applying to non-existing location");
+}
+
+void assign_sampler_uniform(const GLuint program, const char* name, int texture_unit){
+    GLint location = glGetUniformLocation(program, name);
+    if(location != -1) glUniform1i(location, texture_unit);
+    //else               assert("Applying to non-existing location");
+}
+}
 
 const int g_component_max_count = INT32_MAX;
 
@@ -259,9 +320,17 @@ void ActiveProgram::bind_uniform(const std::string& name, const vec3& vec){
     if(sp->has_uniform(name, ShaderVar::Vec3)) assign(sp->program_handle, name.c_str(), vec);
 }
 
-void ActiveProgram::bind_uniform(const std::string& name, const Texture& tex){
+void ActiveProgram::bind_uniform(const std::string& name, Texture& tex){
     ShaderProgram* sp = shader_program(handle_);
-    if(sp->has_uniform(name, ShaderVar::Sampler2D)) assign(sp->program_handle, name.c_str(), tex);
+    ShaderVar* uniform_var = sp->get_uniform(name, ShaderVar::Sampler2D);
+
+    if(uniform_var){
+        int texture_unit = uniform_var->texture_unit_;
+
+        GraphicsManagerInt& manager(*sp->manager_);
+        graphics_manager_use_texture(manager, texture_unit, tex);
+        assign_sampler_uniform(sp->program_handle, name.c_str(), texture_unit);
+    }
 }
 
 void ActiveProgram::draw(){
@@ -457,9 +526,9 @@ bool release_program(ShaderProgram& program)
     return result;
 }
 
-ShaderProgram* create_shader_program(cstring& name, cstring& geometry_shader, cstring& vertex_shader, cstring& fragment_shader)
+ShaderProgram* create_shader_program(GraphicsManagerInt* manager, cstring& name, cstring& geometry_shader, cstring& vertex_shader, cstring& fragment_shader)
 {
-    ShaderProgram* program = new ShaderProgram(name);
+    ShaderProgram* program = new ShaderProgram(manager, name);
     bool result = true;
 
     program->geometry_shader = geometry_shader;
@@ -474,6 +543,12 @@ ShaderProgram* create_shader_program(cstring& name, cstring& geometry_shader, cs
     {
         delete program;
         program = 0;
+    }
+    else
+    {
+        // Transfer params to uniforms
+        program->allocate_texture_units();
+        program->assign_uniform_locations();
     }
 
     return program;
@@ -498,7 +573,6 @@ void program_params_from_env(ActiveProgram& program, RenderEnvironment& env){
             else if(input.type == ShaderVar::Sampler2D)
             {
                 Texture& tex(env.get_texture2d(input.name));
-                tex.apply_settings();
                 program.bind_uniform(input.name, tex);
             }
         }
@@ -512,21 +586,29 @@ class GraphicsManagerInt : public GraphicsManager
 {
 public:
 
-    typedef std::shared_ptr<ShaderProgram> ShaderProgramPtr;
-    typedef std::shared_ptr<BufferHandle>  BufferHandlePtr;
-    typedef std::shared_ptr<Texture>       TexturePtr;
-
-    // TODO: Bind entities to obj_id and name, boost::multi-index
 
     std::map<std::string, ShaderProgramPtr> programs_;
     std::list<BufferHandlePtr>              bufferhandles_;
     std::list<TexturePtr>                   textures_;
 
+//////// Internal: Texture unit stuff //////// 
+
+    GLuint gen_texture_object(){
+        GLuint handle;
+        glGenTextures(1, &handle); // TODO move
+        return handle;
+    }
+
+    void free_texture_object(GLuint handle){
+        glDeleteTextures(1, &handle);
+    }
+
+    GraphicsManagerInt(){}
     ~GraphicsManagerInt(){}
 
     virtual ProgramHandle* create_program(cstring& name, cstring& geometry, cstring& vertex, cstring& fragment) override
     {
-        ShaderProgram* p = create_shader_program(name, geometry, vertex, fragment);
+        ShaderProgram* p = create_shader_program(this, name, geometry, vertex, fragment);
 
         if(p) programs_[name] = ShaderProgramPtr(p);
         else throw GraphicsException("Program creation failed.");
@@ -549,12 +631,59 @@ public:
          return textures_.rbegin()->get();
      }
 
+     virtual void remove_from_gpu(Texture* t) override {
+         bool on_gpu;
+         GLuint handle;
+         std::tie(on_gpu, handle) = t->gpu_status();
+         // TODO: Add a state mapping consistency check here.
+         if(on_gpu){
+             free_texture_object(handle);
+             t->gpu_status(false, 0);
+         }
+     }
+
 };
 
 GraphicsManager* make_graphics_manager()
 {
     GraphicsManagerInt* manager(new GraphicsManagerInt());
     return manager;
+}
+
+static void activate_texture_unit(int texture_unit){
+    glActiveTexture(GL_TEXTURE0 + texture_unit);
+}
+
+static void upload_texture_image(GraphicsManagerInt& manager, Texture& t){
+
+    GLuint texture_object;
+    texture_object = manager.gen_texture_object();
+    t.upload_image_data(texture_object);
+}
+
+void graphics_manager_use_texture(GraphicsManagerInt& manager, int texture_unit, Texture& t)
+{
+    if(t.image_ == 0) throw GraphicsException("graphics_manager_use_texture: Texture does not have image attached.");
+
+    activate_texture_unit(texture_unit);
+
+    bool on_gpu;
+    GLuint dummy;
+
+    std::tie(on_gpu, dummy) = t.gpu_status();
+
+    if(!on_gpu){
+        upload_texture_image(manager, t);
+    }
+    else if(t.dirty_) {
+        manager.remove_from_gpu(&t);
+        upload_texture_image(manager, t);
+    }
+    else {
+        t.bind();
+    }
+
+    t.upload_sampler_parameters();
 }
 
 ///////////// RenderPassSettings ///////////////
