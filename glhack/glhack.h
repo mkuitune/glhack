@@ -75,17 +75,14 @@ public:
 // TODO: Need to wrap in interface?
 class FullRenderable {
 public:
-
-    typedef std::shared_ptr<DefaultMesh> MeshPtr;
-
     ProgramHandle*    program_;
     RenderEnvironment material_;
     BufferSet         device_buffers_;
-    MeshPtr           mesh_;
+    DefaultMesh*      mesh_;
 
     bool meshdata_on_gpu_;
 
-    FullRenderable():meshdata_on_gpu_(false){}
+    FullRenderable():meshdata_on_gpu_(false), mesh_(0){}
 
     void bind_program(ProgramHandle& program){
         program_ = &program;
@@ -93,16 +90,21 @@ public:
     }
 
     void transfer_vertexdata_to_gpu(){
-        if(mesh_.get()){
+        if(mesh_){
             glh::assign_by_guessing_names(device_buffers_, *mesh_); // Assign mesh data to buffers
             meshdata_on_gpu_ = true;
         }
     }
 
-    void set_mesh(MeshPtr& mesh){
-        mesh_ = mesh;
+    void set_mesh(DefaultMesh* meshptr){
+        mesh_ = meshptr;
     }
+
+    DefaultMesh* mesh(){return mesh_;}
+
 };
+
+typedef std::shared_ptr<FullRenderable> FullRenderablePtr;
 
 /** Interface state for one text field. 
     // TODO: instantiate font textures to a single cache, share texture
@@ -151,8 +153,13 @@ DeclInterface(GraphicsManager,
     virtual Texture* create_texture() = 0;
 
     virtual void remove_from_gpu(Texture* t) = 0;
+
+    virtual DefaultMesh*    create_mesh() = 0;
+    virtual FullRenderable* create_renderable() = 0;
+
     /** Mark asset dirty. */
     // TODO: Need this? virtual void image8_data_modified(int texture_unit, Image8& image);
+
 );
 
 GraphicsManager* make_graphics_manager();
@@ -164,6 +171,21 @@ GraphicsManager* make_graphics_manager();
 class RenderPassSettings
 {
 public:
+    struct DepthMask{
+        DepthMask():flag_(GL_FALSE){}
+        DepthMask(GLboolean flag):flag_(flag){}
+        GLboolean flag_;
+        void apply() const {glDepthMask(flag_);}
+    };
+
+    struct ColorMask{
+        GLboolean r_;GLboolean g_; GLboolean b_; GLboolean a_;
+        ColorMask(GLboolean r, GLboolean g, GLboolean b, GLboolean a):
+            r_(r),g_(g),b_(b),a_(a){}
+        ColorMask():
+            r_(GL_FALSE),g_(GL_FALSE),b_(GL_FALSE),a_(GL_FALSE){}
+        void apply() const {glColorMask(r_,g_,b_,a_);}
+    };
 
     struct BlendSettings{
         bool blend_active_;
@@ -191,13 +213,19 @@ public:
     vec4     clear_color; bool clear_color_set;
     GLclampd clear_depth; bool clear_depth_set;
     BlendSettings blend;  bool blend_set;
+    DepthMask depth_mask; bool depth_mask_set;
+    ColorMask color_mask; bool color_mask_set;
 
 
     RenderPassSettings(const GLuint clear_mask, const vec4& clear_color, const GLclampd clear_depth);
     RenderPassSettings(BlendSettings& blend_settings);
-
+    RenderPassSettings(DepthMask& depth_mask_param);
+    RenderPassSettings(ColorMask& color_mask_param);
+    RenderPassSettings();
 
     void set_buffer_clear(Buffer buffer);
+
+    static RenderPassSettings empty();
 };
 
 void apply(const RenderPassSettings& pass);

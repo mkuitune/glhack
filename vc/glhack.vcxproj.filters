@@ -25,6 +25,7 @@
     <ClCompile Include="..\glhack\masp_classwrap.cpp" />
     <ClCompile Include="..\glhack\glh_font.cpp" />
     <ClCompile Include="..\glhack\glh_generators.cpp" />
+    <ClCompile Include="..\glhack\glh_typedefs.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\glhack\glbase.h" />

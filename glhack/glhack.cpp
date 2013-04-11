@@ -597,10 +597,12 @@ class GraphicsManagerInt : public GraphicsManager
 {
 public:
 
-
     std::map<std::string, ShaderProgramPtr> programs_;
     std::list<BufferHandlePtr>              bufferhandles_;
     std::list<TexturePtr>                   textures_;
+    std::list<DefaultMeshPtr>               meshes_;
+    std::list<FullRenderablePtr>            renderables_;
+
 
     ShaderProgram* current_program_;
 
@@ -661,7 +663,7 @@ public:
 
     virtual void GraphicsManagerInt::render(FullRenderable& r, RenderEnvironment& env) override {
 
-        if(!r.mesh_.get()) throw GraphicsException("FullRenderable: trying to render without bound mesh.");
+        if(!r.mesh()) throw GraphicsException("FullRenderable: trying to render without bound mesh.");
 
         if(!r.meshdata_on_gpu_) r.transfer_vertexdata_to_gpu(); // TODO MUSTFIX: Store on-gpu status in buffers
                                                                 // So that FullRenderables may instantiate
@@ -688,6 +690,16 @@ public:
              t->gpu_status(false, 0);
          }
      }
+
+    virtual DefaultMesh* create_mesh() override {
+        meshes_.emplace_back(DefaultMeshPtr(new glh::DefaultMesh()));
+        return meshes_.rbegin()->get();
+    }
+
+    virtual FullRenderable* create_renderable() override {
+        renderables_.emplace_back(FullRenderablePtr(new glh::FullRenderable()));
+        return renderables_.rbegin()->get();
+    }
 
 };
 
@@ -736,13 +748,33 @@ void graphics_manager_use_texture(GraphicsManagerInt& manager, int texture_unit,
 ///////////// RenderPassSettings ///////////////
 
 // TODO: writemask and glStencilMask, glDepthMask and glColorMask
+
+RenderPassSettings::RenderPassSettings():
+    clear_color_set(false), clear_depth_set(false), blend_set(false), clear_mask(0),
+    depth_mask_set(false), color_mask_set(false) {
+}
+
 RenderPassSettings::RenderPassSettings(const GLuint clear_mask, const vec4& color, const GLclampd depth)
 :clear_mask(clear_mask), clear_color(color), clear_depth(depth),
-clear_color_set(true), clear_depth_set(true), blend_set(false)
+clear_color_set(true), clear_depth_set(true), blend_set(false), depth_mask_set(false), color_mask_set(false)
 {}
 
-RenderPassSettings::RenderPassSettings(BlendSettings& blend_settings)
-    :blend(blend_settings), clear_color_set(false), clear_depth_set(false), blend_set(true), clear_mask(0) {
+RenderPassSettings::RenderPassSettings(BlendSettings& blend_settings){
+    *this = RenderPassSettings::empty();
+    blend = blend_settings;
+    blend_set = true;
+}
+
+RenderPassSettings::RenderPassSettings(DepthMask& depth_mask_param){
+    *this = RenderPassSettings::empty();
+    depth_mask = depth_mask_param;
+    depth_mask_set = true;
+}
+
+RenderPassSettings::RenderPassSettings(ColorMask& color_mask_param){
+    *this = RenderPassSettings::empty();
+    color_mask = color_mask_param;
+    color_mask_set = true;
 }
 
 void RenderPassSettings::set_buffer_clear(Buffer buffer)
@@ -764,8 +796,14 @@ void apply(const RenderPassSettings& pass)
     if(pass.clear_depth_set) glClearDepth(pass.clear_depth);
     if(pass.clear_mask) glClear(pass.clear_mask);
     if(pass.blend_set) pass.blend.apply();
+    if(pass.depth_mask_set) pass.depth_mask.apply();
+    if(pass.color_mask_set) pass.color_mask.apply();
 }
 
-
+RenderPassSettings RenderPassSettings::empty()
+{
+    RenderPassSettings s;
+    return s;
+}
 
 } // namespace glh

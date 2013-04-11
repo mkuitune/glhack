@@ -23,8 +23,11 @@ public:
     static void load_defaults(DefaultMesh& d);
 };
 
+typedef std::shared_ptr<DefaultMesh> DefaultMeshPtr;
+
 /** Load screenquad data to mesh using default channels. */
 void mesh_load_screenquad(glh::DefaultMesh& mesh);
-void mesh_load_screenquad_pixelcoords(float w, float h, glh::DefaultMesh& mesh);
+void mesh_load_quad_xy(vec2 low, vec2 high, glh::DefaultMesh& mesh);
+void mesh_load_screenquad(float w, float h, glh::DefaultMesh& mesh);
 
 }

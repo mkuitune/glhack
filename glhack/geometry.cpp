@@ -13,8 +13,6 @@ class UnstructuredMeshImp : public UnstructuredMesh
 {
 public:
 
-
-
     virtual ~UnstructuredMeshImp(){}
 
     virtual void add_face(const Polygon3d& p, const vec3& normal) override

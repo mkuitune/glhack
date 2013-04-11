@@ -8,6 +8,8 @@
 #include<utility>
 #include<limits>
 
+#include "math_tools.h"
+
 namespace glh{
 
 class TypeId{
@@ -37,6 +39,29 @@ public:
     enum t{Value,Index, T_LAST};
 };
 
+///////////// Selection ID:s /////////////
+
+/** Utilities for color/id based selection buffer. */
+class ColorSelection {
+public:
+    static const int max_id = 16777215;
+
+    static vec4 color_of_id(int id);
+    static int id_of_color(const vec4& color);
+    static int id_of_color(uint8_t r, uint8_t g, uint8_t b);
+
+    class IdGenerator{
+    public:
+        IdGenerator();
+        int new_id();
+    private:
+        int m_next;
+    };
+};
+
+/* TODO: Figure out if this level of genericity below is required for 
+graph based state handling or can we manage with simpler structures.
+*/
 class EntityType{
 public:
     enum t
@@ -77,5 +102,4 @@ inline obj_key obj_id_key(obj_id oid){
     return (obj_key) (oid & 0xffffffff);
 }
 
-
-}
+} // namespace glh

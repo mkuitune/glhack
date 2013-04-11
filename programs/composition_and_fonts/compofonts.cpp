@@ -330,9 +330,9 @@ bool init(glh::App* app)
    // mesh_load_screenquad(*mesh);
     int width = app->config().width;
     int height = app->config().height;
-    mesh_load_screenquad_pixelcoords((float) width, (float) height, *mesh);
+    mesh_load_screenquad((float) width, (float) height, *mesh);
 
-    //mesh_load_screenquad_pixelcoords(0.5f, 0.5f, *mesh);
+    //mesh_load_screenquad(0.5f, 0.5f, *mesh);
 
     load_image();
     load_font_image();

@@ -44,6 +44,7 @@ namespace glh{
 /////////////// Types //////////////
 
 typedef Eigen::Vector4f vec4;
+typedef Eigen::Vector4i vec4i;
 typedef Eigen::Vector3f vec3;
 typedef Eigen::Vector2f vec2;
 typedef Eigen::Vector2i vec2i;
@@ -54,7 +55,13 @@ template<class T>
 class Math
 {
 public:
-    typedef std::array<T,2> span_t;
+    class span_t {
+        T data[2];
+    public:
+        span_t(const T& first, const T& second){data[0] = first; data[1] = second;}
+        T& operator[](size_t ind){return data[ind];}
+        const T& operator[](size_t ind) const {return data[ind];}
+    };
 
     static span_t null_span(){return span_t(T(0), T(0));}
     template<class NUM>
@@ -113,15 +120,28 @@ inline bool bit_is_on(const uint32_t field, const uint32_t bit)
 template<class T, int N>
 struct Box
 {
-    typedef Eigen::Matrix<T, N, 1> corner;
-    corner min;
-    corner max;
+    typedef Eigen::Matrix<T, N, 1> vec_t;
+    vec_t min;
+    vec_t max;
 
-    Box(const corner& min_, const corner& max_):min(min_), max(max_){}
+    Box(const vec_t& min_, const vec_t& max_):min(min_), max(max_){}
     Box(){}
+
+    vec_t size(){return max - min;}
+
+    /** In 2D returns area, in 3D volume, etc. */
+    T content(){
+        vec_t s = size();
+        T res = Math<T>::to_type(1);
+        for(int i = 0; i < N; ++i) res *= s[i];
+        return res;
+    }
 };
 
 typedef Box<int, 2> Box2i;
+
+template<class T>
+Box<T, 2> make_box2(T xlow, T ylow, T xhigh, T yhigh){return Box<T, 2>(Box<T, 2>::vec_t(xlow, ylow), Box<T, 2>::vec_t(xhigh, yhigh));}
 
 /** If s is in range (a,b) return true. */
 template<class T>
@@ -168,7 +188,7 @@ bool span_is_empty(const typename Math<T>::span_t& span){return span[0] >= span[
 template<class T, int N>
 std::tuple<Box<T,N>, bool> intersect(const Box<T,N>& a, const Box<T,N>& b)
 {
-    typedef Math<T>::span_t span_t;
+    typedef typename Math<T>::span_t span_t;
 
     bool has_volume = true;
     Box<T,N> box;
@@ -178,9 +198,9 @@ std::tuple<Box<T,N>, bool> intersect(const Box<T,N>& a, const Box<T,N>& b)
         span_t spanA(a.min[i], a.max[i]);
         span_t spanB(b.min[i], b.max[i]);
 
-        span_t span = intersect_spans(spanA, spanB);
+        span_t span = intersect_spans<T>(spanA, spanB);
 
-        if(span_is_empty(span)) has_volume = false;
+        if(span_is_empty<T>(span)) has_volume = false;
 
         box.min[i] = span[0];
         box.max[i] = span[1];
