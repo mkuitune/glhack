@@ -38,14 +38,26 @@ int ColorSelection::id_of_color(uint8_t r, uint8_t g, uint8_t b){
 }
 
 ColorSelection::IdGenerator::IdGenerator(){
-    m_next = 1;
+    m_next = null_id + 1;
 }
 
 int ColorSelection::IdGenerator::new_id(){
-    int id = m_next++;
-    if(id > max_id) throw GraphicsException("ColorSelection::IdGenerator new id above max");
+    int id;
+
+    if(m_unused.empty()){
+        id = m_next++;
+        if(id > max_id) throw GraphicsException("ColorSelection::IdGenerator new id above max");
+    } else{
+        id = m_unused.top();
+        m_unused.pop();
+    }
     return id;
 }
+
+void ColorSelection::IdGenerator::release(int id){
+    m_unused.push(id);
+}
+
 
 
 }

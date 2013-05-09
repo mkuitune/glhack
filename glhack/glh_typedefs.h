@@ -7,6 +7,7 @@
 #include<cstdint>
 #include<utility>
 #include<limits>
+#include<stack>
 
 #include "math_tools.h"
 
@@ -52,10 +53,15 @@ public:
 
     class IdGenerator{
     public:
+
+        static const int null_id = 0;
+
         IdGenerator();
-        int new_id();
+        int  new_id();
+        void release(int id);
     private:
-        int m_next;
+        int             m_next;
+        std::stack<int> m_unused;
     };
 };
 

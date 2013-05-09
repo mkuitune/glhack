@@ -127,10 +127,10 @@ struct Box
     Box(const vec_t& min_, const vec_t& max_):min(min_), max(max_){}
     Box(){}
 
-    vec_t size(){return max - min;}
+    vec_t size() const {return max - min;}
 
     /** In 2D returns area, in 3D volume, etc. */
-    T content(){
+    T content() const {
         vec_t s = size();
         T res = Math<T>::to_type(1);
         for(int i = 0; i < N; ++i) res *= s[i];

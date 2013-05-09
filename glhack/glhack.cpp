@@ -680,6 +680,22 @@ public:
         active.draw();
     }
 
+    // TODO: Merge with render function above.
+    virtual void render(FullRenderable& r, ProgramHandle& program, RenderEnvironment& material, RenderEnvironment& env) override {
+
+        if(!r.mesh()) throw GraphicsException("FullRenderable: trying to render without bound mesh.");
+
+        if(!r.meshdata_on_gpu_) r.transfer_vertexdata_to_gpu();
+                                                               
+        auto active = make_active(&program);
+        active.bind_vertex_input(r.device_buffers_.buffers_);
+        
+        program_params_from_env(active, env);
+        program_params_from_env(active, material);
+
+        active.draw();
+    }
+
      virtual void remove_from_gpu(Texture* t) override {
          bool on_gpu;
          GLuint handle;

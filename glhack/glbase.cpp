@@ -341,6 +341,9 @@ mat4 app_orthographic_pixel_projection(const App* app){
     return screen_to_view;
 }
 
+///////////// Misc ///////////////
+
+
 /////////////////////// Minimal app callbacks ///////////////////////
 
 /** The minimal scene callbacks setup. */

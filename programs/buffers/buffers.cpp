@@ -127,7 +127,7 @@ glh::ColorSelection::IdGenerator idgen;
 
 int obj_id = glh::ColorSelection::max_id / 2;
 
-
+glh::UIContextPtr uicontext;
 
 void mouse_move_callback(int x, int y)
 {
@@ -136,14 +136,12 @@ void mouse_move_callback(int x, int y)
     //std::cout << "Mouse:"  << x << " " << y << std::endl;
 }
 
-
 void init_uniform_data(){
     //env.set_vec4("ObjColor", glh::vec4(0.f, 1.f, 0.f, 0.2f));
     glh::vec4 obj_color_sel = glh::ColorSelection::color_of_id(obj_id);
     env.set_vec4("ObjColor",     obj_color_sel);
     env.set_vec4("Albedo", glh::vec4(0.28f, 0.024f, 0.024f, 1.0));
 }
-
 
 bool init(glh::App* app)
 {
@@ -169,7 +167,6 @@ bool init(glh::App* app)
 
     return true;
 }
-
 
 bool update(glh::App* app)
 {
@@ -207,7 +204,16 @@ void render(glh::App* app)
     std::tie(read_bounds, bounds_ok) = intersect(screen_bounds, mouse_bounds);
     auto read_dims = read_bounds.size();
 
+
+    glDisable(GL_SCISSOR_TEST);
+    apply(g_renderpass_settings);
+
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(read_bounds.min[0], read_bounds.min[1], read_dims[0], read_dims[1]);
+
+
     if(bounds_ok && g_read_color_at_mouse){
+
         GLenum read_format = GL_BGRA;
         GLenum read_type = GL_UNSIGNED_INT_8_8_8_8_REV;
         const int pixel_count = 9;
@@ -232,6 +238,9 @@ void render(glh::App* app)
         g_read_color_at_mouse = false;
     }
 
+
+    // ^
+    // |   Uses the result from previous render pass
 
     apply(g_renderpass_settings);
     //apply(g_color_mask_settings);
@@ -281,6 +290,8 @@ int main(int arch, char* argv)
     manager = glh::make_asset_manager(config_file);
 
     glh::App app(config);
+
+    uicontext = std::make_shared<glh::UIContext>(app);
 
     GLH_LOG_EXPR("Logger started");
     add_key_callback(app, key_callback);

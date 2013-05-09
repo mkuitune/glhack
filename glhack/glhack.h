@@ -146,8 +146,11 @@ DeclInterface(GraphicsManager,
     virtual ProgramHandle* program(cstring& name) = 0;
     // TODO: Add create buffer handle (so gl functions are not used before possible)
 
-    /** Activate program. */
+    /** Render renderable. */
     virtual void render(FullRenderable& r, RenderEnvironment& env) = 0;
+
+    /** Render renderable, override program and material.*/
+    virtual void render(FullRenderable& r, ProgramHandle& program, RenderEnvironment& material, RenderEnvironment& env) = 0;
 
     /** Allocate texture unit interface.*/
     virtual Texture* create_texture() = 0;

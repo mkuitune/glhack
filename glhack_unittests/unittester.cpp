@@ -1,8 +1,6 @@
-// This file unittester.cpp is part of Tiny Unittester.
-//
 // See unittester.h for instructions.
 //
-// This code is int the public domain.
+// This code is in the public domain.
 //
 // The software is provided "as is", without warranty of any kind etc.
 //

@@ -1,11 +1,4 @@
-// This file unittester.h is part of Tiny Unittester.
-//
-// A short guide
-// =============
-//
-// Introduction
-// ------------
-// Tiny Unittester is a lightweight unit test suite.
+// This is a lightweight unittest suite.
 //
 // It contains two files - unittester.h and unittester.cpp. The latter implements the
 // test entry point main -function.
@@ -25,9 +18,6 @@
 // The macros
 //
 // ASSERT_TRUE(<statement_in_c++>, <message string>)
-//
-// and
-//
 // ASSERT_FALSE(<statement_in_c++>, <message string>)
 //
 // catch erroneus states, seize the execution of a particular test and signal the test suite of failure in a particular test.
@@ -70,7 +60,7 @@
 // }
 //
 //
-// This code is int the public domain.
+// This code is in the public domain.
 //
 // The software is provided "as is", without warranty of any kind etc.
 //
