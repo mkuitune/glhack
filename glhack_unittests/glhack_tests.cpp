@@ -4,8 +4,11 @@
 #include "glhack.h"
 #include "persistent_containers.h"
 #include "glh_image.h"
+#include "glh_scenemanagement.h"
+
 #include<string>
 #include "unittester.h"
+
 
 
 //ADD_GROUP(collections_pmap);
@@ -129,6 +132,75 @@ UTEST(containers, aligned_array_test)
 #endif
 }
 
+/////////// Scene management ////////////////
+
+namespace glh{
+
+class DummyManager: public GraphicsManager {
+public:
+    virtual ProgramHandle* create_program(cstring& name, cstring& geometry, cstring& vertex, cstring& fragment) override {return 0;}
+
+    virtual ProgramHandle* program(cstring& name)  override { return 0;}
+
+    virtual void render(FullRenderable& r, RenderEnvironment& env)  override {}
+
+    virtual void render(FullRenderable& r, ProgramHandle& program, RenderEnvironment& material, RenderEnvironment& env)  override {}
+
+    virtual Texture* create_texture()  override {return 0;}
+
+    virtual void remove_from_gpu(Texture* t) override {}
+
+    virtual DefaultMesh*    create_mesh() override {return 0;}
+
+    virtual FullRenderable* create_renderable() override {
+        renderables_.push_back(FullRenderable());
+        return & renderables_.back();
+    }
+
+    std::vector<FullRenderable> renderables_;
+};
+}
+
+UTEST(scene, scene_rai_test)
+{
+    using namespace glh;
+
+    SceneTree         scene;
+    DummyManager      manager;
+    RenderQueue       queue(&manager);
+    RenderEnvironment env;
+
+    FullRenderable* f0 = manager.create_renderable();
+
+    std::map<SceneTree::Node*, int> counts;
+
+    auto add = [&counts](SceneTree::Node* n){counts[n] = 0;};
+
+    SceneTree::Node* root = scene.root();
+
+    add(root);
+
+    SceneTree::Node* n0 = scene.make_node(root); add(n0);
+    SceneTree::Node* n1 = scene.make_node(n0);   add(n1);
+    SceneTree::Node* n2 = scene.make_node(n0);   add(n2);
+    SceneTree::Node* n3 = scene.make_node(n1);   add(n3);
+
+    scene.update();
+
+    for(auto n:scene){
+        if(counts.find(n) != counts.end()){
+            counts[n]++;
+        }
+    }
+
+    for(auto& p:counts){
+        ASSERT_TRUE(p.second > 0, "Scene did not contain all elements.");
+    }
+
+    //queue.add(scene);
+    //queue.render(env);
+
+}
 
 ////////// Shader utilities etc. ///////////
 #if 0

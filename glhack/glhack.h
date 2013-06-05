@@ -82,7 +82,7 @@ public:
 
     bool meshdata_on_gpu_;
 
-    FullRenderable():meshdata_on_gpu_(false), mesh_(0){}
+    FullRenderable():program_(0),meshdata_on_gpu_(false), mesh_(0){}
 
     void bind_program(ProgramHandle& program){
         program_ = &program;

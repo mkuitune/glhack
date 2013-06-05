@@ -15,6 +15,7 @@
 #include<map>
 #include<cstdarg>
 #include<vector>
+#include<limits>
 
 #define PIf 3.141592846f
 
@@ -63,7 +64,11 @@ public:
         const T& operator[](size_t ind) const {return data[ind];}
     };
 
+    static T max(){return std::numeric_limits<T>::max();}
+    static T min(){return std::numeric_limits<T>::min();}
+
     static span_t null_span(){return span_t(T(0), T(0));}
+
     template<class NUM>
     static T to_type(const NUM& n){return static_cast<T>(n);}
 };
@@ -112,6 +117,22 @@ inline bool bit_is_on(const uint32_t field, const uint32_t bit)
     return  (field & 1 << bit) != 0;
 }
 
+//////////////////// Linear algebra etc. ///////////////////////////
+
+template<class T, int N>
+Eigen::Matrix<T, N+1, 1> increase_dim(const Eigen::Matrix<T, N, 1>& v){
+    Eigen::Matrix<T, N+1, 1> out;
+    for(int i = 0; i < N; ++i){out[i] = v[i];}
+    out[N] = Math<T>::to_type(1);
+    return out;
+}
+
+template<class T, int N>
+Eigen::Matrix<T, N-1, 1> decrease_dim(const Eigen::Matrix<T, N, 1>& v){
+    Eigen::Matrix<T, N-1, 1> out;
+    for(int i = 0; i < N - 1; ++i){out[i] = v[i];}
+    return out;
+}
 
 //////////////////// Geometric entities ///////////////////////////
 
@@ -120,14 +141,21 @@ inline bool bit_is_on(const uint32_t field, const uint32_t bit)
 template<class T, int N>
 struct Box
 {
-    typedef Eigen::Matrix<T, N, 1> vec_t;
-    vec_t min;
-    vec_t max;
+    typedef Eigen::Matrix<T, N, 1>   vec_t;
+    typedef Eigen::Matrix<T, N+1, 1> vec_p;
 
-    Box(const vec_t& min_, const vec_t& max_):min(min_), max(max_){}
-    Box(){}
+    vec_t min_;
+    vec_t max_;
 
-    vec_t size() const {return max - min;}
+    Box(const vec_t& min, const vec_t& max):min_(min), max_(max){}
+    Box(){
+        for(int i = 0; i < N; ++i){
+            min_[i] = Math<T>::to_type(0);
+            max_[i] = Math<T>::to_type(0);
+        }
+    }
+
+    vec_t size() const {return max_ - min_;}
 
     /** In 2D returns area, in 3D volume, etc. */
     T content() const {
@@ -139,9 +167,25 @@ struct Box
 };
 
 typedef Box<int, 2> Box2i;
+typedef Box<float, 3> Box3f;
 
 template<class T>
 Box<T, 2> make_box2(T xlow, T ylow, T xhigh, T yhigh){return Box<T, 2>(Box<T, 2>::vec_t(xlow, ylow), Box<T, 2>::vec_t(xhigh, yhigh));}
+
+/** Return this boxes bounds transformed by the given N+1 dimensional matrix as a new box. */
+template<class T, int N, class M>
+Box<T,N> transform_box(M& tr, const Box<T,N>& box){
+    Box<T,N>::vec_p minp = increase_dim(box.min_);
+    Box<T,N>::vec_p maxp = increase_dim(box.max_);
+
+    minp = tr * minp;
+    maxp = tr * maxp;
+
+    Box<T,N>::vec_t new_min = decrease_dim(minp);
+    Box<T,N>::vec_t new_max = decrease_dim(maxp);
+
+    return Box<T,N>(new_min, new_max);
+}
 
 /** If s is in range (a,b) return true. */
 template<class T>
@@ -179,6 +223,19 @@ typename Math<T>::span_t intersect_spans(const typename Math<T>::span_t& a, cons
     return span;
 }
 
+/* Return span that covers both spans (a[0],a[1]) and (b[0],b[1])
+ * */
+template<class T>
+typename Math<T>::span_t cover_spans(const typename Math<T>::span_t& a, const typename Math<T>::span_t& b)
+{
+    T lower  = std::min(a[0], b[0]);
+    T higher = std::max(a[1], b[1]);
+
+    Math<T>::span_t covering_span(lower, higher);
+
+    return covering_span;
+}
+
 template<class T>
 bool span_is_empty(const typename Math<T>::span_t& span){return span[0] >= span[1];}
 
@@ -195,19 +252,43 @@ std::tuple<Box<T,N>, bool> intersect(const Box<T,N>& a, const Box<T,N>& b)
 
     for(int i = 0; i < N; ++i)
     {
-        span_t spanA(a.min[i], a.max[i]);
-        span_t spanB(b.min[i], b.max[i]);
+        span_t spanA(a.min_[i], a.max_[i]);
+        span_t spanB(b.min_[i], b.max_[i]);
 
         span_t span = intersect_spans<T>(spanA, spanB);
 
         if(span_is_empty<T>(span)) has_volume = false;
 
-        box.min[i] = span[0];
-        box.max[i] = span[1];
+        box.min_[i] = span[0];
+        box.max_[i] = span[1];
 
     }
 
     return std::make_tuple(box, has_volume);
+}
+
+/**
+ * @return box that is the smallest box containing a and b.
+ */
+template<class T, int N>
+Box<T,N> cover(const Box<T,N>& a, const Box<T,N>& b)
+{
+    typedef typename Math<T>::span_t span_t;
+
+    Box<T,N> box;
+
+    for(int i = 0; i < N; ++i)
+    {
+        span_t spanA(a.min_[i], a.max_[i]);
+        span_t spanB(b.min_[i], b.max_[i]);
+
+        span_t span = cover_spans<T>(spanA, spanB);
+
+        box.min_[i] = span[0];
+        box.max_[i] = span[1];
+    }
+
+    return box;
 }
 
 
@@ -516,11 +597,6 @@ std::list<std::pair<typename V::value_type, typename V::value_type>> all_pairs(V
 
     return result;
 }
-
-
-////////////// Linear algebra ////////////////
-
-
 
 } // namespace glh
 

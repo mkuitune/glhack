@@ -661,23 +661,27 @@ public:
         return a;
     }
 
+    //virtual void GraphicsManagerInt::render(FullRenderable& r, RenderEnvironment& env) override {
+
+    //    if(!r.mesh()) throw GraphicsException("FullRenderable: trying to render without bound mesh.");
+
+    //    if(!r.meshdata_on_gpu_) r.transfer_vertexdata_to_gpu(); // TODO MUSTFIX: Store on-gpu status in buffers
+    //                                                            // So that FullRenderables may instantiate
+    //                                                            // meshes in stead of transferring them to gpu.
+
+    //    // TODO: Should here be transfer_texture_data_to_gpu
+
+    //    auto active = make_active(r.program_);
+    //    active.bind_vertex_input(r.device_buffers_.buffers_);
+
+    //    program_params_from_env(active, env);
+    //    program_params_from_env(active, r.material_);
+
+    //    active.draw();
+    //}
+
     virtual void GraphicsManagerInt::render(FullRenderable& r, RenderEnvironment& env) override {
-
-        if(!r.mesh()) throw GraphicsException("FullRenderable: trying to render without bound mesh.");
-
-        if(!r.meshdata_on_gpu_) r.transfer_vertexdata_to_gpu(); // TODO MUSTFIX: Store on-gpu status in buffers
-                                                                // So that FullRenderables may instantiate
-                                                                // meshes in stead of transferring them to gpu.
-
-        // TODO: Should here be transfer_texture_data_to_gpu
-
-        auto active = make_active(r.program_);
-        active.bind_vertex_input(r.device_buffers_.buffers_);
-
-        program_params_from_env(active, env);
-        program_params_from_env(active, r.material_);
-
-        active.draw();
+        render(r, *r.program_, r.material_, env);
     }
 
     // TODO: Merge with render function above.

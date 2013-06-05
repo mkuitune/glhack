@@ -10,6 +10,7 @@
 #include "glh_font.h"
 #include "shims_and_types.h"
 #include "math_tools.h"
+#include "glh_scenemanagement.h"
 
 //////////////// Program stuff ////////////////
 
@@ -71,10 +72,10 @@ const char* sh_fragment =
 
 const char* sh_fragment_fix_color = 
 "#version 150                  \n"
-"uniform vec4 ObjColor;        "
+"uniform vec4 " UICTX_SELECT_NAME ";"
 "out vec4 FragColor;           "
 "void main() {                 "
-"    FragColor = ObjColor; "
+"    FragColor = " UICTX_SELECT_NAME "; "
 "}";
 
 const char* sh_fragment_tex = 
@@ -97,7 +98,7 @@ glh::Texture* texture;
 // App state
 
 glh::RenderPassSettings g_renderpass_settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT,
-                                            glh::vec4(0.16f,0.11f,0.15f,1.f), 1);
+                                            glh::vec4(0.0f,0.0f,0.0f,1.f), 1);
 //glh::RenderPassSettings g_color_mask_settings(glh::RenderPassSettings::ColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE));
 //glh::RenderPassSettings g_blend_settings(glh::RenderPassSettings::BlendSettings(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 //glh::RenderPassSettings g_blend_settings(glh::RenderPassSettings::BlendSettings(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
@@ -139,8 +140,23 @@ void mouse_move_callback(int x, int y)
 void init_uniform_data(){
     //env.set_vec4("ObjColor", glh::vec4(0.f, 1.f, 0.f, 0.2f));
     glh::vec4 obj_color_sel = glh::ColorSelection::color_of_id(obj_id);
-    env.set_vec4("ObjColor",     obj_color_sel);
+    env.set_vec4(UICTX_SELECT_NAME,     obj_color_sel);
     env.set_vec4("Albedo", glh::vec4(0.28f, 0.024f, 0.024f, 1.0));
+}
+
+using glh::vec2i;
+using glh::vec2;
+
+void load_screenquad(vec2 pos, vec2 size, glh::DefaultMesh& mesh)
+{
+    using namespace glh;
+
+    vec2 halfsize = 0.5f * size;
+
+    vec2 low  = pos - halfsize;
+    vec2 high = pos + halfsize;
+
+    mesh_load_quad_xy(low, high, mesh);
 }
 
 bool init(glh::App* app)
@@ -152,12 +168,9 @@ bool init(glh::App* app)
     //sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment);
     sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment_fix_color);
 
-    vec2 low0(-0.75, -0.75);
-    vec2 high0(-0.25, -0.25);
-
     glh::DefaultMesh* mesh = gm->create_mesh();
-
-    mesh_load_quad_xy(low0, high0, *mesh);
+    vec2 dims = vec2(0.5, 0.5);
+    load_screenquad(vec2(-0.5, -0.5), dims, *mesh);
 
     //mesh_load_screenquad(0.5f, 0.5f, *mesh);
     init_uniform_data();
@@ -186,7 +199,8 @@ bool update(glh::App* app)
 
 bool g_read_color_at_mouse = false;
 
-void render(glh::App* app)
+
+void render_with_selection_pass(glh::App* app)
 {
     using namespace glh;
 
@@ -206,10 +220,10 @@ void render(glh::App* app)
 
 
     glDisable(GL_SCISSOR_TEST);
-    apply(g_renderpass_settings);
+    //apply(g_renderpass_settings);
 
-    glEnable(GL_SCISSOR_TEST);
-    glScissor(read_bounds.min[0], read_bounds.min[1], read_dims[0], read_dims[1]);
+    //glEnable(GL_SCISSOR_TEST);
+    //glScissor(read_bounds.min[0], read_bounds.min[1], read_dims[0], read_dims[1]);
 
 
     if(bounds_ok && g_read_color_at_mouse){
@@ -221,7 +235,7 @@ void render(glh::App* app)
         uint8_t imagedata[pixel_count * pixel_channels] = {0};
         glFlush();
         glReadBuffer(GL_BACK);
-        glReadPixels(read_bounds.min[0], read_bounds.min[1], read_dims[0], read_dims[1], read_format, read_type, imagedata);
+        glReadPixels(read_bounds.min_[0], read_bounds.min_[1], read_dims[0], read_dims[1], read_format, read_type, imagedata);
 
         const uint8_t* b = &imagedata[4 * pixel_channels];
         const uint8_t* g = b + 1;
@@ -249,6 +263,18 @@ void render(glh::App* app)
 
 }
 
+void render(glh::App* app)
+{
+    using namespace glh;
+
+    GraphicsManager* gm = app->graphics_manager();
+
+    apply(g_renderpass_settings);
+    //apply(g_color_mask_settings);
+    //apply(g_blend_settings);
+    gm->render(screenquad_image, env);
+
+}
 
 void resize(glh::App* app, int width, int height)
 {
@@ -259,17 +285,18 @@ void print_mouse_position()
 {
 }
 
-
 void read_color_at_mouse(){
     //std::cout << "Mouse:"  << x << " " << y << std::endl;
     
 }
 
-
 void mouse_button_callback(int key, const glh::Input::ButtonState& s)
 {
     using namespace glh;
-    if(key == Input::LeftButton) g_read_color_at_mouse = true;
+
+    if(s == glh::Input::Held) std::cout << "Mouse down." << std::endl;
+
+    if(key == Input::LeftButton && (s == glh::Input::Held)) g_read_color_at_mouse = true;
 }
 
 void key_callback(int key, const glh::Input::ButtonState& s)
@@ -281,7 +308,7 @@ void key_callback(int key, const glh::Input::ButtonState& s)
 int main(int arch, char* argv)
 {
     glh::AppConfig config = glh::app_config_default(init, update, render, resize);
-
+    //glh::AppConfig config = glh::app_config_default(init, update, render_with_selection_pass, resize);
     config.width = 1024;
     config.height = 640;
 

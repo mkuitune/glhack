@@ -26,6 +26,7 @@
     <ClCompile Include="..\glhack\glh_font.cpp" />
     <ClCompile Include="..\glhack\glh_generators.cpp" />
     <ClCompile Include="..\glhack\glh_typedefs.cpp" />
+    <ClCompile Include="..\glhack\glh_scenemanagement.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\glhack\glbase.h" />
@@ -54,5 +55,6 @@
     <ClInclude Include="..\glhack\masp_extensions.h" />
     <ClInclude Include="..\glhack\glh_font.h" />
     <ClInclude Include="..\glhack\glh_generators.h" />
+    <ClInclude Include="..\glhack\glh_scenemanagement.h" />
   </ItemGroup>
 </Project>
