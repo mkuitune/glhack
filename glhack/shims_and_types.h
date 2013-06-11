@@ -680,6 +680,47 @@ private:
     InverseMap values_to_keys_;
 };
 
+
+/** std::vector like sequence that minimized memory allocations. Does
+*   NOT call destructors for contained elements - use to store only
+*   value types.*/
+template<class value_type>
+class ArenaQueue{
+public:
+    struct iterator{
+        value_type* cur_;
+        iterator(value_type* v):cur_(v){}
+        value_type operator*(){return *cur_;}
+        void operator++(){cur_++;}
+        bool operator!=(const iterator& a){return cur_ != a.cur_;}
+    };
+
+    ArenaQueue():size_(0), max_size_(128){
+        queue_.resize(max_size_);
+    }
+
+    void push(value_type v){
+        if(size_ < max_size_){
+            queue_[size_++] = v;
+        } else {
+            max_size_ *= 2;
+            queue_.resize(max_size_);
+            push(v);
+        }
+    }
+
+    void clear(){size_ = 0;}
+
+    iterator begin(){return iterator(&queue_[0]);}
+    iterator end(){return iterator(&queue_[size_]);}
+
+private:
+    size_t                  size_;
+    size_t                  max_size_;
+    std::vector<value_type> queue_;
+
+};
+
 //////////////// Container insertion ////////////////
 
 

@@ -104,8 +104,6 @@ glh::RenderPassSettings g_renderpass_settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFE
 //glh::RenderPassSettings g_blend_settings(glh::RenderPassSettings::BlendSettings(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
 bool g_run = true;
-
-
 std::shared_ptr<glh::DefaultMesh> green_mesh(new glh::DefaultMesh());
 
 glh::AssetManagerPtr manager;
@@ -117,8 +115,6 @@ glh::FullRenderable red_square;
 glh::FullRenderable green_square;
 glh::FullRenderable blue_square;
 
-std::list<glh::FullRenderablePtr> render_queue;
-
 std::shared_ptr<glh::FontContext> fontcontext;
 
 int g_mouse_x;
@@ -129,6 +125,9 @@ glh::ColorSelection::IdGenerator idgen;
 int obj_id = glh::ColorSelection::max_id / 2;
 
 glh::UIContextPtr uicontext;
+
+glh::SceneTree   scene;
+glh::RenderQueue render_queueue;
 
 void mouse_move_callback(int x, int y)
 {
@@ -159,6 +158,22 @@ void load_screenquad(vec2 pos, vec2 size, glh::DefaultMesh& mesh)
     mesh_load_quad_xy(low, high, mesh);
 }
 
+void add_quad_to_scene(glh::GraphicsManager* gm, glh::ProgramHandle& program,
+                       glh::vec2 pos, glh::vec2 dims){
+
+    glh::DefaultMesh* mesh = gm->create_mesh();
+    load_screenquad(pos, dims, *mesh);
+
+    auto renderable = gm->create_renderable();
+
+    renderable->bind_program(program);
+    renderable->set_mesh(mesh);
+
+    auto root = scene.root();
+    auto node = scene.add_node(root, renderable);
+
+}
+
 bool init(glh::App* app)
 {
     using namespace glh;
@@ -169,17 +184,50 @@ bool init(glh::App* app)
     sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment_fix_color);
 
     glh::DefaultMesh* mesh = gm->create_mesh();
+
     vec2 dims = vec2(0.5, 0.5);
-    load_screenquad(vec2(-0.5, -0.5), dims, *mesh);
+    vec2 pos = vec2(-0.5, -0.5);
+    add_quad_to_scene(gm, *sp_colored_program, pos, dims);
 
-    //mesh_load_screenquad(0.5f, 0.5f, *mesh);
+    pos = vec2(0.5, 0.5);
+    add_quad_to_scene(gm, *sp_colored_program, pos, dims);
+
+    pos = vec2(-0.5, 0.5);
+    add_quad_to_scene(gm, *sp_colored_program, pos, dims);
+
+    pos = vec2(0.5, -0.5);
+    add_quad_to_scene(gm, *sp_colored_program, pos, dims);
+
+
     init_uniform_data();
-
-    screenquad_image.bind_program(*sp_colored_program);
-    screenquad_image.set_mesh(mesh);
 
     return true;
 }
+
+//bool init(glh::App* app)
+//{
+//    using namespace glh;
+//
+//    GraphicsManager* gm = app->graphics_manager();
+//
+//    //sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment);
+//    sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment_fix_color);
+//
+//    glh::DefaultMesh* mesh = gm->create_mesh();
+//    vec2 dims = vec2(0.5, 0.5);
+//    load_screenquad(vec2(-0.5, -0.5), dims, *mesh);
+//
+//    //mesh_load_screenquad(0.5f, 0.5f, *mesh);
+//    init_uniform_data();
+//
+//    screenquad_image.bind_program(*sp_colored_program);
+//    screenquad_image.set_mesh(mesh);
+//
+//    auto root = scene.root();
+//    auto node = scene.add_node(root, &screenquad_image);
+//
+//    return true;
+//}
 
 bool update(glh::App* app)
 {
@@ -193,6 +241,9 @@ bool update(glh::App* app)
     env.set_mat4(OBJ2WORLD, transform.matrix());
 
     env.set_vec4("Albedo", glh::vec4(0.28f, 0.024f, 0.024f, 1.0));
+
+    render_queueue.clear();
+    render_queueue.add(scene);
 
     return g_run;
 }
@@ -263,6 +314,19 @@ void render_with_selection_pass(glh::App* app)
 
 }
 
+//void render(glh::App* app)
+//{
+//    using namespace glh;
+//
+//    GraphicsManager* gm = app->graphics_manager();
+//
+//    apply(g_renderpass_settings);
+//    //apply(g_color_mask_settings);
+//    //apply(g_blend_settings);
+//    gm->render(screenquad_image, env);
+//
+//}
+
 void render(glh::App* app)
 {
     using namespace glh;
@@ -270,10 +334,7 @@ void render(glh::App* app)
     GraphicsManager* gm = app->graphics_manager();
 
     apply(g_renderpass_settings);
-    //apply(g_color_mask_settings);
-    //apply(g_blend_settings);
-    gm->render(screenquad_image, env);
-
+    render_queueue.render(gm, env);
 }
 
 void resize(glh::App* app, int width, int height)

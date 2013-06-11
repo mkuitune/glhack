@@ -4,6 +4,7 @@
 #pragma once
 
 #include "glbase.h"
+#include "glh_names.h"
 
 namespace glh{
 
@@ -56,7 +57,6 @@ public:
 
     // RegisterKeySink?
 
-#define UICTX_SELECT_NAME "SelectionColor"
 
     //typedef std::array<float, 4> color_t;
 
@@ -224,8 +224,8 @@ public:
 
         typedef std::vector<Node*> ChildContainer;
 
-        mat4  ObjectToWorld_;
-        mat4  ObjectToParent_;
+        mat4  LocalToWorld_;
+        mat4  LocalToParent_;
 
         Box3f LocalBoundsAAB_;
         Box3f WorldBoundsAAB_;
@@ -242,8 +242,8 @@ public:
         }
 
         void reset_data(){
-            ObjectToWorld_ = mat4::Ones();
-            ObjectToParent_ = mat4::Ones();
+            LocalToWorld_ = mat4::Ones();
+            LocalToParent_ = mat4::Ones();
         }
 
         // TODO: Must update bounds!
@@ -258,17 +258,17 @@ public:
             children_.push_back(node);
         }
 
-        void update_transforms(const mat4& parent_object_to_world){
-            ObjectToWorld_ = ObjectToParent_ * parent_object_to_world;
+        void update_transforms(const mat4& parent_local_to_world){
+            LocalToWorld_ = LocalToParent_ * parent_local_to_world;
             update_transforms();
         }
 
         void update_transforms(){
-            for(auto c:children_) c->update_transforms(this->ObjectToWorld_);
+            for(auto c:children_) c->update_transforms(this->LocalToWorld_);
         }
 
         Box3f& update_bounds(){
-            WorldBoundsAAB_ = transform_box<float,3>(ObjectToWorld_, LocalBoundsAAB_);
+            WorldBoundsAAB_ = transform_box<float,3>(LocalToWorld_, LocalBoundsAAB_);
             TreeWorldBoundsAAB_ = WorldBoundsAAB_;
             for(auto c:children_) 
                 TreeWorldBoundsAAB_ = cover(c->update_bounds(), TreeWorldBoundsAAB_);
@@ -347,15 +347,15 @@ public:
        root_ = &nodes_.back();
     }
 
-    Node* make_node(Node* parent){
+    Node* add_node(Node* parent){
         nodes_.push_back(Node());
         Node* newnode = &nodes_.back();
         if(parent) parent->add_child(newnode);
         return newnode;
     }
 
-    Node* make_node(Node* parent, FullRenderable* r){
-        Node* newnode = make_node(parent);
+    Node* add_node(Node* parent, FullRenderable* r){
+        Node* newnode = add_node(parent);
         newnode->set_renderable(r);
         return newnode;
     }
@@ -367,6 +367,11 @@ public:
         root_->update_transforms();
         root_->update_bounds();
     }
+
+    void apply_to_renderables(){
+        for(auto& n: nodes_){
+            if(auto renderable = n.renderable()){
+                renderable->material_.set_mat4(GLH_LOCAL_TO_WORLD, n.LocalToWorld_);}}}
 
     iterator begin() {return tree_iterator(root_);}
     iterator end() {return tree_iterator(0);}
@@ -381,39 +386,38 @@ private:
 class RenderQueue{
 public:
 
-    RenderQueue(GraphicsManager* gm):manager_(gm){}
+    RenderQueue(){}
 
     void add(FullRenderable* r){
-        renderables_.push_back(r);
-    }
-
-    void remove(FullRenderable* r){
-        renderables_.erase(std::remove(renderables_.begin(), renderables_.end(), r), renderables_.end());
+        renderables_.push(r);
     }
 
     void add(SceneTree& scene){
         for(SceneTree::Node* node: scene){
             FullRenderable* r = node->renderable();
-            if(r) renderables_.push_back(r);
+            if(r) add(r);
         }
     }
 
     // Render items in queue
-    void render(glh::RenderEnvironment& env){
-        for(auto& f:renderables_){
-            manager_->render(*f, env);
+    void render(GraphicsManager* manager, glh::RenderEnvironment& env){
+        for(auto f:renderables_){
+            manager->render(*f, env);
         }
     }
 
     // Render items in queue by overloading program
-    void render(ProgramHandle& program, glh::RenderEnvironment& env){
-        for(auto& f:renderables_){
-            manager_->render(*f, program, f->material_, env);
+    void render(GraphicsManager* manager, ProgramHandle& program, glh::RenderEnvironment& env){
+        for(auto f:renderables_){
+            manager->render(*f, program, f->material_, env);
         }
     }
 
-    std::vector<FullRenderable*> renderables_;
-    GraphicsManager*             manager_;
+    void clear(){renderables_.clear();}
+
+    ArenaQueue<FullRenderable*> renderables_;
 };
+
+
 
 } // namespace glh
