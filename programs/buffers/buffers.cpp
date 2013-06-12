@@ -25,32 +25,18 @@ const char* sh_vertex   =
 "    gl_Position = vec4( VertexPosition, 1.0 );"
 "}";
 
-#define OBJ2WORLD "ObjectToWorld"
-
-const char* sh_vertex_obj   = 
-"#version 150               \n"
-"uniform mat4 ObjectToWorld;"
-"in vec3      VertexPosition;    "
-"in vec3      VertexColor;       "
-"out vec3 Color;            "
-"void main()                "
-"{                          "
-"    Color = VertexColor;   "
-"    gl_Position = ObjectToWorld * vec4( VertexPosition, 1.0 );"
-"}";
-
 const char* sh_vertex_obj_pos   = 
 "#version 150               \n"
-"uniform mat4 ObjectToWorld;"
+"uniform mat4 LocalToWorld;"
 "in vec3      VertexPosition;    "
 "void main()                "
 "{                          "
-"    gl_Position = ObjectToWorld * vec4( VertexPosition, 1.0 );"
+"    gl_Position = LocalToWorld * vec4( VertexPosition, 1.0 );"
 "}";
 
 const char* sh_vertex_obj_tex   = 
 "#version 150               \n"
-"uniform mat4 ObjectToWorld;"
+"uniform mat4 LocalToWorld;"
 "in vec3      VertexPosition;    "
 "in vec3      TexCoord;"
 "out vec3 v_color;            "
@@ -58,9 +44,8 @@ const char* sh_vertex_obj_tex   =
 "void main()                "
 "{                          "
 "    v_texcoord = TexCoord.xy;"
-"    gl_Position = ObjectToWorld * vec4( VertexPosition, 1.0 );"
+"    gl_Position = LocalToWorld * vec4( VertexPosition, 1.0 );"
 "}";
-
 
 const char* sh_fragment = 
 "#version 150                  \n"
@@ -68,14 +53,6 @@ const char* sh_fragment =
 "out vec4 FragColor;           "
 "void main() {                 "
 "    FragColor = vec4(Color, 1.0); "
-"}";
-
-const char* sh_fragment_fix_color = 
-"#version 150                  \n"
-"uniform vec4 " UICTX_SELECT_NAME ";"
-"out vec4 FragColor;           "
-"void main() {                 "
-"    FragColor = " UICTX_SELECT_NAME "; "
 "}";
 
 const char* sh_fragment_tex = 
@@ -88,6 +65,28 @@ const char* sh_fragment_tex =
 "    FragColor = texColor;"
 //"    FragColor = vec4(Color, 1.0); "
 "}";
+
+
+const char* sh_vertex_obj   = 
+"#version 150               \n"
+"uniform mat4 LocalToWorld;"
+"in vec3      VertexPosition;    "
+"in vec3      VertexColor;       "
+"out vec3 Color;            "
+"void main()                "
+"{                          "
+"    Color = VertexColor;   "
+"    gl_Position = LocalToWorld * vec4( VertexPosition, 1.0 );"
+"}";
+
+const char* sh_fragment_fix_color = 
+"#version 150                  \n"
+"uniform vec4 " UICTX_SELECT_NAME ";"
+"out vec4 FragColor;           "
+"void main() {                 "
+"    FragColor = " UICTX_SELECT_NAME "; "
+"}";
+
 
 const char* sh_geometry = "";
 const char* sp_obj     = "sp_colored";
@@ -195,7 +194,7 @@ bool init(glh::App* app)
     pos = vec2(-0.5, 0.5);
     add_quad_to_scene(gm, *sp_colored_program, pos, dims);
 
-    pos = vec2(0.5, -0.5);
+    pos = vec2(0.5, -0.5); dims *= 0.5f;
     add_quad_to_scene(gm, *sp_colored_program, pos, dims);
 
 
@@ -203,31 +202,6 @@ bool init(glh::App* app)
 
     return true;
 }
-
-//bool init(glh::App* app)
-//{
-//    using namespace glh;
-//
-//    GraphicsManager* gm = app->graphics_manager();
-//
-//    //sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment);
-//    sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment_fix_color);
-//
-//    glh::DefaultMesh* mesh = gm->create_mesh();
-//    vec2 dims = vec2(0.5, 0.5);
-//    load_screenquad(vec2(-0.5, -0.5), dims, *mesh);
-//
-//    //mesh_load_screenquad(0.5f, 0.5f, *mesh);
-//    init_uniform_data();
-//
-//    screenquad_image.bind_program(*sp_colored_program);
-//    screenquad_image.set_mesh(mesh);
-//
-//    auto root = scene.root();
-//    auto node = scene.add_node(root, &screenquad_image);
-//
-//    return true;
-//}
 
 bool update(glh::App* app)
 {
@@ -238,9 +212,12 @@ bool update(glh::App* app)
 
     mat4 screen_to_view = app_orthographic_pixel_projection(app);
 
-    env.set_mat4(OBJ2WORLD, transform.matrix());
+    env.set_mat4(GLH_LOCAL_TO_WORLD, transform.matrix());
 
     env.set_vec4("Albedo", glh::vec4(0.28f, 0.024f, 0.024f, 1.0));
+
+    scene.update();
+    scene.apply_to_renderables();
 
     render_queueue.clear();
     render_queueue.add(scene);
@@ -313,19 +290,6 @@ void render_with_selection_pass(glh::App* app)
     gm->render(screenquad_image, env);
 
 }
-
-//void render(glh::App* app)
-//{
-//    using namespace glh;
-//
-//    GraphicsManager* gm = app->graphics_manager();
-//
-//    apply(g_renderpass_settings);
-//    //apply(g_color_mask_settings);
-//    //apply(g_blend_settings);
-//    gm->render(screenquad_image, env);
-//
-//}
 
 void render(glh::App* app)
 {

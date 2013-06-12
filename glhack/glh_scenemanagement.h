@@ -224,12 +224,12 @@ public:
 
         typedef std::vector<Node*> ChildContainer;
 
-        mat4  LocalToWorld_;
-        mat4  LocalToParent_;
+        mat4  local_to_world_;
+        mat4  local_to_parent_;
 
-        Box3f LocalBoundsAAB_;
-        Box3f WorldBoundsAAB_;
-        Box3f TreeWorldBoundsAAB_; // Bounds of object and children in world coordinates
+        Box3f local_bounds_AAB_;
+        Box3f world_bounds_AAB_;
+        Box3f tree_world_bounds_AAB_; // Bounds of object and children in world coordinates
 
         FullRenderable* renderable_;
 
@@ -242,8 +242,8 @@ public:
         }
 
         void reset_data(){
-            LocalToWorld_ = mat4::Ones();
-            LocalToParent_ = mat4::Ones();
+            local_to_world_ = mat4::Identity();
+            local_to_parent_ = mat4::Identity();
         }
 
         // TODO: Must update bounds!
@@ -259,20 +259,22 @@ public:
         }
 
         void update_transforms(const mat4& parent_local_to_world){
-            LocalToWorld_ = LocalToParent_ * parent_local_to_world;
+            local_to_world_ = local_to_parent_ * parent_local_to_world;
             update_transforms();
         }
 
         void update_transforms(){
-            for(auto c:children_) c->update_transforms(this->LocalToWorld_);
+            for(auto c:children_) c->update_transforms(local_to_world_);
         }
 
         Box3f& update_bounds(){
-            WorldBoundsAAB_ = transform_box<float,3>(LocalToWorld_, LocalBoundsAAB_);
-            TreeWorldBoundsAAB_ = WorldBoundsAAB_;
-            for(auto c:children_) 
-                TreeWorldBoundsAAB_ = cover(c->update_bounds(), TreeWorldBoundsAAB_);
-            return TreeWorldBoundsAAB_;
+            world_bounds_AAB_ = transform_box<float,3>(local_to_world_, local_bounds_AAB_);
+            tree_world_bounds_AAB_ = world_bounds_AAB_;
+            for(auto c:children_){
+                tree_world_bounds_AAB_ = cover(c->update_bounds(), tree_world_bounds_AAB_);
+            }
+
+            return tree_world_bounds_AAB_;
         }
 
         ChildContainer::iterator begin(){return children_.begin();}
@@ -371,7 +373,7 @@ public:
     void apply_to_renderables(){
         for(auto& n: nodes_){
             if(auto renderable = n.renderable()){
-                renderable->material_.set_mat4(GLH_LOCAL_TO_WORLD, n.LocalToWorld_);}}}
+                renderable->material_.set_mat4(GLH_LOCAL_TO_WORLD, n.local_to_world_);}}}
 
     iterator begin() {return tree_iterator(root_);}
     iterator end() {return tree_iterator(0);}
