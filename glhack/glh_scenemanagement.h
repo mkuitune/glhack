@@ -47,8 +47,8 @@ The FullRenderable environment is given a selection color (overriding any proper
 3. When rendering selection scene, the same mechanism is used as per visible scene. The only
 difference is that the program for the FullRenderables is overloaded with the selection rendering
 program.
-
 */
+
 class UIContext{
 public:
     /*typedef void (*HoverCB)(FullRenderable*);
@@ -250,6 +250,7 @@ public:
         void set_renderable(FullRenderable* renderable){renderable_ = renderable;}
 
         bool has_renderable(){return renderable_ != 0;}
+
         FullRenderable* renderable(){return renderable_;}
 
         bool empty(){return children_.empty();}
@@ -382,6 +383,11 @@ private:
     std::deque<Node, Eigen::aligned_allocator<Node>> nodes_;
     Node*           root_;
 };
+
+///////////// Utility functions for scene elements /////////////
+
+void set_material(SceneTree::Node& node, RenderEnvironment& material);
+void set_material(SceneTree::Node& node, cstring& name, const vec4& var);
 
 ///////////// RenderQueue //////////////
 

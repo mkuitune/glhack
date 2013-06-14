@@ -79,7 +79,17 @@ const char* sh_vertex_obj   =
 "    gl_Position = LocalToWorld * vec4( VertexPosition, 1.0 );"
 "}";
 
+#define FIXED_COLOR "FixedColor"
+
 const char* sh_fragment_fix_color = 
+"#version 150                  \n"
+"uniform vec4 FixedColor;"
+"out vec4 FragColor;           "
+"void main() {                 "
+"    FragColor = FixedColor;   "
+"}";
+
+const char* sh_fragment_selection_color = 
 "#version 150                  \n"
 "uniform vec4 " UICTX_SELECT_NAME ";"
 "out vec4 FragColor;           "
@@ -90,7 +100,10 @@ const char* sh_fragment_fix_color =
 
 const char* sh_geometry = "";
 const char* sp_obj     = "sp_colored";
+const char* sp_select  = "sp_selecting";
+
 glh::ProgramHandle* sp_colored_program;
+glh::ProgramHandle* sp_select_program;
 
 glh::Texture* texture;
 
@@ -103,16 +116,9 @@ glh::RenderPassSettings g_renderpass_settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFE
 //glh::RenderPassSettings g_blend_settings(glh::RenderPassSettings::BlendSettings(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
 bool g_run = true;
-std::shared_ptr<glh::DefaultMesh> green_mesh(new glh::DefaultMesh());
 
 glh::AssetManagerPtr manager;
 glh::RenderEnvironment env;
-
-glh::FullRenderable screenquad_image;
-
-glh::FullRenderable red_square;
-glh::FullRenderable green_square;
-glh::FullRenderable blue_square;
 
 std::shared_ptr<glh::FontContext> fontcontext;
 
@@ -139,7 +145,7 @@ void init_uniform_data(){
     //env.set_vec4("ObjColor", glh::vec4(0.f, 1.f, 0.f, 0.2f));
     glh::vec4 obj_color_sel = glh::ColorSelection::color_of_id(obj_id);
     env.set_vec4(UICTX_SELECT_NAME,     obj_color_sel);
-    env.set_vec4("Albedo", glh::vec4(0.28f, 0.024f, 0.024f, 1.0));
+    env.set_vec4(FIXED_COLOR, glh::vec4(0.28f, 0.024f, 0.024f, 1.0));
 }
 
 using glh::vec2i;
@@ -157,7 +163,7 @@ void load_screenquad(vec2 pos, vec2 size, glh::DefaultMesh& mesh)
     mesh_load_quad_xy(low, high, mesh);
 }
 
-void add_quad_to_scene(glh::GraphicsManager* gm, glh::ProgramHandle& program,
+glh::SceneTree::Node* add_quad_to_scene(glh::GraphicsManager* gm, glh::ProgramHandle& program,
                        glh::vec2 pos, glh::vec2 dims){
 
     glh::DefaultMesh* mesh = gm->create_mesh();
@@ -169,8 +175,7 @@ void add_quad_to_scene(glh::GraphicsManager* gm, glh::ProgramHandle& program,
     renderable->set_mesh(mesh);
 
     auto root = scene.root();
-    auto node = scene.add_node(root, renderable);
-
+    return scene.add_node(root, renderable);
 }
 
 bool init(glh::App* app)
@@ -180,23 +185,40 @@ bool init(glh::App* app)
     GraphicsManager* gm = app->graphics_manager();
 
     //sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment);
+    sp_select_program  = gm->create_program(sp_select, sh_geometry, sh_vertex_obj, sh_fragment_selection_color);
     sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment_fix_color);
 
-    glh::DefaultMesh* mesh = gm->create_mesh();
+    struct{vec2 dims; vec2 pos; vec4 color;} quads[] ={
+        {vec2(0.5, 0.5), vec2(-0.5, -0.5), vec4(COLOR_RED)},
+        {vec2(0.5, 0.5), vec2(0.5, 0.5), vec4(COLOR_GREEN)},
+        {vec2(0.5, 0.5), vec2(-0.5, 0.5), vec4(COLOR_BLUE)},
+        {vec2(0.25, 0.25), vec2(0.5, -0.5), vec4(COLOR_YELLOW)}
+    };
 
+    size_t quad_count = static_array_size(quads);
+
+    for(auto& s: quads){
+        auto n = add_quad_to_scene(gm, *sp_colored_program, s.pos, s.dims);
+        set_material(*n, FIXED_COLOR,  s.color);}
+
+#if 0
     vec2 dims = vec2(0.5, 0.5);
     vec2 pos = vec2(-0.5, -0.5);
-    add_quad_to_scene(gm, *sp_colored_program, pos, dims);
+    auto n0 = add_quad_to_scene(gm, *sp_colored_program, pos, dims);
+    set_material(*n0, FIXED_COLOR,  vec4(COLOR_RED));
 
     pos = vec2(0.5, 0.5);
-    add_quad_to_scene(gm, *sp_colored_program, pos, dims);
+    auto n1 = add_quad_to_scene(gm, *sp_colored_program, pos, dims);
+    set_material(*n1, FIXED_COLOR,  vec4(COLOR_GREEN));
 
     pos = vec2(-0.5, 0.5);
-    add_quad_to_scene(gm, *sp_colored_program, pos, dims);
+    auto n2 = add_quad_to_scene(gm, *sp_colored_program, pos, dims);
+    set_material(*n2, FIXED_COLOR,  vec4(COLOR_BLUE));
 
     pos = vec2(0.5, -0.5); dims *= 0.5f;
-    add_quad_to_scene(gm, *sp_colored_program, pos, dims);
-
+    auto n3 = add_quad_to_scene(gm, *sp_colored_program, pos, dims);
+    set_material(*n3, FIXED_COLOR,  vec4(COLOR_YELLOW));
+#endif
 
     init_uniform_data();
 
@@ -287,7 +309,7 @@ void render_with_selection_pass(glh::App* app)
     apply(g_renderpass_settings);
     //apply(g_color_mask_settings);
     //apply(g_blend_settings);
-    gm->render(screenquad_image, env);
+    //gm->render(screenquad_image, env);
 
 }
 
@@ -298,7 +320,8 @@ void render(glh::App* app)
     GraphicsManager* gm = app->graphics_manager();
 
     apply(g_renderpass_settings);
-    render_queueue.render(gm, env);
+    //render_queueue.render(gm, env);
+    render_queueue.render(gm, *sp_select_program, env);
 }
 
 void resize(glh::App* app, int width, int height)

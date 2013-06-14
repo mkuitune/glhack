@@ -147,14 +147,12 @@ public:
 
     void bind_vertex_input(NamedBufferHandles& buffers)
     {
-        ShaderVarList& input_variables(vertex_input_vars);
-
         for(auto& bi : buffers)
         {
-            auto ivar = std::find_if(input_variables.begin(), input_variables.end(),
+            auto ivar = std::find_if(vertex_input_vars.begin(), vertex_input_vars.end(),
                                   [&bi](const ShaderVar& v)->bool{return (v.name == bi.first);});
 
-            if(ivar == input_variables.end()) continue;
+            if(ivar == vertex_input_vars.end()) continue;
 
             BufferHandle& bufferhandle(*bi.second);
 
