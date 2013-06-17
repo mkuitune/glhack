@@ -4,9 +4,21 @@
 #pragma once
 
 namespace glh{
+
+//////////////// Reserved shader names. ////////////////
+// Anything to do with these
+// has probably some hidden un-explicit side effects attached
+// to them. TODO: Try to make all side-effects explicit.
+
 #define UICTX_SELECT_NAME "SelectionColor"
 
 #define GLH_LOCAL_TO_WORLD  "LocalToWorld"
+
+//////////////// Color constants. ////////////////
+// Can be used as eg. 
+//    float red[] = {COLOR_RED};
+//    or
+//    vec4 red = vec4(COLOR_RED);
 
 #define COLOR_RED    1.f, 0.f, 0.f, 1.f
 #define COLOR_GREEN  0.f, 1.f, 0.f, 1.f

@@ -9,220 +9,14 @@
 namespace glh{
 
 
-
-///////////// UiContext //////////////
-
-// Tree of widgets, operation wise. Not a spatial tree, but context tree?
-// 
-
-class UiElement{
-public:
-    virtual void focus_gained() = 0;
-    virtual void focus_lost() = 0;
-    
-    virtual void button_activate() = 0;
-    virtual void button_deactivate() = 0;
-};
-
-
-
-class UiEntity{
-public:
-
-    FullRenderable* renderable_;
-
-
-};
-typedef std::shared_ptr<UiEntity> UiEntityPtr; 
-
-
-/** User interface state. 
-
-Usage (refactor):
-0. Scene rendering: scene graph is flattened to render queue (per frame?)
-1. Each UiEntity is assigned a FullRenderable entity (or just a color - a texture
-should be renderable in selection pass)
-2. If a UiEntity is assigned a FullRenderable and it is attached to a UIContext,
-The FullRenderable environment is given a selection color (overriding any properties there, if any)
-3. When rendering selection scene, the same mechanism is used as per visible scene. The only
-difference is that the program for the FullRenderables is overloaded with the selection rendering
-program.
-*/
-
-class UIContext{
-public:
-    /*typedef void (*HoverCB)(FullRenderable*);
-    typedef void (*ClickCB)(FullRenderable*);
-    typedef void (*DragCB)(FullRenderable*, vec2i);*/
-
-    // RegisterKeySink?
-
-
-    //typedef std::array<float, 4> color_t;
-
-    //static color_t color_t_of_vec4(const vec4& v){
-    //    color_t c;
-    //    for(int i = 0; i < 4; ++i) c[i] = v[i];
-    //    return c;
-    //}
-
-    //static vec4 vec4_of_color_t(const color_t& c){
-    //    vec4 v;
-    //    for(int i = 0; i < 4; ++i) v[i] = c[i];
-    //    return v;
-    //}
-
-    // TODO: Remove 'Selectable' as a concept.
-    struct Selectable{
-        UiEntity&         entity_;
-        //color_t           color_;
-        RenderEnvironment material_; // TODO: implement a lighter way to transfer color to program
-                                     // without each selectable requiring a map of it's own
-
-                                    // TODO: object to world transforms etc should be passed from original
-                                    // material, selection color only from local env.
-
-                                    // TODO: Create a check that FullRenderable does not contain an
-                                    // env parameter with the same name for picking color.
-
-        Selectable(UiEntity& e, const vec4& color):entity_(e)
-        //    , color_(color)
-        {
-            material_.set_vec4(UICTX_SELECT_NAME, color);
-        }
-
-        void render(GraphicsManager& gm, ProgramHandle& selection_program){
-            //TODO: force env to color
-            gm.render(*entity_.renderable_, selection_program, entity_.renderable_->material_, material_);
-            //entity_->render();
-        }
-    };
-
-
-    UIContext(App& app):app_(app){}
-
-    void add(UiEntity* e){
-        int id = idgen_.new_id();
-        vec4 color = ColorSelection::color_of_id(id);
-        e->renderable_->material_.set_vec4(UICTX_SELECT_NAME, color);
-        //selectables_.emplace(id, Selectable(*e, color));
-        entity_to_int_[e] = id;
-    }
-
-     void remove(UiEntity* e){
-        int id = entity_to_int_[e];
-        //selectables_.erase(id);
-        entity_to_int_.erase(e);
-        idgen_.release(id);
-    }
-
-    std::tuple<Box<int,2>, bool> setup_context(){
-         // set up scene
-         RenderPassSettings settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT,
-                                            glh::vec4(0.0f,0.0f,0.0f,1.f), 1);
-         // Constrain view box
-        const int w = app_.config().width;
-        const int h = app_.config().height;
-
-        Box<int,2> screen_bounds = make_box2(0, 0, w, h);
-        int mousey = h - pointer_y_;
-        Box<int,2> mouse_bounds  = make_box2(pointer_x_ - 1, mousey - 1, pointer_x_ + 2, mousey + 2);
-        Box<int,2> read_bounds;
-        bool       bounds_ok;
-
-        std::tie(read_bounds, bounds_ok) = intersect(screen_bounds, mouse_bounds);
-        auto read_dims = read_bounds.size();
-
-        glDisable(GL_SCISSOR_TEST);
-        
-        apply(settings);
-
-        glEnable(GL_SCISSOR_TEST);
-        glScissor(read_bounds.min_[0], read_bounds.min_[1], read_dims[0], read_dims[1]);
-
-        return std::make_tuple(read_bounds, bounds_ok);
-    }
-
-    int do_picking(Box<int,2>& read_bounds){
-        auto read_dims = read_bounds.size();
-        GLenum read_format = GL_BGRA;
-        GLenum read_type = GL_UNSIGNED_INT_8_8_8_8_REV;
-        const int pixel_count = 9;
-        const int pixel_channels = 4;
-        uint8_t imagedata[pixel_count * pixel_channels] = {0};
-        glFlush();
-        glReadBuffer(GL_BACK);
-        glReadPixels(read_bounds.min_[0], read_bounds.min_[1], read_dims[0], read_dims[1], read_format, read_type, imagedata);
-
-        const uint8_t* b = &imagedata[4 * pixel_channels];
-        const uint8_t* g = b + 1;
-        const uint8_t* r = g + 1;
-        const uint8_t* a = r + 1;
-
-        //char buf[1024];
-        //sprintf(buf, "r%hhu g%hhu b%hhu a%hhu", *r, *g, *b, *a);
-        //std::cout << "Mouse read:" << buf << std::endl;
-
-        return ColorSelection::id_of_color(*r,*g,*b);
-    }
-
-    void reset_context(){
-         glDisable(GL_SCISSOR_TEST);
-    }
-
-    void render_selectables(){
-        GraphicsManager* gm = app_.graphics_manager();
-        Box<int,2> read_bounds;
-        bool bounds_ok;
-
-        std::tie(read_bounds, bounds_ok) = setup_context();
-
-        if(bounds_ok){
-            for(auto& id_selectable: selectables_){
-                // render e
-                id_selectable.second.render(*gm, *selection_program_);
-            }
-
-            int selected_id = do_picking(read_bounds);
-
-        }
-
-        //Once all the items are rendered do picking
-        reset_context();
-    }
-
-    void pointer_move_cb(int x, int y){
-       pointer_x_ = x;
-       pointer_y_ = y;
-    }
-
-    static std::function<void(int,int)> get_pointer_move_cb(UIContext& ctx){
-        using namespace std::placeholders;
-        return std::bind(&UIContext::pointer_move_cb, ctx, _1, _2);
-    }
-
-    int pointer_x_;
-    int pointer_y_;
-
-    std::map<int, Selectable> selectables_;
-    std::map<UiEntity*, int> entity_to_int_;
-
-    ColorSelection::IdGenerator idgen_;
-
-    App& app_;
-
-    ProgramHandle* selection_program_;
-};
-
-typedef std::shared_ptr<UIContext> UIContextPtr;
-
-
 class SceneTree{
 public:
     class Node{
     public:
 
         typedef std::vector<Node*> ChildContainer;
+
+        std::string name_;
 
         mat4  local_to_world_;
         mat4  local_to_parent_;
@@ -427,5 +221,178 @@ public:
 };
 
 
+
+///////////// RenderPicker //////////////
+
+// Tree of widgets, operation wise. Not a spatial tree, but context tree?
+// 
+
+class UiElement{
+public:
+    virtual void focus_gained() = 0;
+    virtual void focus_lost() = 0;
+    
+    virtual void button_activate() = 0;
+    virtual void button_deactivate() = 0;
+};
+
+class UiEntity{
+public:
+
+    SceneTree::Node* node_;
+
+    UiEntity(SceneTree::Node* node):node_(node){}
+
+    // TODO: Do not store selection color in node material?
+    void render(GraphicsManager& gm, ProgramHandle& selection_program, RenderEnvironment& env){
+        FullRenderable* r = node_->renderable();
+        if(r){
+            gm.render(*r, selection_program, r->material_, env);
+        }
+    }
+};
+
+typedef std::shared_ptr<UiEntity> UiEntityPtr; 
+
+/** User interface state. 
+
+Usage (refactor):
+0. Scene rendering: scene graph is flattened to render queue (per frame?)
+1. Each UiEntity is assigned a FullRenderable entity (or just a color - a texture
+should be renderable in selection pass)
+2. If a UiEntity is assigned a FullRenderable and it is attached to a RenderPicker,
+The FullRenderable environment is given a selection color (overriding any properties there, if any)
+3. When rendering selection scene, the same mechanism is used as per visible scene. The only
+difference is that the program for the FullRenderables is overloaded with the selection rendering
+program.
+*/
+
+class RenderPicker{
+public:
+
+    RenderPicker(App& app):app_(app){}
+
+    void add(UiEntity* e){
+        int id = idgen_.new_id();
+        vec4 color = ColorSelection::color_of_id(id);
+        //e->material_.set_vec4(UICTX_SELECT_NAME, color);
+        e->node_->renderable_->material_.set_vec4(UICTX_SELECT_NAME, color);
+        entity_to_id_[e] = id;
+        id_to_entity_[id] = e;
+    }
+
+     void remove(UiEntity* e){
+        int id = entity_to_id_[e];
+        entity_to_id_.erase(e);
+        idgen_.release(id);
+        e->node_->renderable_->material_.remove(UICTX_SELECT_NAME);
+    }
+
+    std::tuple<Box<int,2>, bool> setup_context(){
+         // set up scene
+         RenderPassSettings settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT,
+                                            glh::vec4(0.0f,0.0f,0.0f,1.f), 1);
+         // Constrain view box
+        const int w = app_.config().width;
+        const int h = app_.config().height;
+
+        Box<int,2> screen_bounds = make_box2(0, 0, w, h);
+        int mousey = h - pointer_y_;
+        Box<int,2> mouse_bounds  = make_box2(pointer_x_ - 1, mousey - 1, pointer_x_ + 2, mousey + 2);
+        Box<int,2> read_bounds;
+        bool       bounds_ok;
+
+        std::tie(read_bounds, bounds_ok) = intersect(screen_bounds, mouse_bounds);
+        auto read_dims = read_bounds.size();
+
+        glDisable(GL_SCISSOR_TEST);
+        
+        apply(settings);
+
+        glEnable(GL_SCISSOR_TEST);
+        glScissor(read_bounds.min_[0], read_bounds.min_[1], read_dims[0], read_dims[1]);
+
+        return std::make_tuple(read_bounds, bounds_ok);
+    }
+
+    int do_picking(Box<int,2>& read_bounds){
+        auto read_dims = read_bounds.size();
+        GLenum read_format = GL_BGRA;
+        GLenum read_type = GL_UNSIGNED_INT_8_8_8_8_REV;
+        const int pixel_count = 9;
+        const int pixel_channels = 4;
+        uint8_t imagedata[pixel_count * pixel_channels] = {0};
+        glFlush();
+        glReadBuffer(GL_BACK);
+        glReadPixels(read_bounds.min_[0], read_bounds.min_[1], read_dims[0], read_dims[1], read_format, read_type, imagedata);
+
+        const uint8_t* b = &imagedata[4 * pixel_channels];
+        const uint8_t* g = b + 1;
+        const uint8_t* r = g + 1;
+        const uint8_t* a = r + 1;
+
+        //char buf[1024];
+        //sprintf(buf, "r%hhu g%hhu b%hhu a%hhu", *r, *g, *b, *a);
+        //std::cout << "Mouse read:" << buf << std::endl;
+
+        return ColorSelection::id_of_color(*r,*g,*b);
+    }
+
+    void reset_context(){
+         glDisable(GL_SCISSOR_TEST);
+    }
+
+    UiEntity* render_selectables(RenderEnvironment& env){
+        GraphicsManager* gm = app_.graphics_manager();
+        Box<int,2> read_bounds;
+        bool bounds_ok;
+
+        std::tie(read_bounds, bounds_ok) = setup_context();
+
+        if(bounds_ok){
+            for(auto& id_uientity: entity_to_id_){
+                id_uientity.first->render(*gm, *selection_program_, env);}
+
+            //Once all the items are rendered do picking
+            selected_id_ = do_picking(read_bounds);
+        }
+
+        reset_context();
+
+        UiEntity* picked = 0;
+
+        if(selected_id_){
+            picked = id_to_entity_[selected_id_];
+        }
+
+        return picked;
+    }
+
+    void pointer_move_cb(int x, int y){
+       pointer_x_ = x;
+       pointer_y_ = y;
+    }
+
+    static std::function<void(int,int)> get_pointer_move_cb(RenderPicker& ctx){
+        using namespace std::placeholders;
+        return std::bind(&RenderPicker::pointer_move_cb, ctx, _1, _2);
+    }
+
+    int pointer_x_;
+    int pointer_y_;
+
+    std::map<UiEntity*, int> entity_to_id_;
+    std::map<int, UiEntity*> id_to_entity_;
+
+    ColorSelection::IdGenerator idgen_;
+
+    App& app_;
+
+    ProgramHandle* selection_program_;
+
+    int selected_id_;
+};
+
+typedef std::shared_ptr<RenderPicker> RenderPickerPtr;
 
 } // namespace glh

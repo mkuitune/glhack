@@ -61,6 +61,12 @@ public:
         return false;
     }
 
+    void remove(cstring name){
+        mat4_.erase(name);
+        vec4_.erase(name);
+        texture2d_.erase(name);
+    }
+
     vec4&    get_vec4(cstring name);
     mat4&    get_mat4(cstring name);
     Texture& get_texture2d(cstring name);

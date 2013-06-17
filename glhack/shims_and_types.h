@@ -244,7 +244,7 @@ private:
     size_t level_;
 };
 
-/** Manage a static array of data aligned 16 byte boundary. */
+/** Manage a static array of data aligned at 16 byte boundary. */
 template<class T>
 class AlignedArray
 {
@@ -826,7 +826,6 @@ typename M::mapped_type* try_get_value(M& map, typename const M::key_type& key)
 
 
 //////////// Container functions //////////////
-
 
 /** Create lists from input parameters*/
 

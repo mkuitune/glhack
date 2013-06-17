@@ -129,17 +129,12 @@ glh::ColorSelection::IdGenerator idgen;
 
 int obj_id = glh::ColorSelection::max_id / 2;
 
-glh::UIContextPtr uicontext;
+glh::RenderPickerPtr render_picker;
 
-glh::SceneTree   scene;
-glh::RenderQueue render_queueue;
-
-void mouse_move_callback(int x, int y)
-{
-    g_mouse_x = x;
-    g_mouse_y = y;
-    //std::cout << "Mouse:"  << x << " " << y << std::endl;
-}
+glh::SceneTree                     scene;
+glh::RenderQueue                   render_queueue;
+std::vector<glh::SceneTree::Node*> nodes;
+std::list<glh::UiEntity>           ui_entities;
 
 void init_uniform_data(){
     //env.set_vec4("ObjColor", glh::vec4(0.f, 1.f, 0.f, 0.2f));
@@ -181,12 +176,15 @@ glh::SceneTree::Node* add_quad_to_scene(glh::GraphicsManager* gm, glh::ProgramHa
 bool init(glh::App* app)
 {
     using namespace glh;
+    using std::string;
 
     GraphicsManager* gm = app->graphics_manager();
 
     //sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment);
     sp_select_program  = gm->create_program(sp_select, sh_geometry, sh_vertex_obj, sh_fragment_selection_color);
     sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment_fix_color);
+
+    render_picker->selection_program_ = sp_select_program;
 
     struct{vec2 dims; vec2 pos; vec4 color;} quads[] ={
         {vec2(0.5, 0.5), vec2(-0.5, -0.5), vec4(COLOR_RED)},
@@ -196,29 +194,19 @@ bool init(glh::App* app)
     };
 
     size_t quad_count = static_array_size(quads);
-
+    int ind =  0;
     for(auto& s: quads){
+        string name = string("node") + std::to_string(ind++);
         auto n = add_quad_to_scene(gm, *sp_colored_program, s.pos, s.dims);
-        set_material(*n, FIXED_COLOR,  s.color);}
+        n->name_ = name;
+        set_material(*n, FIXED_COLOR,  s.color);
+        add(nodes, n);
+        add(ui_entities, UiEntity(n));
+    }
 
-#if 0
-    vec2 dims = vec2(0.5, 0.5);
-    vec2 pos = vec2(-0.5, -0.5);
-    auto n0 = add_quad_to_scene(gm, *sp_colored_program, pos, dims);
-    set_material(*n0, FIXED_COLOR,  vec4(COLOR_RED));
-
-    pos = vec2(0.5, 0.5);
-    auto n1 = add_quad_to_scene(gm, *sp_colored_program, pos, dims);
-    set_material(*n1, FIXED_COLOR,  vec4(COLOR_GREEN));
-
-    pos = vec2(-0.5, 0.5);
-    auto n2 = add_quad_to_scene(gm, *sp_colored_program, pos, dims);
-    set_material(*n2, FIXED_COLOR,  vec4(COLOR_BLUE));
-
-    pos = vec2(0.5, -0.5); dims *= 0.5f;
-    auto n3 = add_quad_to_scene(gm, *sp_colored_program, pos, dims);
-    set_material(*n3, FIXED_COLOR,  vec4(COLOR_YELLOW));
-#endif
+    for(auto& e:ui_entities){
+        render_picker->add(&e);
+    }
 
     init_uniform_data();
 
@@ -249,79 +237,34 @@ bool update(glh::App* app)
 
 bool g_read_color_at_mouse = false;
 
+std::string prev("");
 
-void render_with_selection_pass(glh::App* app)
-{
+void do_selection_pass(glh::App* app){
     using namespace glh;
-
-    GraphicsManager* gm = app->graphics_manager();
-
-    int w = app->config().width;
-    int h = app->config().height;
-
-    Box<int,2> screen_bounds = make_box2(0, 0, w, h);
-    int mousey = h - g_mouse_y;
-    Box<int,2> mouse_bounds  = make_box2(g_mouse_x - 1, mousey - 1, g_mouse_x + 2, mousey + 2);
-    Box<int,2> read_bounds;
-    bool       bounds_ok;
-
-    std::tie(read_bounds, bounds_ok) = intersect(screen_bounds, mouse_bounds);
-    auto read_dims = read_bounds.size();
-
-
-    glDisable(GL_SCISSOR_TEST);
-    //apply(g_renderpass_settings);
-
-    //glEnable(GL_SCISSOR_TEST);
-    //glScissor(read_bounds.min[0], read_bounds.min[1], read_dims[0], read_dims[1]);
-
-
-    if(bounds_ok && g_read_color_at_mouse){
-
-        GLenum read_format = GL_BGRA;
-        GLenum read_type = GL_UNSIGNED_INT_8_8_8_8_REV;
-        const int pixel_count = 9;
-        const int pixel_channels = 4;
-        uint8_t imagedata[pixel_count * pixel_channels] = {0};
-        glFlush();
-        glReadBuffer(GL_BACK);
-        glReadPixels(read_bounds.min_[0], read_bounds.min_[1], read_dims[0], read_dims[1], read_format, read_type, imagedata);
-
-        const uint8_t* b = &imagedata[4 * pixel_channels];
-        const uint8_t* g = b + 1;
-        const uint8_t* r = g + 1;
-        const uint8_t* a = r + 1;
-
-        char buf[1024];
-        sprintf(buf, "r%hhu g%hhu b%hhu a%hhu", *r, *g, *b, *a);
-
-        std::cout << "Mouse read:" << buf << std::endl;
-
-        int read_id = ColorSelection::id_of_color(*r,*g,*b);
-
-        g_read_color_at_mouse = false;
+    UiEntity* picked = render_picker->render_selectables(env);
+    if(picked){
+        prev = picked->node_->name_;
+        std::cout << "Picked:" << prev << std::endl;
     }
-
-
-    // ^
-    // |   Uses the result from previous render pass
-
-    apply(g_renderpass_settings);
-    //apply(g_color_mask_settings);
-    //apply(g_blend_settings);
-    //gm->render(screenquad_image, env);
-
 }
 
-void render(glh::App* app)
-{
+void do_render_pass(glh::App* app){
     using namespace glh;
 
     GraphicsManager* gm = app->graphics_manager();
 
     apply(g_renderpass_settings);
     //render_queueue.render(gm, env);
-    render_queueue.render(gm, *sp_select_program, env);
+    render_queueue.render(gm, *sp_colored_program, env);
+}
+
+void render(glh::App* app)
+{
+    if(g_read_color_at_mouse){
+        do_selection_pass(app);
+        g_read_color_at_mouse = false;
+    }
+    do_render_pass(app);
 }
 
 void resize(glh::App* app, int width, int height)
@@ -336,6 +279,14 @@ void print_mouse_position()
 void read_color_at_mouse(){
     //std::cout << "Mouse:"  << x << " " << y << std::endl;
     
+}
+
+void mouse_move_callback(int x, int y)
+{
+    g_mouse_x = x;
+    g_mouse_y = y;
+    //std::cout << "Mouse:"  << x << " " << y << std::endl;
+    render_picker->pointer_move_cb(x,y);
 }
 
 void mouse_button_callback(int key, const glh::Input::ButtonState& s)
@@ -366,7 +317,7 @@ int main(int arch, char* argv)
 
     glh::App app(config);
 
-    uicontext = std::make_shared<glh::UIContext>(app);
+    render_picker = std::make_shared<glh::RenderPicker>(app);
 
     GLH_LOG_EXPR("Logger started");
     add_key_callback(app, key_callback);
