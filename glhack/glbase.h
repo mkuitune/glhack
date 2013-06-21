@@ -145,10 +145,10 @@ public:
 
     EventContainer events;
 
-    ArraySet<KeyCallback, funcompare<KeyCallback>>               key_callbacks;
-    ArraySet<KeyCallback, funcompare<KeyCallback>>               mouse_button_callbacks;
-    ArraySet<MouseMoveCallback, funcompare<MouseMoveCallback>>   mouse_move_callbacks;
-    ArraySet<MouseWheelCallback, funcompare<MouseWheelCallback>> mouse_wheel_callbacks;
+    SortedArray<KeyCallback, funcompare<KeyCallback>>               key_callbacks;
+    SortedArray<KeyCallback, funcompare<KeyCallback>>               mouse_button_callbacks;
+    SortedArray<MouseMoveCallback, funcompare<MouseMoveCallback>>   mouse_move_callbacks;
+    SortedArray<MouseWheelCallback, funcompare<MouseWheelCallback>> mouse_wheel_callbacks;
 
     vec2i          mouse;
     int            mouse_wheel;

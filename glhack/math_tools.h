@@ -560,8 +560,6 @@ public:
                     lerp(dx, samples_[first], samples_[first + 1]) :
                     (dx > 0.5 ? samples_[first + 1] : samples_[first]);
     }
-
-
 };
 
 template<class Key, class Value, class Interp>
@@ -578,6 +576,14 @@ Sampler1D<Value> sample_interpolating_map(const InterpolatingMap<Key, Value, Int
     }
     return sampler;
 }
+
+// TODO: Piecewise curve? Own section for polynomes, splines and piecewise curves?
+
+//template<class T >
+//class PiecewiseCurve{
+//public:
+//    std::vector<>
+//};
 
 ////////////////// Combinatorial stuff /////////////////////
 

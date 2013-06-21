@@ -547,7 +547,7 @@ struct funcompare
 
 /** Stl-vector like container that is always ordered.*/
 template<class T, class Compare = std::less<T>>
-struct ArraySet
+struct SortedArray
 {
     typedef std::vector<T>                      Container;
     typedef typename Container::iterator        iterator;
@@ -560,10 +560,10 @@ struct ArraySet
     std::vector<T> data_;
     Compare cmp_;
 
-    ArraySet(const Compare& c = Compare()):data_(), cmp_(c){}
+    SortedArray(const Compare& c = Compare()):data_(), cmp_(c){}
 
     template <class InputIterator>
-    ArraySet(InputIterator first, InputIterator last, const Compare& c = Compare()):data_(first, last), cmp_(c)
+    SortedArray(InputIterator first, InputIterator last, const Compare& c = Compare()):data_(first, last), cmp_(c)
     {
         std::sort(begin(), end(), cmp_);
         // Remove duplicates
@@ -596,10 +596,30 @@ struct ArraySet
         data_.erase(std::remove(begin(), end(), t), end());
     }
 
+    void clear(){data_.clear();}
+
     void push_back(const T& t)
     {
         insert(t);
     }
+
+    /** out = {x| x in this, x not in cmp} */
+    void set_difference(const SortedArray& cmp, SortedArray& out) const {
+        for(auto& d:data_){if(cmp.find(d) == cmp.end()) out.insert(d);}
+    }
+
+    /** out = {x| x in this or x in cmp} */
+    void set_union(const SortedArray& cmp, SortedArray& out) const {
+        out.data_ = data_;
+        for(auto& c:cmp){if(find(c) == end()) out.insert(c);}
+    }
+
+    /** out = {x| x in this and x in cmp} */
+    void set_intersection(const SortedArray& cmp, SortedArray& out) const {
+        for(auto& c:cmp){if(find(c) != end()) out.insert(c);}
+    }
+
+    size_t size(){return data_.size();}
 
     iterator begin(){return data_.begin();}
     iterator end(){return data_.end();}
@@ -766,10 +786,10 @@ struct Inserter2{
 
 
 template<class T>
-Inserter1<ArraySet<T>> add(ArraySet<T>& c, const T& p)
+Inserter1<SortedArray<T>> add(SortedArray<T>& c, const T& p)
 {
     c.insert(p);
-    return Inserter1<ArraySet<T>>(c);
+    return Inserter1<SortedArray<T>>(c);
 }
 
 template<class T>
@@ -981,7 +1001,7 @@ std::ostream& operator<<(std::ostream& os, const PooledList<T>& list)
 }
 
 template<class T>
-std::ostream& operator<<(std::ostream& os, const ArraySet<T>& list)
+std::ostream& operator<<(std::ostream& os, const SortedArray<T>& list)
 {
     each_elem_to_os(os, list.begin(), list.end());
     return os;

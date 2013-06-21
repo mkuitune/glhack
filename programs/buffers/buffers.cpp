@@ -11,6 +11,7 @@
 #include "shims_and_types.h"
 #include "math_tools.h"
 #include "glh_scenemanagement.h"
+#include "glh_timebased_signals.h"
 
 //////////////// Program stuff ////////////////
 
@@ -136,6 +137,9 @@ glh::RenderQueue                   render_queueue;
 std::vector<glh::SceneTree::Node*> nodes;
 std::list<glh::UiEntity>           ui_entities;
 
+glh::DynamicSystem                 dynamics;
+glh::FocusContext                  focus_context;
+
 void init_uniform_data(){
     //env.set_vec4("ObjColor", glh::vec4(0.f, 1.f, 0.f, 0.2f));
     glh::vec4 obj_color_sel = glh::ColorSelection::color_of_id(obj_id);
@@ -217,6 +221,10 @@ bool update(glh::App* app)
 {
     using namespace glh;
 
+    float t = (float) app->time();
+
+    dynamics.update(t);
+
     Eigen::Affine3f transform;
     transform = Eigen::AngleAxis<float>(0.f, glh::vec3(0.f, 0.f, 1.f));
 
@@ -237,14 +245,19 @@ bool update(glh::App* app)
 
 bool g_read_color_at_mouse = false;
 
-std::string prev("");
-
 void do_selection_pass(glh::App* app){
     using namespace glh;
-    UiEntity* picked = render_picker->render_selectables(env);
-    if(picked){
-        prev = picked->node_->name_;
-        std::cout << "Picked:" << prev << std::endl;
+
+    glh::FocusContext::Focus focus = focus_context.start_event_handling();
+
+    if(g_read_color_at_mouse){
+        auto picked = render_picker->render_selectables(env);
+
+        for(auto& p: picked){
+            focus.on_focus(p);
+        }
+        focus.update_event_state();
+        g_read_color_at_mouse = false;
     }
 }
 
@@ -260,11 +273,16 @@ void do_render_pass(glh::App* app){
 
 void render(glh::App* app)
 {
-    if(g_read_color_at_mouse){
-        do_selection_pass(app);
-        g_read_color_at_mouse = false;
-    }
+    do_selection_pass(app);
     do_render_pass(app);
+
+    if(focus_context.event_handling_done_){
+        for(auto& g:focus_context.focus_gained_){
+            std::cout << "Focus gained:" << g->node_->name_<< std::endl;}
+
+        for(auto& l:focus_context.focus_lost_){
+            std::cout << "Focus lost:" << l->node_->name_<< std::endl;}
+    }
 }
 
 void resize(glh::App* app, int width, int height)
@@ -287,6 +305,7 @@ void mouse_move_callback(int x, int y)
     g_mouse_y = y;
     //std::cout << "Mouse:"  << x << " " << y << std::endl;
     render_picker->pointer_move_cb(x,y);
+    g_read_color_at_mouse = true;
 }
 
 void mouse_button_callback(int key, const glh::Input::ButtonState& s)
@@ -295,7 +314,7 @@ void mouse_button_callback(int key, const glh::Input::ButtonState& s)
 
     if(s == glh::Input::Held) std::cout << "Mouse down." << std::endl;
 
-    if(key == Input::LeftButton && (s == glh::Input::Held)) g_read_color_at_mouse = true;
+    //if(key == Input::LeftButton && (s == glh::Input::Held)) g_read_color_at_mouse = true;
 }
 
 void key_callback(int key, const glh::Input::ButtonState& s)

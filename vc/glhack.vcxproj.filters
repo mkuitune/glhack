@@ -28,6 +28,7 @@
     <ClCompile Include="..\glhack\glh_typedefs.cpp" />
     <ClCompile Include="..\glhack\glh_scenemanagement.cpp" />
     <ClCompile Include="..\glhack\glh_names.cpp" />
+    <ClCompile Include="..\glhack\glh_timebased_signals.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\glhack\glbase.h" />
@@ -58,5 +59,6 @@
     <ClInclude Include="..\glhack\glh_generators.h" />
     <ClInclude Include="..\glhack\glh_scenemanagement.h" />
     <ClInclude Include="..\glhack\glh_names.h" />
+    <ClInclude Include="..\glhack\glh_timebased_signals.h" />
   </ItemGroup>
 </Project>

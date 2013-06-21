@@ -5,6 +5,7 @@
 
 #include "glbase.h"
 #include "glh_names.h"
+#include "shims_and_types.h"
 
 namespace glh{
 
@@ -220,21 +221,19 @@ public:
     ArenaQueue<FullRenderable*> renderables_;
 };
 
-
-
-///////////// RenderPicker //////////////
+///////////// UiEvents //////////////
 
 // Tree of widgets, operation wise. Not a spatial tree, but context tree?
 // 
 
-class UiElement{
-public:
-    virtual void focus_gained() = 0;
-    virtual void focus_lost() = 0;
-    
-    virtual void button_activate() = 0;
-    virtual void button_deactivate() = 0;
-};
+//class UiElement{
+//public:
+//    virtual void focus_gained() = 0;
+//    virtual void focus_lost() = 0;
+//    
+//    virtual void button_activate() = 0;
+//    virtual void button_deactivate() = 0;
+//};
 
 class UiEntity{
 public:
@@ -254,6 +253,7 @@ public:
 
 typedef std::shared_ptr<UiEntity> UiEntityPtr; 
 
+
 /** User interface state. 
 
 Usage (refactor):
@@ -269,6 +269,20 @@ program.
 
 class RenderPicker{
 public:
+
+    // TODO: Enable several pickers to select items in same frame
+    // In this case set scissor bounds to full screen, render once,
+    // then for each picker location pick id.
+
+    typedef std::vector<UiEntity*> uientity_container_t;
+
+    struct PickedContext{
+        RenderPicker& picker_;
+        PickedContext(RenderPicker& picker):picker_(picker){}
+
+        uientity_container_t::iterator begin(){return picker_.picked_.begin();}
+        uientity_container_t::iterator end(){return picker_.picked_.end();}
+    };
 
     RenderPicker(App& app):app_(app){}
 
@@ -342,10 +356,12 @@ public:
          glDisable(GL_SCISSOR_TEST);
     }
 
-    UiEntity* render_selectables(RenderEnvironment& env){
+    PickedContext render_selectables(RenderEnvironment& env){
         GraphicsManager* gm = app_.graphics_manager();
         Box<int,2> read_bounds;
         bool bounds_ok;
+
+        picked_.clear();
 
         std::tie(read_bounds, bounds_ok) = setup_context();
 
@@ -363,9 +379,10 @@ public:
 
         if(selected_id_){
             picked = id_to_entity_[selected_id_];
+            picked_.push_back(picked);
         }
 
-        return picked;
+        return PickedContext(*this);
     }
 
     void pointer_move_cb(int x, int y){
@@ -390,9 +407,59 @@ public:
 
     ProgramHandle* selection_program_;
 
+    uientity_container_t picked_;
+
     int selected_id_;
 };
 
 typedef std::shared_ptr<RenderPicker> RenderPickerPtr;
+
+
+/** Stored picker states etc. */
+class FocusContext{
+public:
+
+    typedef SortedArray<UiEntity*> entity_container_t;
+
+    struct Focus{
+        FocusContext& ctx_;
+
+        Focus(FocusContext& ctx):ctx_(ctx){}
+        ~Focus(){}
+
+        void on_focus(UiEntity* e){
+            ctx_.currently_focused_.insert(e);
+        }
+
+        void update_event_state(){
+            ctx_.currently_focused_.set_difference(ctx_.previously_focused_, ctx_.focus_gained_);
+            ctx_.previously_focused_.set_difference(ctx_.currently_focused_, ctx_.focus_lost_);
+
+            for(auto& entity:ctx_.focus_lost_){
+                ctx_.previously_focused_.erase(entity);}
+            for(auto& entity:ctx_.focus_gained_){
+                ctx_.previously_focused_.insert(entity);}
+
+            ctx_.event_handling_done_ = true;
+        }
+
+    };
+
+    Focus start_event_handling(){
+        event_handling_done_ = false;
+        focus_gained_.clear();
+        focus_lost_.clear();
+        currently_focused_.clear();
+        return Focus(*this);
+    }
+
+    entity_container_t previously_focused_;
+    entity_container_t currently_focused_;
+    entity_container_t focus_gained_;
+    entity_container_t focus_lost_;
+
+    bool event_handling_done_ ;
+};
+
 
 } // namespace glh

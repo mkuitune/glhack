@@ -74,10 +74,10 @@ UTEST(containers, pooled_list_test)
     ut_test_out() << list2 << std::endl;
 }
 
-UTEST(containers, arrayset_test)
+UTEST(containers, SortedArray_test)
 {
     using namespace glh;
-    ArraySet<int> set;
+    SortedArray<int> set;
     int ints[] = {5,1,1,2,3,1,2,4};
     size_t intsize = static_array_size(ints);
     add_range(set, ints, ints + intsize);

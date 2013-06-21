@@ -225,7 +225,7 @@ void load_image()
     texture->attach_image(image_test);
 }
 
-void load_font_image()
+void load_font_image(glh::GraphicsManager* gm)
 {
     using namespace glh;
 
@@ -265,7 +265,8 @@ void load_font_image()
     fontcontext->write_pixel_coords_for_string("This should be another line, then", handle, x, y + line_height, text_coords);
 
     // Create font material and renderable.
-    FullRenderable::MeshPtr fontmesh(new DefaultMesh);
+    DefaultMesh* fontmesh = gm->create_mesh();
+
     fonttexture->attach_image(*fontimage);
 
     font_renderable.bind_program(*sp_fonts_handle);
@@ -335,14 +336,14 @@ bool init(glh::App* app)
     //mesh_load_screenquad(0.5f, 0.5f, *mesh);
 
     load_image();
-    load_font_image();
+    load_font_image(gm);
     init_uniform_data();
 
     screenquad_color.bind_program(*sp_colorcoded);
-    screenquad_color.set_mesh(mesh);
+    screenquad_color.set_mesh(mesh.get());
 
     screenquad_image.bind_program(*sp_tex_handle);
-    screenquad_image.set_mesh(mesh);
+    screenquad_image.set_mesh(mesh.get());
 
     return true;
 }
