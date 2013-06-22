@@ -80,10 +80,11 @@ public:
         ProgramHandle = 5,
         BufferSet     = 6,
         DefaultMesh   = 7,
-        Vec4          = 8,
-        Mat4          = 9,
-        Image8        = 10,
-        Image32       = 11,
+        SceneTreeNode = 8,
+        Vec4          = 1008,
+        Mat4          = 1009,
+        Image8        = 1010,
+        Image32       = 1011,
         LAST_TYPE
     };
 

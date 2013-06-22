@@ -78,6 +78,28 @@ inline float   to_float(const uint8_t u){return static_cast<float>(u);}
 inline float   to_float(const double d){return static_cast<float>(d);}
 inline int     to_int(const double d){return static_cast<int>(d);}
 
+/** Convenience class to store vectors as some types such as Eigen::Vector4f has strict alignment requirements. */
+template<class T, int N>
+struct ArrayN{
+
+    typedef Eigen::Matrix<T, N, 1> complement_t;
+
+    T data_[N];
+
+    ArrayN(const complement_t& in){
+        for(int i = 0; i < N; ++i) data_[i] = in[i];}
+
+    ArrayN& operator=(const complement_t& in){
+        for(int i = 0; i < N; ++i) data_[i] = in[i];}
+
+    complement_t to_vec() const{
+        complement_t comp;
+        for(int i = 0; i < N; ++i) comp[i] = data_[i];
+        return comp;}
+};
+
+typedef ArrayN<float, 4> array4;
+
 /////////////// Bit operations //////////////
 
 

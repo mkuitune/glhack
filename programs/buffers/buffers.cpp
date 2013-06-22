@@ -271,6 +271,45 @@ void do_render_pass(glh::App* app){
     render_queueue.render(gm, *sp_colored_program, env);
 }
 
+std::map<glh::SceneTree::Node*, glh::vec4, std::less<glh::SceneTree::Node*>,
+Eigen::aligned_allocator<std::pair<glh::UiEntity*, glh::vec4>>> prev_color;
+
+
+void node_focus_gained(glh::App* app, glh::SceneTree::Node* node){
+    std::cout << "Focus gained:" << node->name_<< std::endl;
+    glh::vec4 true_color = node->renderable_->material_.vec4_[FIXED_COLOR];;
+    prev_color[node] =  true_color;
+    float apptime = (float) app->time();
+    glh::vec4 target_color(COLOR_WHITE);
+    
+    glh::vec4* address = &node->renderable_->material_.vec4_[FIXED_COLOR];
+
+    glh::array4 origcol(true_color);
+    glh::array4 targcol(target_color);
+
+    auto updater = [=](float t){
+        glh::vec4 tru = origcol.to_vec();
+        glh::vec4 targ = targcol.to_vec();
+
+        bool is_done = false;
+        float dur = 0.2f;
+        float delta = (t - apptime) / dur;
+        if(delta < 1.0f){*address = glh::lerp(delta, tru, targ);}
+        else is_done = true;
+        return is_done;
+    };
+
+    dynamics.add(node, updater); 
+}
+
+void node_focus_lost(glh::App* app, glh::SceneTree::Node* node){
+    std::cout << "Focus lost:" << node->name_<< std::endl;
+
+    node->renderable_->material_.vec4_[FIXED_COLOR] = prev_color[node];
+    prev_color.erase(node);
+    dynamics.remove(node); 
+}
+
 void render(glh::App* app)
 {
     do_selection_pass(app);
@@ -278,12 +317,60 @@ void render(glh::App* app)
 
     if(focus_context.event_handling_done_){
         for(auto& g:focus_context.focus_gained_){
-            std::cout << "Focus gained:" << g->node_->name_<< std::endl;}
+            node_focus_gained(app, g->node_);
+        }
 
         for(auto& l:focus_context.focus_lost_){
-            std::cout << "Focus lost:" << l->node_->name_<< std::endl;}
+            node_focus_lost(app, l->node_);
+        }
     }
 }
+
+#if 0
+void render(glh::App* app)
+{
+    do_selection_pass(app);
+    do_render_pass(app);
+
+    if(focus_context.event_handling_done_){
+        for(auto& g:focus_context.focus_gained_){
+            std::cout << "Focus gained:" << g->node_->name_<< std::endl;
+            glh::vec4 true_color = g->node_->renderable_->material_.vec4_[FIXED_COLOR];;
+            prev_color[ g->node_] =  true_color;
+            float apptime = (float) app->time();
+            glh::vec4 target_color(COLOR_WHITE);
+            
+            glh::vec4* address = &g->node_->renderable_->material_.vec4_[FIXED_COLOR];
+
+            glh::array4 origcol(true_color);
+            glh::array4 targcol(target_color);
+
+            auto updater = [=](float t){
+                glh::vec4 tru = origcol.to_vec();
+                glh::vec4 targ = targcol.to_vec();
+
+                bool is_done = false;
+                float dur = 1.0f;
+                float delta = (t - apptime) / dur;
+                if(delta < 1.0f){*address = glh::lerp(delta, tru, targ);}
+                else is_done = true;
+                return is_done;
+            };
+
+            dynamics.add(g->node_, updater); 
+        }
+
+        for(auto& l:focus_context.focus_lost_){
+            std::cout << "Focus lost:" << l->node_->name_<< std::endl;
+
+           l->node_->renderable_->material_.vec4_[FIXED_COLOR] = prev_color[l->node_];
+           prev_color.erase(l->node_);
+           dynamics.remove(l->node_); 
+
+        }
+    }
+}
+#endif
 
 void resize(glh::App* app, int width, int height)
 {

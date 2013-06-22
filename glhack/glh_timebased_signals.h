@@ -45,10 +45,19 @@ public:
     void update(float t){
         for(auto& e:events_){e.second.update(t);}}
 
-    void add(obj_id id, const Event& event){events_[id] = event;}
+    void add(obj_id id, const std::function<bool (float)>& event){events_[id] = Event(event);}
 
     void remove(obj_id id){events_.erase(id);}
 
+    template<class T>
+    void add(T id, const std::function<bool (float)>& event){
+        obj_id idc = (obj_id) id;
+        events_[idc] = Event(event);}
+
+    template<class T>
+    void remove(T id){
+        obj_id idc = (obj_id) id;
+        events_.erase(idc);}
 
 };
 
