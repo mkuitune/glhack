@@ -277,12 +277,12 @@ Eigen::aligned_allocator<std::pair<glh::UiEntity*, glh::vec4>>> prev_color;
 
 void node_focus_gained(glh::App* app, glh::SceneTree::Node* node){
     std::cout << "Focus gained:" << node->name_<< std::endl;
-    glh::vec4 true_color = node->renderable_->material_.vec4_[FIXED_COLOR];;
+    glh::vec4 true_color = node->material_.vec4_[FIXED_COLOR];;
     prev_color[node] =  true_color;
     float apptime = (float) app->time();
     glh::vec4 target_color(COLOR_WHITE);
     
-    glh::vec4* address = &node->renderable_->material_.vec4_[FIXED_COLOR];
+    glh::vec4* address = &node->material_.vec4_[FIXED_COLOR];
 
     glh::array4 origcol(true_color);
     glh::array4 targcol(target_color);
@@ -305,7 +305,7 @@ void node_focus_gained(glh::App* app, glh::SceneTree::Node* node){
 void node_focus_lost(glh::App* app, glh::SceneTree::Node* node){
     std::cout << "Focus lost:" << node->name_<< std::endl;
 
-    node->renderable_->material_.vec4_[FIXED_COLOR] = prev_color[node];
+    node->material_.vec4_[FIXED_COLOR] = prev_color[node];
     prev_color.erase(node);
     dynamics.remove(node); 
 }

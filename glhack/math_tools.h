@@ -39,6 +39,11 @@ uint32_t hash32(const T& hashable)
 template<class R, class P>
 R to_number(P in){return (R) in;}
 
+struct Dim{
+    enum coord_t{X = 0, Y = 1, Z = 2};
+    enum scale_t{SX = 0, SY = 1, SZ = 2};
+    enum euler_t{RX = 0, RY = 1, RZ = 2};
+};
 
 namespace glh{
 
@@ -52,10 +57,16 @@ typedef Eigen::Vector2i vec2i;
 
 typedef Eigen::Matrix4f mat4;
 
+typedef Eigen::Quaternion<float>  quaternion;
+typedef Eigen::Quaternion<double> quaterniond;
+
+typedef Eigen::Transform<float, 3, Eigen::Affine> transform3;
+
 template<class T>
 class Math
 {
 public:
+
     class span_t {
         T data[2];
     public:
@@ -154,6 +165,15 @@ Eigen::Matrix<T, N-1, 1> decrease_dim(const Eigen::Matrix<T, N, 1>& v){
     Eigen::Matrix<T, N-1, 1> out;
     for(int i = 0; i < N - 1; ++i){out[i] = v[i];}
     return out;
+}
+
+
+/** Calculate transform matrix m := m_loc * m_rot * m_scale */
+template<class T>
+Eigen::Transform<T,3, Eigen::Affine> generate_transform(Eigen::Matrix<T, 3, 1>& loc, Eigen::Quaternion<T>& rot, Eigen::Matrix<T, 3, 1>& scale)
+{
+    Eigen::Transform<T,3, Eigen::Affine> t = Eigen::Translation<T,3>(loc) * rot * Eigen::Scaling(scale);
+    return t;
 }
 
 //////////////////// Geometric entities ///////////////////////////

@@ -82,7 +82,6 @@ public:
 class FullRenderable {
 public:
     ProgramHandle*    program_;
-    RenderEnvironment material_;
     BufferSet         device_buffers_;
     DefaultMesh*      mesh_;
 
@@ -153,7 +152,7 @@ DeclInterface(GraphicsManager,
     // TODO: Add create buffer handle (so gl functions are not used before possible)
 
     /** Render renderable. */
-    virtual void render(FullRenderable& r, RenderEnvironment& env) = 0;
+    virtual void render(FullRenderable& r, RenderEnvironment& material, RenderEnvironment& env) = 0;
 
     /** Render renderable, override program and material.*/
     virtual void render(FullRenderable& r, ProgramHandle& program, RenderEnvironment& material, RenderEnvironment& env) = 0;

@@ -14,13 +14,18 @@ class SceneTree{
 public:
     class Node{
     public:
-
         typedef std::vector<Node*> ChildContainer;
-
-        std::string name_;
 
         mat4  local_to_world_;
         mat4  local_to_parent_;
+
+        std::string name_;
+
+        RenderEnvironment material_;
+
+        vec3       location_;
+        vec3       scale_;
+        quaternion rotation_;
 
         Box3f local_bounds_AAB_;
         Box3f world_bounds_AAB_;
@@ -37,6 +42,11 @@ public:
         }
 
         void reset_data(){
+
+            location_ = vec3(0.f, 0.f, 0.f);
+            scale_    = vec3(1.f, 1.f, 1.f);
+            rotation_ = quaternion(1.f, 0.f, 0.f, 0.f);
+
             local_to_world_ = mat4::Identity();
             local_to_parent_ = mat4::Identity();
         }
@@ -55,6 +65,11 @@ public:
         }
 
         void update_transforms(const mat4& parent_local_to_world){
+
+            transform3 t = generate_transform<float>(location_, rotation_, scale_);
+
+            local_to_parent_ = t.matrix();
+
             local_to_world_ = local_to_parent_ * parent_local_to_world;
             update_transforms();
         }
@@ -168,8 +183,7 @@ public:
 
     void apply_to_renderables(){
         for(auto& n: nodes_){
-            if(auto renderable = n.renderable()){
-                renderable->material_.set_mat4(GLH_LOCAL_TO_WORLD, n.local_to_world_);}}}
+                n.material_.set_mat4(GLH_LOCAL_TO_WORLD, n.local_to_world_);}}
 
     iterator begin() {return tree_iterator(root_);}
     iterator end() {return tree_iterator(0);}
@@ -191,34 +205,26 @@ public:
 
     RenderQueue(){}
 
-    void add(FullRenderable* r){
-        renderables_.push(r);
-    }
+    void add(SceneTree::Node* node){
+        renderables_.push(node);}
 
     void add(SceneTree& scene){
         for(SceneTree::Node* node: scene){
-            FullRenderable* r = node->renderable();
-            if(r) add(r);
-        }
-    }
+            if(node->renderable()) add(node);}}
 
     // Render items in queue
     void render(GraphicsManager* manager, glh::RenderEnvironment& env){
-        for(auto f:renderables_){
-            manager->render(*f, env);
-        }
-    }
+        for(auto n:renderables_){
+            manager->render(*n->renderable_, n->material_,env);}}
 
     // Render items in queue by overloading program
     void render(GraphicsManager* manager, ProgramHandle& program, glh::RenderEnvironment& env){
-        for(auto f:renderables_){
-            manager->render(*f, program, f->material_, env);
-        }
-    }
+        for(auto n:renderables_){
+            manager->render(*n->renderable_, program, n->material_, env);}}
 
     void clear(){renderables_.clear();}
 
-    ArenaQueue<FullRenderable*> renderables_;
+    ArenaQueue<SceneTree::Node*> renderables_;
 };
 
 ///////////// UiEvents //////////////
@@ -246,7 +252,7 @@ public:
     void render(GraphicsManager& gm, ProgramHandle& selection_program, RenderEnvironment& env){
         FullRenderable* r = node_->renderable();
         if(r){
-            gm.render(*r, selection_program, r->material_, env);
+            gm.render(*r, selection_program, node_->material_, env);
         }
     }
 };
@@ -289,8 +295,7 @@ public:
     void add(UiEntity* e){
         int id = idgen_.new_id();
         vec4 color = ColorSelection::color_of_id(id);
-        //e->material_.set_vec4(UICTX_SELECT_NAME, color);
-        e->node_->renderable_->material_.set_vec4(UICTX_SELECT_NAME, color);
+        e->node_->material_.set_vec4(UICTX_SELECT_NAME, color);
         entity_to_id_[e] = id;
         id_to_entity_[id] = e;
     }
@@ -299,7 +304,7 @@ public:
         int id = entity_to_id_[e];
         entity_to_id_.erase(e);
         idgen_.release(id);
-        e->node_->renderable_->material_.remove(UICTX_SELECT_NAME);
+        e->node_->material_.remove(UICTX_SELECT_NAME);
     }
 
     std::tuple<Box<int,2>, bool> setup_context(){
@@ -379,6 +384,9 @@ public:
 
         if(selected_id_){
             picked = id_to_entity_[selected_id_];
+
+            if(picked == 0) throw GraphicsException("Trying to pick null entity!");
+
             picked_.push_back(picked);
         }
 

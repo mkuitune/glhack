@@ -678,8 +678,8 @@ public:
     //    active.draw();
     //}
 
-    virtual void GraphicsManagerInt::render(FullRenderable& r, RenderEnvironment& env) override {
-        render(r, *r.program_, r.material_, env);
+    virtual void GraphicsManagerInt::render(FullRenderable& r, RenderEnvironment& material, RenderEnvironment& env) override {
+        render(r, *r.program_, material, env);
     }
 
     // TODO: Merge with render function above.

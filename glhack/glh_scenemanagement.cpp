@@ -3,23 +3,17 @@
 */
 
 #include "glh_scenemanagement.h"
-
 #include "glh_typedefs.h"
-
 #include "glsystem.h"
 
 
 namespace glh {
 
 void set_material(SceneTree::Node& node, RenderEnvironment& material){
-    if(auto r = node.renderable()){
-        r->material_ = material;}
-}
+    node.material_ = material;}
 
 void set_material(SceneTree::Node& node, cstring& name, const vec4& var){
-    if(auto r = node.renderable()){
-        r->material_.set_vec4(name, var);}
-}
+    node.material_.set_vec4(name, var);}
 
 
 }
