@@ -89,7 +89,7 @@ inline float   to_float(const uint8_t u){return static_cast<float>(u);}
 inline float   to_float(const double d){return static_cast<float>(d);}
 inline int     to_int(const double d){return static_cast<int>(d);}
 
-/** Convenience class to store vectors as some types such as Eigen::Vector4f has strict alignment requirements. */
+/** Convenience class to store vectors as some types such as Eigen::Vector4f have strict alignment requirements. */
 template<class T, int N>
 struct ArrayN{
 
@@ -97,16 +97,32 @@ struct ArrayN{
 
     T data_[N];
 
+    ArrayN(){memset(data_, sizeof(data_), 0);}
     ArrayN(const complement_t& in){
         for(int i = 0; i < N; ++i) data_[i] = in[i];}
 
+    T& operator[](size_t i){return data_[i];}
+
     ArrayN& operator=(const complement_t& in){
         for(int i = 0; i < N; ++i) data_[i] = in[i];}
+
+    void fill(const T& val){
+        for(int i = 0; i < N; ++i) data_[i] = val;}
+
 
     complement_t to_vec() const{
         complement_t comp;
         for(int i = 0; i < N; ++i) comp[i] = data_[i];
         return comp;}
+
+    template<int M>
+    Eigen::Matrix<T, M, 1> change_dim() const {
+        static_assert(M <= N, "Only ouput of equal or reduced dimension supported");
+        Eigen::Matrix<T, M, 1> output;
+        for(int i = 0; i < M; i++) output[i] = data_[i];
+        return output;
+    }
+
 };
 
 typedef ArrayN<float, 4> array4;

@@ -382,8 +382,9 @@ public:
 
         UiEntity* picked = 0;
 
-        if(selected_id_){
-            picked = id_to_entity_[selected_id_];
+        auto ie = id_to_entity_.find(selected_id_);
+        if(ie != id_to_entity_.end()){
+            picked = ie->second;
 
             if(picked == 0) throw GraphicsException("Trying to pick null entity!");
 

@@ -150,23 +150,22 @@ void init_uniform_data(){
 using glh::vec2i;
 using glh::vec2;
 
-void load_screenquad(vec2 pos, vec2 size, glh::DefaultMesh& mesh)
+void load_screenquad(vec2 size, glh::DefaultMesh& mesh)
 {
     using namespace glh;
 
     vec2 halfsize = 0.5f * size;
 
-    vec2 low  = pos - halfsize;
-    vec2 high = pos + halfsize;
+    vec2 low  = - halfsize;
+    vec2 high = halfsize;
 
     mesh_load_quad_xy(low, high, mesh);
 }
 
-glh::SceneTree::Node* add_quad_to_scene(glh::GraphicsManager* gm, glh::ProgramHandle& program,
-                       glh::vec2 pos, glh::vec2 dims){
+glh::SceneTree::Node* add_quad_to_scene(glh::GraphicsManager* gm, glh::ProgramHandle& program, glh::vec2 dims){
 
     glh::DefaultMesh* mesh = gm->create_mesh();
-    load_screenquad(pos, dims, *mesh);
+    load_screenquad(dims, *mesh);
 
     auto renderable = gm->create_renderable();
 
@@ -190,18 +189,19 @@ bool init(glh::App* app)
 
     render_picker->selection_program_ = sp_select_program;
 
-    struct{vec2 dims; vec2 pos; vec4 color;} quads[] ={
-        {vec2(0.5, 0.5), vec2(-0.5, -0.5), vec4(COLOR_RED)},
-        {vec2(0.5, 0.5), vec2(0.5, 0.5), vec4(COLOR_GREEN)},
-        {vec2(0.5, 0.5), vec2(-0.5, 0.5), vec4(COLOR_BLUE)},
-        {vec2(0.25, 0.25), vec2(0.5, -0.5), vec4(COLOR_YELLOW)}
+    struct{vec2 dims; vec3 pos; vec4 color;} quads[] ={
+        {vec2(0.5, 0.5), vec3(-0.5, -0.5, 0.), vec4(COLOR_RED)},
+        {vec2(0.5, 0.5), vec3(0.5, 0.5, 0.), vec4(COLOR_GREEN)},
+        {vec2(0.5, 0.5), vec3(-0.5, 0.5, 0.), vec4(COLOR_BLUE)},
+        {vec2(0.25, 0.25), vec3(0.5, -0.5, 0.), vec4(COLOR_YELLOW)}
     };
 
     size_t quad_count = static_array_size(quads);
     int ind =  0;
     for(auto& s: quads){
         string name = string("node") + std::to_string(ind++);
-        auto n = add_quad_to_scene(gm, *sp_colored_program, s.pos, s.dims);
+        auto n = add_quad_to_scene(gm, *sp_colored_program, s.dims);
+        n->location_ = s.pos;
         n->name_ = name;
         set_material(*n, FIXED_COLOR,  s.color);
         add(nodes, n);
@@ -306,6 +306,7 @@ void node_focus_lost(glh::App* app, glh::SceneTree::Node* node){
     std::cout << "Focus lost:" << node->name_<< std::endl;
 
     node->material_.vec4_[FIXED_COLOR] = prev_color[node];
+    node->scale_ = glh::vec3(1.f,1.f,1.f);
     prev_color.erase(node);
     dynamics.remove(node); 
 }

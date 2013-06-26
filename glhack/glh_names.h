@@ -14,6 +14,9 @@ namespace glh{
 
 #define GLH_LOCAL_TO_WORLD  "LocalToWorld"
 
+#define GLH_CHANNEL_ROTATION "rotation"
+#define GLH_CHANNEL_POSITION "position"
+#define GLH_CHANNEL_SCALE    "scale"
 //////////////// Color constants. ////////////////
 // Can be used as eg. 
 //    float red[] = {COLOR_RED};
