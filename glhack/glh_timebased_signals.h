@@ -228,11 +228,11 @@ class SystemInput : public DynamicGraph::DynamicNode{
     App* app_;
 
     SystemInput(App* app):app_(app){
-        set_output("time", DynamicGraph::Value(DynamicGraph::Value::SCALAR, app_->time()));
+        set_output(GLH_CHANNEL_TIME, DynamicGraph::Value(DynamicGraph::Value::SCALAR, app_->time()));
     }
     
     void eval() override {
-        set_output("time", DynamicGraph::Value(DynamicGraph::Value::SCALAR, app_->time()));
+        set_output(GLH_CHANNEL_TIME, DynamicGraph::Value(DynamicGraph::Value::SCALAR, app_->time()));
     }
 };
 
