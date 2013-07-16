@@ -89,6 +89,12 @@ inline float   to_float(const uint8_t u){return static_cast<float>(u);}
 inline float   to_float(const double d){return static_cast<float>(d);}
 inline int     to_int(const double d){return static_cast<int>(d);}
 
+/** Approximate comparison of floats. */
+inline bool are_near(const float first, const float second, const float epsilon = 0.001f){
+    return fabsf((first - second)) < epsilon;
+}
+
+
 /** Convenience class to store vectors as some types such as Eigen::Vector4f have strict alignment requirements. */
 template<class T, int N>
 struct ArrayN{
@@ -102,6 +108,7 @@ struct ArrayN{
         for(int i = 0; i < N; ++i) data_[i] = in[i];}
 
     T& operator[](size_t i){return data_[i];}
+    const T& operator[](size_t i) const {return data_[i];}
 
     ArrayN& operator=(const complement_t& in){
         for(int i = 0; i < N; ++i) data_[i] = in[i];}

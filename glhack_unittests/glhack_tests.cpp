@@ -5,6 +5,7 @@
 #include "persistent_containers.h"
 #include "glh_image.h"
 #include "glh_scenemanagement.h"
+#include "glh_timebased_signals.h"
 
 #include<string>
 #include "unittester.h"
@@ -142,7 +143,7 @@ public:
 
     virtual ProgramHandle* program(cstring& name)  override { return 0;}
 
-    virtual void render(FullRenderable& r, RenderEnvironment& env)  override {}
+    virtual void render(FullRenderable& r, RenderEnvironment& material, RenderEnvironment& env)  override {}
 
     virtual void render(FullRenderable& r, ProgramHandle& program, RenderEnvironment& material, RenderEnvironment& env)  override {}
 
@@ -167,23 +168,23 @@ UTEST(scene, scene_rai_test)
 
     SceneTree         scene;
     DummyManager      manager;
-    RenderQueue       queue(&manager);
+    RenderQueue       queue;
     RenderEnvironment env;
 
     FullRenderable* f0 = manager.create_renderable();
 
     std::map<SceneTree::Node*, int> counts;
 
-    auto add = [&counts](SceneTree::Node* n){counts[n] = 0;};
+    auto add_counts = [&counts](SceneTree::Node* n){counts[n] = 0;};
 
     SceneTree::Node* root = scene.root();
 
-    add(root);
+    add_counts(root);
 
-    SceneTree::Node* n0 = scene.make_node(root); add(n0);
-    SceneTree::Node* n1 = scene.make_node(n0);   add(n1);
-    SceneTree::Node* n2 = scene.make_node(n0);   add(n2);
-    SceneTree::Node* n3 = scene.make_node(n1);   add(n3);
+    SceneTree::Node* n0 = scene.add_node(root); add_counts(n0);
+    SceneTree::Node* n1 = scene.add_node(n0);   add_counts(n1);
+    SceneTree::Node* n2 = scene.add_node(n0);   add_counts(n2);
+    SceneTree::Node* n3 = scene.add_node(n1);   add_counts(n3);
 
     scene.update();
 
@@ -201,6 +202,100 @@ UTEST(scene, scene_rai_test)
     //queue.render(env);
 
 }
+
+////////// Graph routines /////////////
+
+namespace TestGraph {
+using namespace glh;
+#define TEST_INPUT_  "test_input"
+#define TEST_OUTPUT_ "test_output"
+
+class SinkNode : public DynamicGraph::DynamicNode { public:
+
+    float val_;
+
+    SinkNode():val_(-1.f){
+        add_input(TEST_INPUT_, DynamicGraph::Value::Empty);}
+
+    void eval() override {
+        auto val = read_input(TEST_INPUT_);
+        DynamicGraph::try_read(val, val_);
+    }
+    
+    static DynamicGraph::dynamic_node_ptr_t make(){
+        return DynamicGraph::dynamic_node_ptr_t(new SinkNode()); }
+
+};
+
+class SourceNode : public DynamicGraph::DynamicNode { public:
+
+    float val_;
+
+    SourceNode():val_(1.f){
+        set_output(TEST_OUTPUT_, DynamicGraph::Value::Scalar, val_);}
+
+    void eval() override {
+        set_output(TEST_OUTPUT_, DynamicGraph::Value::Scalar, val_);}
+    
+    static DynamicGraph::dynamic_node_ptr_t make(){
+        return DynamicGraph::dynamic_node_ptr_t(new SourceNode());}
+
+};
+
+class TransformNode : public DynamicGraph::DynamicNode { public:
+
+    float val_;
+
+    TransformNode():val_(2.f){
+        add_input(TEST_INPUT_, DynamicGraph::Value::Scalar);
+        set_output(TEST_OUTPUT_, DynamicGraph::Value::Scalar, val_);
+    }
+
+    void eval() override {
+        auto val = read_input(TEST_INPUT_); 
+        DynamicGraph::try_read(val, val_);
+        val_ = val_ * 3.f;
+        set_output(TEST_OUTPUT_, DynamicGraph::Value::Scalar, val_);
+    }
+    
+    static DynamicGraph::dynamic_node_ptr_t make(){
+        return DynamicGraph::dynamic_node_ptr_t(new TransformNode()); }
+};
+
+}// end namespace TestGRaph
+
+
+UTEST(dynamic_graph, simple)
+{
+    using namespace glh;
+    using namespace TestGraph;
+
+    DynamicGraph g;
+
+    auto source    = SourceNode::make();
+    auto sink      = SinkNode::make();
+    auto transform = TransformNode::make();
+    auto SOURCE = "srcnode";
+    auto SINK = "sinknode";
+    auto TRANSFORM = "transform";
+
+    g.add_node(SOURCE, source);
+    g.add_node(SINK, sink);
+    g.add_node(TRANSFORM, transform);
+
+    g.add_link(SOURCE, TEST_OUTPUT_, TRANSFORM, TEST_INPUT_); // This should link the input ptr to the source node var
+    g.add_link(TRANSFORM, TEST_OUTPUT_, SINK, TEST_INPUT_);
+
+    g.solve_dependencies();
+    g.execute();
+
+    // Verify SINK has value of 3.f
+    SinkNode* sink_ptr = dynamic_cast<SinkNode*>(sink.get());
+    float sinkval = sink_ptr->val_;
+    ASSERT_TRUE(are_near(sinkval, 3.f), "Graph compute chain failed.");
+
+}
+
 
 ////////// Shader utilities etc. ///////////
 #if 0

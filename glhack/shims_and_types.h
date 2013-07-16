@@ -115,6 +115,20 @@ bool contains(const std::string& str, const T& t){
 bool elements_are_ordered(const std::string& first, const std::string& second);
 ///////////// Container operations ////////////////
 
+/** If container has last element, compare it with the given. */
+template<class Container, class value_type>
+bool last_is(const Container& c, const value_type& v){
+    if(c.size() > 0) return *c.rbegin() == v;
+    else             return false;
+}
+
+/** Always insert the given element to the container. */
+template<class Container, class value_type>
+void insert_new(Container&c , const value_type& v){
+    std::pair<Container::iterator, bool> ir = c.insert(v);
+    if(!ir.second) *ir.first = v;
+}
+
 template<class Container, class Function>
 void foreach(Container& c, Function& f)
 {
