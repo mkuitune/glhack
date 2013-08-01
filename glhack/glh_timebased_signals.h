@@ -183,6 +183,8 @@ public:
         Value(t type, float value):type_(type){
             value_.fill(value);
         }
+        Value(t type, const array4& value):type_(type), value_(value){}
+        Value(t type, const vec4& value):type_(type), value_(value){}
 
         void get(float& res) const {res = value_[0];}
         void get(vec3& res) const {res = value_.change_dim<3>();}
@@ -246,6 +248,14 @@ public:
             else     return *res;
         }
 
+        template<class T>
+        T read_input(const std::string& input_name){
+            constvalue_t val = read_input(input_name);
+            T output;
+            val.get(output);
+            return output;
+        }
+
         void set_output(const std::string& output_name, const Value& val){
             sources_[output_name] = val;}
 
@@ -255,6 +265,9 @@ public:
         template<class V>
         void set_output(const std::string& output_name, const Value::t& type, const V& val){
             sources_[output_name] = Value(type, val);}
+
+        void set_output(const std::string& output_name, const float val){
+            sources_[output_name] = Value(Value::Scalar, val);}
 
         void set_input_address(const std::string& input_name, constvalue_t_ptr ptr){
             link_varptr(inputs_[input_name]) = ptr;
@@ -271,6 +284,10 @@ public:
         template<class V>
         void add_input(const std::string& varname, Value::t type, const V& val){
             sinks_[varname] = Value(type, val);
+            set_input_address(varname, &sinks_[varname]);}
+
+        void add_input(const std::string& varname, const float val){
+            sinks_[varname] = Value(Value::Scalar, val);
             set_input_address(varname, &sinks_[varname]);}
 
         /** Call eval. Eval can read values using read_input and write values using set_output.*/
@@ -386,21 +403,166 @@ public:
         add_input(GLH_CHANNEL_POSITION, DynamicGraph::Value::Empty);
         add_input(GLH_CHANNEL_SCALE, DynamicGraph::Value::Empty);
 
+        // TODO: Should be able to add paramaeters to all shader variables.
+
         //sinks_[GLH_CHANNEL_ROTATION] = DynamicGraph::Value();
         //sinks_[GLH_CHANNEL_POSITION] = DynamicGraph::Value();
         //sinks_[GLH_CHANNEL_SCALE]    = DynamicGraph::Value();
     }
 
-    void eval() override {
-        for(auto& v:inputs_){
-            auto val = DynamicGraph::link_varptr(v.second); 
+    void add_var(const std::string& name){
+        auto hasvar = node_->material_.has(name);
 
-            if(val->type_ != DynamicGraph::Value::Empty){
-                     if(v.first == GLH_CHANNEL_ROTATION){val->get(node_->rotation_);}
-                else if(v.first == GLH_CHANNEL_POSITION){val->get(node_->location_);} //TODO MUSTFIX rename node location_ to position_
-                else if(v.first == GLH_CHANNEL_SCALE)   {val->get(node_->scale_);}
+        if(hasvar.second){
+            if(hasvar.first == ShaderVar::Scalar){
+                add_input(name, DynamicGraph::Value::Scalar);
+            }
+            else if(hasvar.first == ShaderVar::Vec4){
+                add_input(name, DynamicGraph::Value::Vector4);
+            }
+            else{
+                throw GraphicsException(std::string("Trying to link un-supported type for var") + name + std::string("as input term to NodeReciever"));
             }
         }
+        else{
+            throw GraphicsException(std::string("Trying to link non-existing var") + name + std::string("as input term to NodeReciever"));
+        }
+    }
+
+    void read_in_val( const std::string& name, DynamicGraph::constvalue_t_ptr val){
+        if(val->type_ != DynamicGraph::Value::Empty){
+                 if(name == GLH_CHANNEL_ROTATION){val->get(node_->rotation_);}
+            else if(name == GLH_CHANNEL_POSITION){val->get(node_->location_);} //TODO MUSTFIX rename node location_ to position_
+            else if(name == GLH_CHANNEL_SCALE)   {val->get(node_->scale_);}
+
+            else{
+                // Handle:
+                //  * Environment vars
+                if(val->type_ == DynamicGraph::Value::Scalar){
+                    float scalar;
+                    val->get(scalar);
+                    node_->material_.set_scalar(name, scalar);
+                }
+                else if(val->type_ == DynamicGraph::Value::Vector4){
+                    vec4 vec;
+                    val->get(vec);
+                    node_->material_.set_vec4(name, vec);
+                }
+            }
+        }
+    }
+
+    void eval() override {
+        for(auto& v:inputs_){
+            read_in_val(v.first, DynamicGraph::link_varptr(v.second));
+        }
+    }
+};
+
+class NodeSource : public DynamicGraph::DynamicNode{
+public:
+    SceneTree::Node* node_;
+    std::list<std::string> vars_;
+
+    NodeSource(SceneTree::Node* node, std::list<std::string> vars):node_(node), vars_(vars){
+        if(!node) throw GraphicsException("Trying to init NodeReciever with empty node!");
+
+        for(auto& var:vars_){
+            set_output(var, DynamicGraph::Value::Empty);}
+    }
+
+    void try_set_var(RenderEnvironment& env, const std::string& name){
+
+        auto varresult = env.has(name);
+        if(varresult.second){
+            if(varresult.first == ShaderVar::Vec4){
+                array4 val = env.get_vec4(name);
+                set_output(name, DynamicGraph::Value(DynamicGraph::Value::Vector4, val));
+            }
+            else if(varresult.first == ShaderVar::Scalar){
+                float val = env.get_scalar(name);
+                set_output(name, DynamicGraph::Value(DynamicGraph::Value::Scalar, val));
+            }
+        }
+    }
+
+    void eval() override {
+        for(auto& var:vars_) try_set_var(node_->material_, var);
+    }
+};
+
+/** Mix inputs of vec4 (color). */
+class MixNode : public DynamicGraph::DynamicNode{
+public:
+
+    MixNode(){
+        vec4 color_out(COLOR_RED);
+        set_output(GLH_PROPERTY_COLOR, DynamicGraph::Value::Vector4, color_out);
+
+        vec4 color1(COLOR_WHITE);
+        vec4 color2(COLOR_BLACK);
+
+        add_input(GLH_PROPERTY_1, DynamicGraph::Value::Vector4, color1);
+        add_input(GLH_PROPERTY_2, DynamicGraph::Value::Vector4, color2);
+
+        add_input(GLH_PROPERTY_INTERPOLANT, DynamicGraph::Value::Scalar, 0.0f);
+    }
+
+    void eval() override {
+        vec4 color_out;
+        vec4 color1       = read_input<vec4>(GLH_PROPERTY_1);
+        vec4 color2       = read_input<vec4>(GLH_PROPERTY_2);
+        float interpolant = read_input<float>(GLH_PROPERTY_INTERPOLANT);
+        interpolant = constrain(interpolant, 0.0f, 1.0f);
+        color_out = lerp(interpolant, color1, color2);
+
+        set_output(GLH_PROPERTY_COLOR, DynamicGraph::Value::Vector4, color_out);
+    }
+};
+
+/** Offset: bias, scale */
+class ScalarOffset : public DynamicGraph::DynamicNode{
+public:
+    ScalarOffset(){
+        add_input(GLH_PROPERTY_INTERPOLANT, DynamicGraph::Value::Scalar, 0.f);
+        add_input(GLH_PROPERTY_SCALE, DynamicGraph::Value::Scalar, 1.f);
+        add_input(GLH_PROPERTY_BIAS, DynamicGraph::Value::Scalar, 0.f);
+
+        set_output(GLH_PROPERTY_INTERPOLANT, DynamicGraph::Value::Scalar, 0.f);
+    }
+
+    void eval() override {
+        float output;
+        float input = read_input<float>(GLH_PROPERTY_INTERPOLANT);
+        float bias = read_input<float>(GLH_PROPERTY_BIAS);
+        float scale = read_input<float>(GLH_PROPERTY_SCALE);
+        
+        output = input * scale + bias;
+        set_output(GLH_PROPERTY_INTERPOLANT, output);
+    }
+};
+
+/** Lerp, etc. TODO: Use multi point ramp or something for this.*/
+class ScalarRamp : public DynamicGraph::DynamicNode{
+public:
+
+    ScalarRamp(){
+       add_input(GLH_PROPERTY_INTERPOLANT, 0.f); 
+
+       add_input(GLH_PROPERTY_1, 0.f); // Range start 
+       add_input(GLH_PROPERTY_2, 0.f); // Range end 
+
+       set_output(GLH_PROPERTY_INTERPOLANT, 0.f);
+    }
+
+    void eval() override {
+        float interpolant = read_input<float>(GLH_PROPERTY_INTERPOLANT);
+        float prop1 = read_input<float>(GLH_PROPERTY_1);
+        float prop2 = read_input<float>(GLH_PROPERTY_2);
+        if(interpolant < prop1) set_output(GLH_PROPERTY_INTERPOLANT, prop1);
+        else if(interpolant > prop2) set_output(GLH_PROPERTY_INTERPOLANT, prop2);
+        else set_output(GLH_PROPERTY_INTERPOLANT, interpolant);
+
     }
 };
 

@@ -26,7 +26,7 @@ namespace glh {
 class ShaderVar {
 public:
     enum Mapping{Uniform, StreamIn, StreamOut, MAPPING_LAST};
-    enum Type{Vec2, Vec3, Vec4, Mat4, Sampler2D, TYPE_LAST};
+    enum Type{Scalar, Vec2, Vec3, Vec4, Mat4, Sampler2D, TYPE_LAST};
 
     Mapping     mapping;
     Type        type;
@@ -52,6 +52,7 @@ public:
     static type_dim typeid_and_dim(Type t)
     {
         switch(t){
+            case Scalar: return std::make_tuple<TypeId::t, int32_t>(TypeId::Float32, 1);
             case Vec2: return std::make_tuple<TypeId::t, int32_t>(TypeId::Float32, 2);
             case Vec3: return std::make_tuple<TypeId::t, int32_t>(TypeId::Float32, 3);
             case Vec4: return std::make_tuple<TypeId::t, int32_t>(TypeId::Float32, 4);

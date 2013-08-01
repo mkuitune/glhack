@@ -5,7 +5,7 @@
 
 namespace glh{
 
-//////////////// Reserved shader names. ////////////////
+//////////////// Reserved shader and dynamic graph names. ////////////////
 // Anything to do with these
 // has probably some hidden un-explicit side effects attached
 // to them. TODO: Try to make all side-effects explicit.
@@ -14,12 +14,23 @@ namespace glh{
 
 #define GLH_LOCAL_TO_WORLD  "LocalToWorld"
 
-#define GLH_CHANNEL_ROTATION "rotation"
-#define GLH_CHANNEL_POSITION "position"
-#define GLH_CHANNEL_SCALE    "scale"
 
-#define GLH_CHANNEL_TIME     "time"
-//////////////// Color constants. ////////////////
+#define GLH_CHANNEL_ROTATION     "GLH_CHANNEL_ROTATION"
+#define GLH_CHANNEL_POSITION     "GLH_CHANNEL_POSITION"
+#define GLH_CHANNEL_SCALE        "GLH_CHANNEL_SCALE"
+                                 
+#define GLH_CHANNEL_TIME         "GLH_CHANNEL_TIME"
+                                 
+#define GLH_PROPERTY_COLOR       "GLH_PROPERTY_COLOR"
+
+#define GLH_PROPERTY_1           "GLH_PROPERTY_1"
+#define GLH_PROPERTY_2           "GLH_PROPERTY_2"
+
+#define GLH_PROPERTY_BIAS        "GLH_PROPERTY_BIAS"
+#define GLH_PROPERTY_SCALE       "GLH_PROPERTY_SCALE"
+#define GLH_PROPERTY_INTERPOLANT "GLH_PROPERTY_INTERPOLANT"
+
+    //////////////// Color constants. ////////////////
 // Can be used as eg. 
 //    float red[] = {COLOR_RED};
 //    or

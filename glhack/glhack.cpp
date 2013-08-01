@@ -91,9 +91,10 @@ bool release_program(ShaderProgram& program);
 
 bool verify_matching_types(ShaderVar::Type stype, TypeId::t t, int32_t components){
     bool result = false;
-    if     (stype == ShaderVar::Vec2 && t == TypeId::Float32 && components == 2)  result = true;
-    else if(stype == ShaderVar::Vec3 && t == TypeId::Float32 && components == 3)  result = true;
-    else if(stype == ShaderVar::Vec4 && t == TypeId::Float32 && components == 4)  result = true;
+         if(stype == ShaderVar::Scalar && t == TypeId::Float32 && components == 1) result = true;
+    else if(stype == ShaderVar::Vec2 && t == TypeId::Float32 && components == 2)   result = true;
+    else if(stype == ShaderVar::Vec3 && t == TypeId::Float32 && components == 3)   result = true;
+    else if(stype == ShaderVar::Vec4 && t == TypeId::Float32 && components == 4)   result = true;
     return result;
 }
 
@@ -566,6 +567,7 @@ ShaderProgram* create_shader_program(GraphicsManagerInt* manager, cstring& name,
 
 //////////// Environment /////////////
 
+float&   RenderEnvironment::get_scalar(cstring name){return scalar_[name];}
 vec4&    RenderEnvironment::get_vec4(cstring name){return vec4_[name];}
 mat4&    RenderEnvironment::get_mat4(cstring name){return mat4_[name];}
 Texture& RenderEnvironment::get_texture2d(cstring name){

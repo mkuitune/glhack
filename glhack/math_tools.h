@@ -106,16 +106,24 @@ struct ArrayN{
     ArrayN(){memset(data_, sizeof(data_), 0);}
     ArrayN(const complement_t& in){
         for(int i = 0; i < N; ++i) data_[i] = in[i];}
+    ArrayN(const ArrayN& in){
+        for(int i = 0; i < N; ++i) data_[i] = in[i];}
+    ArrayN(const T* data){
+        for(int i = 0; i < N; ++i) data_[i] = data[i];}
 
     T& operator[](size_t i){return data_[i];}
     const T& operator[](size_t i) const {return data_[i];}
 
     ArrayN& operator=(const complement_t& in){
-        for(int i = 0; i < N; ++i) data_[i] = in[i];}
+        for(int i = 0; i < N; ++i) data_[i] = in[i];
+        return *this;}
+
+    ArrayN& operator=(const ArrayN& rhs){
+        for(int i = 0; i < N; ++i) data_[i] = rhs[i];
+        return *this;}
 
     void fill(const T& val){
         for(int i = 0; i < N; ++i) data_[i] = val;}
-
 
     complement_t to_vec() const{
         complement_t comp;
@@ -514,6 +522,12 @@ struct RandomRange<float>
 
 /** Given value within [begin, end], map it's position to range [0,1] */
 template<class T> inline T interval_range(const T value, const T begin, const T end){return (value - begin)/(end - begin);}
+
+/** Constrain given value within [begin, end]. If it's outside these ranges then truncate to closest extrema. */
+template<class T> inline T constrain(const T value, const T begin, const T end){
+    return value > end ? end : (value < begin?  begin : value);
+}
+
 
 /** Smoothstep polynomial between [0,1] range. */
 inline float smoothstep(const float x){return (1.0f - 2.0f*(-1.0f + x))* x * x;}

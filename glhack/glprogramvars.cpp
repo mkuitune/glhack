@@ -10,10 +10,11 @@ namespace glh {
 /////////////////// ShaderVar ///////////////////
 size_t ShaderVar::type_count(Type t){
     switch(t){
-        case Vec2: return 2;
-        case Vec3: return 3;
-        case Vec4: return 4;
-        case Mat4: return 16;
+        case Scalar: return 1;
+        case Vec2:   return 2;
+        case Vec3:   return 3;
+        case Vec4:   return 4;
+        case Mat4:   return 16;
         case Sampler2D:
         case TYPE_LAST:
         default: return 0;
@@ -23,10 +24,11 @@ size_t ShaderVar::type_count(Type t){
 ShaderTypeTokens shader_type_tokens()
 {
     ShaderTypeTokens map;
-    add(map, ShaderVar::Vec2, "vec2")
-            (ShaderVar::Vec3, "vec3")
-            (ShaderVar::Vec4, "vec4")
-            (ShaderVar::Mat4, "mat4")
+    add(map, ShaderVar::Scalar, "float")
+            (ShaderVar::Vec2,   "vec2")
+            (ShaderVar::Vec3,   "vec3")
+            (ShaderVar::Vec4,   "vec4")
+            (ShaderVar::Mat4,   "mat4")
             (ShaderVar::Sampler2D, "sampler2D");
 
     return map;

@@ -374,7 +374,7 @@ void render_textured(glh::App* app)
     glh::GraphicsManager* gm = app->graphics_manager();
     apply(g_renderpass_settings);
     apply(g_blend_settings);
-    gm->render(screenquad_image, env);
+    gm->render(screenquad_image, env, env);
 }
 
 void render_font(glh::App* app)
@@ -382,7 +382,7 @@ void render_font(glh::App* app)
     glh::GraphicsManager* gm = app->graphics_manager();
     apply(g_renderpass_settings);
     apply(g_blend_settings);
-    gm->render(font_renderable, env);
+    gm->render(font_renderable, env, env);
 }
 
 
@@ -390,7 +390,7 @@ void render_colorcoded(glh::App* app)
 {
     glh::GraphicsManager* gm = app->graphics_manager();
     apply(g_renderpass_settings);
-    gm->render(screenquad_color, env);
+    gm->render(screenquad_color, env, env);
 }
 
 //std::function<void(glh::App*)> render = render_textured;

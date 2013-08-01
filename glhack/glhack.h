@@ -50,27 +50,40 @@ void assign_by_guessing_names(BufferSet& bufs, DefaultMesh& mesh);
 
 class RenderEnvironment{
 public:
+    std::map<std::string, float>    scalar_;
+    std::map<std::string, Texture*> texture2d_;
     std::map<std::string, mat4, std::less<std::string>, Eigen::aligned_allocator<std::pair<std::string, mat4> >> mat4_;
     std::map<std::string, vec4,  std::less<std::string>, Eigen::aligned_allocator<std::pair<std::string, vec4> >> vec4_;
-    std::map<std::string, Texture*> texture2d_;
 
-    bool has(cstring name, ShaderVar::Type type){
-        if(type == ShaderVar::Vec4)           return has_key(vec4_, name);
+    bool has(cstring& name, ShaderVar::Type type){
+             if(type == ShaderVar::Scalar)    return has_key(scalar_, name);
+        else if(type == ShaderVar::Vec4)      return has_key(vec4_, name);
         else if(type == ShaderVar::Mat4)      return has_key(mat4_, name);
         else if(type == ShaderVar::Sampler2D) return has_key(texture2d_, name);
         return false;
     }
 
+    std::pair<ShaderVar::Type, bool> has(cstring& name){
+             if(has_key(scalar_, name))    return std::make_pair(ShaderVar::Scalar, true);
+        else if(has_key(mat4_, name))      return std::make_pair(ShaderVar::Mat4, true);
+        else if(has_key(vec4_, name))      return std::make_pair(ShaderVar::Vec4, true);
+        else if(has_key(texture2d_, name)) return std::make_pair(ShaderVar::Sampler2D, true);
+        else                               return std::make_pair(ShaderVar::TYPE_LAST, false);
+    }
+
     void remove(cstring name){
+        scalar_.erase(name);
         mat4_.erase(name);
         vec4_.erase(name);
         texture2d_.erase(name);
     }
 
+    float&   get_scalar(cstring name);
     vec4&    get_vec4(cstring name);
     mat4&    get_mat4(cstring name);
     Texture& get_texture2d(cstring name);
 
+    void set_scalar(cstring name, const float val){scalar_[name] = val;}
     void set_vec4(cstring name, const vec4& vec){vec4_[name] = vec;}
     void set_mat4(cstring name, const mat4& mat){mat4_[name] = mat;}
     void set_texture2d(cstring name, Texture* tex){texture2d_[name] = tex;}

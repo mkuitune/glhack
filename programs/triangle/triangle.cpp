@@ -171,7 +171,7 @@ bool init(glh::App* app)
     load_image();
 
     triren.bind_program(*sp_tex_handle);
-    triren.set_mesh(mesh);
+    triren.set_mesh(mesh.get());
 
     return true;
 }
@@ -197,7 +197,7 @@ void render(glh::App* app)
     apply(g_renderpass_settings);
     apply(g_blend_settings);
 
-    gm->render(triren, env);
+    gm->render(triren, env, env);
 }
 
 void resize(glh::App* app, int width, int height)
