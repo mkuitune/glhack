@@ -2,3 +2,4 @@
 bin/*.mp
 bin/*.png
 bin/*.exe
+data/bitmaps/Thumbs.db
