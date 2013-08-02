@@ -1,1 +1,0 @@
-(def asset_path "barbar")
