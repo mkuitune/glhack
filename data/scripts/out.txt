@@ -1,4 +1,0 @@
-Hello there.
-This should start a new line.
-
-Dear me. I do hope I've not erased anything.
