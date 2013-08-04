@@ -12,6 +12,7 @@
 #include "math_tools.h"
 #include "glh_scenemanagement.h"
 #include "glh_timebased_signals.h"
+#include "glh_dynamic_graph.h"
 
 //////////////// Program stuff ////////////////
 
@@ -137,8 +138,14 @@ glh::RenderQueue                   render_queueue;
 std::vector<glh::SceneTree::Node*> nodes;
 std::list<glh::UiEntity>           ui_entities;
 
-glh::DynamicSystem                 dynamics;
-glh::FocusContext                  focus_context;
+glh::DynamicSystem      dynamics;
+glh::FocusContext       focus_context;
+
+struct GraphSystem {
+public:
+    glh::DynamicGraph graph;
+
+};
 
 void init_uniform_data(){
     //env.set_vec4("ObjColor", glh::vec4(0.f, 1.f, 0.f, 0.2f));
@@ -160,6 +167,12 @@ void load_screenquad(vec2 size, glh::DefaultMesh& mesh)
     vec2 high = halfsize;
 
     mesh_load_quad_xy(low, high, mesh);
+}
+
+void init_graph(){
+}
+
+void init_single_node_callback_chain(){
 }
 
 glh::SceneTree::Node* add_quad_to_scene(glh::GraphicsManager* gm, glh::ProgramHandle& program, glh::vec2 dims){

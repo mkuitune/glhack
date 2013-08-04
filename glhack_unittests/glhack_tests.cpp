@@ -6,6 +6,8 @@
 #include "glh_image.h"
 #include "glh_scenemanagement.h"
 #include "glh_timebased_signals.h"
+#include "glh_dynamic_graph.h"
+
 
 #include<string>
 #include "unittester.h"
