@@ -155,24 +155,24 @@ void add_color_interpolation_to_graph(glh::App* app, glh::SceneTree::Node* node)
 
     noderef_t sys    = {DynamicGraph::dynamic_node_ptr_t(new SystemInput(app)), "sys"};
     addnode(sys);
-    noderef_t ramp   = {DynamicGraph::dynamic_node_ptr_t(new ScalarRamp()),     "ramp"};
+    noderef_t ramp   = {DynamicGraph::dynamic_node_ptr_t(new ScalarRamp()),     string_numerator("ramp")};
     addnode(ramp);
 
-    noderef_t dynvalue   = {DynamicGraph::dynamic_node_ptr_t(new LimitedIncrementalValue(0.0, 0.0, 1.0)), "dynvalue"};
+    noderef_t dynvalue   = {DynamicGraph::dynamic_node_ptr_t(new LimitedIncrementalValue(0.0, 0.0, 1.0)), string_numerator("dynvalue")};
     addnode(dynvalue);
 
-    noderef_t offset = {DynamicGraph::dynamic_node_ptr_t(new ScalarOffset()),   "offset"};
+    noderef_t offset = {DynamicGraph::dynamic_node_ptr_t(new ScalarOffset()),   string_numerator("offset")};
     addnode(offset);
-    noderef_t mix    = {DynamicGraph::dynamic_node_ptr_t(new MixNode()),        "mix"};
+    noderef_t mix    = {DynamicGraph::dynamic_node_ptr_t(new MixNode()),        string_numerator("mix")};
     addnode(mix);
 
     std::list<std::string> vars = list(std::string(COLOR_DELTA), 
                                        std::string(PRIMARY_COLOR),
                                        std::string(SECONDARY_COLOR));
 
-    noderef_t nodesource = {DynamicGraph::dynamic_node_ptr_t(new NodeSource(node, vars)),   "nodesource"};
+    noderef_t nodesource = {DynamicGraph::dynamic_node_ptr_t(new NodeSource(node, vars)),   string_numerator("nodesource")};
     addnode(nodesource);
-    noderef_t nodereciever = {DynamicGraph::dynamic_node_ptr_t(new NodeReciever(node)),   "nodereciever"};
+    noderef_t nodereciever = {DynamicGraph::dynamic_node_ptr_t(new NodeReciever(node)),   string_numerator("nodereciever")};
     addnode(nodereciever);
 
     graph.add_link(sys.name, GLH_PROPERTY_TIME_DELTA, offset.name, GLH_PROPERTY_INTERPOLANT);
@@ -185,7 +185,7 @@ void add_color_interpolation_to_graph(glh::App* app, glh::SceneTree::Node* node)
     graph.add_link(nodesource.name, PRIMARY_COLOR, mix.name, GLH_PROPERTY_1);
     graph.add_link(nodesource.name, SECONDARY_COLOR, mix.name, GLH_PROPERTY_2);
 
-    graph.add_link(mix.name, GLH_PROPERTY_COLOR, nodereciever.name, GLH_PROPERTY_COLOR);
+    graph.add_link(mix.name, GLH_PROPERTY_COLOR, nodereciever.name, FIXED_COLOR);
 }
 
 void init_uniform_data(){
@@ -273,8 +273,6 @@ bool init(glh::App* app)
 
     init_uniform_data();
 
-
-
     return true;
 }
 
@@ -313,6 +311,10 @@ void do_selection_pass(glh::App* app){
 
     glh::FocusContext::Focus focus = focus_context.start_event_handling();
 
+    // TODO MUSTFIX: render_selectables and pick_selectables should be two different functions
+    //       pick_selectables should accept as input parameters pixel coordinates to pick onto
+    //       this way we can support multiple pickers.
+    //       Do not store mouse coordinates in render_picker, rather pass them as parameters.
     if(g_read_color_at_mouse){
         auto picked = render_picker->render_selectables(env);
 
@@ -337,41 +339,14 @@ void do_render_pass(glh::App* app){
 std::map<glh::SceneTree::Node*, glh::vec4, std::less<glh::SceneTree::Node*>,
 Eigen::aligned_allocator<std::pair<glh::UiEntity*, glh::vec4>>> prev_color;
 
-
 void node_focus_gained(glh::App* app, glh::SceneTree::Node* node){
     std::cout << "Focus gained:" << node->name_<< std::endl;
-    glh::vec4 true_color = node->material_.vec4_[FIXED_COLOR];;
-    prev_color[node] =  true_color;
-    float apptime = (float) app->time();
-    glh::vec4 target_color(COLOR_WHITE);
-    
-    glh::vec4* address = &node->material_.vec4_[FIXED_COLOR];
-
-    glh::array4 origcol(true_color);
-    glh::array4 targcol(target_color);
-
-    auto updater = [=](float t){
-        glh::vec4 tru = origcol.to_vec();
-        glh::vec4 targ = targcol.to_vec();
-
-        bool is_done = false;
-        float dur = 0.2f;
-        float delta = (t - apptime) / dur;
-        if(delta < 1.0f){*address = glh::lerp(delta, tru, targ);}
-        else is_done = true;
-        return is_done;
-    };
-
-    dynamics.add(node, updater); 
+    node->material_.scalar_[COLOR_DELTA] = 5.0f;
 }
 
 void node_focus_lost(glh::App* app, glh::SceneTree::Node* node){
     std::cout << "Focus lost:" << node->name_<< std::endl;
-
-    node->material_.vec4_[FIXED_COLOR] = prev_color[node];
-    node->scale_ = glh::vec3(1.f,1.f,1.f);
-    prev_color.erase(node);
-    dynamics.remove(node); 
+    node->material_.scalar_[COLOR_DELTA] = -1.0f;
 }
 
 void render(glh::App* app)
@@ -389,52 +364,6 @@ void render(glh::App* app)
         }
     }
 }
-
-#if 0
-void render(glh::App* app)
-{
-    do_selection_pass(app);
-    do_render_pass(app);
-
-    if(focus_context.event_handling_done_){
-        for(auto& g:focus_context.focus_gained_){
-            std::cout << "Focus gained:" << g->node_->name_<< std::endl;
-            glh::vec4 true_color = g->node_->renderable_->material_.vec4_[FIXED_COLOR];;
-            prev_color[ g->node_] =  true_color;
-            float apptime = (float) app->time();
-            glh::vec4 target_color(COLOR_WHITE);
-            
-            glh::vec4* address = &g->node_->renderable_->material_.vec4_[FIXED_COLOR];
-
-            glh::array4 origcol(true_color);
-            glh::array4 targcol(target_color);
-
-            auto updater = [=](float t){
-                glh::vec4 tru = origcol.to_vec();
-                glh::vec4 targ = targcol.to_vec();
-
-                bool is_done = false;
-                float dur = 1.0f;
-                float delta = (t - apptime) / dur;
-                if(delta < 1.0f){*address = glh::lerp(delta, tru, targ);}
-                else is_done = true;
-                return is_done;
-            };
-
-            dynamics.add(g->node_, updater); 
-        }
-
-        for(auto& l:focus_context.focus_lost_){
-            std::cout << "Focus lost:" << l->node_->name_<< std::endl;
-
-           l->node_->renderable_->material_.vec4_[FIXED_COLOR] = prev_color[l->node_];
-           prev_color.erase(l->node_);
-           dynamics.remove(l->node_); 
-
-        }
-    }
-}
-#endif
 
 void resize(glh::App* app, int width, int height)
 {

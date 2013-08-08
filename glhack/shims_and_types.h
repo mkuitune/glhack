@@ -786,6 +786,8 @@ public:
         return string + std::string(".") + std::to_string(var);
     }
 
+    std::string operator()(const std::string& string){return get(string);}
+
     /** If the string before the last dot is parsed into existing string,
     *   free the index for future use.*/
     void release(const std::string& string){
