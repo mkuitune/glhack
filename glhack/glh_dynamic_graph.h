@@ -304,6 +304,8 @@ public:
         std::map<std::string, Value> sinks_;   //> Available sinks - "prototypes". TODO: use only Value::Type!
         std::map<std::string, Value> sources_; //> Available sources.                    or not. This way we can have a default value inplace.
 
+        std::string                  name_;
+
         inputs_map_t& get_inputs(){return inputs_;}
         const inputs_map_t& get_inputs() const {return inputs_;}
 
@@ -415,6 +417,7 @@ public:
 
             for(auto& i: node->inputs_){
                 auto source_id = link_node_id(i.second);
+                if(source_id.empty()) continue;
                 DynamicNode* source = try_get_node(source_id);
                 if(source){
                     edges.insert(std::make_pair(source, node));
@@ -442,6 +445,9 @@ public:
             for(auto& input: input_node->get_inputs()){
 
                 auto srcnodename = link_node_id(input.second);
+
+                if(srcnodename.empty()) continue; // TODO, do we need some graph computability checks here.
+
                 DynamicNode* srcnode = try_get_node(srcnodename);
 
                 if(srcnode){
@@ -624,11 +630,7 @@ public:
     }
 };
 
-/** Lerp, etc. TODO: Use multi point ramp or something for this.
-
-todo - limit to range 0,1, use other compute nodes to tweak the range.
-
-*/
+/** Lerp, etc. Limited to range [0,1].*/
 class ScalarRamp : public DynamicGraph::DynamicNode{
 public:
 
@@ -651,14 +653,55 @@ public:
     }
 };
 
-class SystemInput : public DynamicGraph::DynamicNode{
-    App* app_;
+class LimitedIncrementalValue : public DynamicGraph::DynamicNode{
+public:
+    double value_;
+    double minimum_;
+    double maximum_;
 
-    SystemInput(App* app):app_(app){
-        set_output(GLH_CHANNEL_TIME, DynamicGraph::Value::Scalar, (float) app_->time());}
-    
+    LimitedIncrementalValue():value_(0.0), minimum_(-1.e37), maximum_(1.e37){
+        config_node();
+    }
+
+    LimitedIncrementalValue(double value, double min, double max):value_(value), minimum_(min), maximum_(max){
+        config_node();
+    }
+
+    void config_node(){
+       add_input(GLH_PROPERTY_DELTA, 0.f); 
+       set_output(GLH_PROPERTY_INTERPOLANT, 0.f);
+    }
+
     void eval() override {
-        set_output(GLH_CHANNEL_TIME, DynamicGraph::Value::Scalar, (float) app_->time());}
+        double delta = read_input<float>(GLH_PROPERTY_DELTA);
+        if(delta < 0.0){
+            if(value_ > minimum_) value_ = value_ + delta;
+        } else {
+            if(value_ < maximum_) value_ = value_ + delta;
+        }
+        set_output(GLH_PROPERTY_INTERPOLANT, (float) value_);
+    }
+};
+
+class SystemInput : public DynamicGraph::DynamicNode{
+public:
+    App* app_;
+    double previous_time_;
+
+    SystemInput(App* app):app_(app), previous_time_(-1.0){
+        set_output(GLH_CHANNEL_TIME, DynamicGraph::Value::Scalar, (float) app_->time());
+        set_output(GLH_PROPERTY_TIME_DELTA, DynamicGraph::Value::Scalar, 0.f);
+    }
+
+    void eval() override {
+        double time = app_->time();
+        double delta = 0.0;
+        if(previous_time_ > 0.0) delta = time - previous_time_;
+        previous_time_ = time;
+
+        set_output(GLH_CHANNEL_TIME, DynamicGraph::Value::Scalar, (float) time);
+        set_output(GLH_PROPERTY_TIME_DELTA, DynamicGraph::Value::Scalar, (float) delta);
+    }
 };
 
 

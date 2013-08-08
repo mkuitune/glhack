@@ -22,6 +22,7 @@ public:
     static float easing(Easing::t e, float v){
              if(e == Easing::Linear){return v;}
         else if(e == Easing::Smoothstep){return smoothstep(v);}
+        else return 0.f;
     }
 
     struct VarType{

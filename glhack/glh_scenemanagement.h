@@ -197,6 +197,7 @@ private:
 
 void set_material(SceneTree::Node& node, RenderEnvironment& material);
 void set_material(SceneTree::Node& node, cstring& name, const vec4& var);
+void set_material(SceneTree::Node& node, cstring& name, const float var);
 
 ///////////// RenderQueue //////////////
 

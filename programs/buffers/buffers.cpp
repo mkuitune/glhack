@@ -140,12 +140,53 @@ std::list<glh::UiEntity>           ui_entities;
 
 glh::DynamicSystem      dynamics;
 glh::FocusContext       focus_context;
+glh::StringNumerator    string_numerator;
 
-struct GraphSystem {
-public:
-    glh::DynamicGraph graph;
+#define COLOR_DELTA "ColorDelta"
+#define PRIMARY_COLOR "PrimaryColor"
+#define SECONDARY_COLOR "SecondaryColor"
 
-};
+glh::DynamicGraph graph;
+
+void add_color_interpolation_to_graph(glh::App* app, glh::SceneTree::Node* node){
+    using namespace glh;
+    struct noderef_t{DynamicGraph::dynamic_node_ptr_t node; std::string name;};
+    auto addnode = [&](noderef_t& n){graph.add_node(n.name, n.node);};
+
+    noderef_t sys    = {DynamicGraph::dynamic_node_ptr_t(new SystemInput(app)), "sys"};
+    addnode(sys);
+    noderef_t ramp   = {DynamicGraph::dynamic_node_ptr_t(new ScalarRamp()),     "ramp"};
+    addnode(ramp);
+
+    noderef_t dynvalue   = {DynamicGraph::dynamic_node_ptr_t(new LimitedIncrementalValue(0.0, 0.0, 1.0)), "dynvalue"};
+    addnode(dynvalue);
+
+    noderef_t offset = {DynamicGraph::dynamic_node_ptr_t(new ScalarOffset()),   "offset"};
+    addnode(offset);
+    noderef_t mix    = {DynamicGraph::dynamic_node_ptr_t(new MixNode()),        "mix"};
+    addnode(mix);
+
+    std::list<std::string> vars = list(std::string(COLOR_DELTA), 
+                                       std::string(PRIMARY_COLOR),
+                                       std::string(SECONDARY_COLOR));
+
+    noderef_t nodesource = {DynamicGraph::dynamic_node_ptr_t(new NodeSource(node, vars)),   "nodesource"};
+    addnode(nodesource);
+    noderef_t nodereciever = {DynamicGraph::dynamic_node_ptr_t(new NodeReciever(node)),   "nodereciever"};
+    addnode(nodereciever);
+
+    graph.add_link(sys.name, GLH_PROPERTY_TIME_DELTA, offset.name, GLH_PROPERTY_INTERPOLANT);
+    graph.add_link(nodesource.name, COLOR_DELTA, offset.name, GLH_PROPERTY_SCALE);
+
+    graph.add_link(offset.name, GLH_PROPERTY_INTERPOLANT, dynvalue.name, GLH_PROPERTY_DELTA);
+    graph.add_link(dynvalue.name, GLH_PROPERTY_INTERPOLANT,  ramp.name, GLH_PROPERTY_INTERPOLANT);
+
+    graph.add_link(ramp.name, GLH_PROPERTY_INTERPOLANT, mix.name, GLH_PROPERTY_INTERPOLANT);
+    graph.add_link(nodesource.name, PRIMARY_COLOR, mix.name, GLH_PROPERTY_1);
+    graph.add_link(nodesource.name, SECONDARY_COLOR, mix.name, GLH_PROPERTY_2);
+
+    graph.add_link(mix.name, GLH_PROPERTY_COLOR, nodereciever.name, GLH_PROPERTY_COLOR);
+}
 
 void init_uniform_data(){
     //env.set_vec4("ObjColor", glh::vec4(0.f, 1.f, 0.f, 0.2f));
@@ -202,11 +243,11 @@ bool init(glh::App* app)
 
     render_picker->selection_program_ = sp_select_program;
 
-    struct{vec2 dims; vec3 pos; vec4 color;} quads[] ={
-        {vec2(0.5, 0.5), vec3(-0.5, -0.5, 0.), vec4(COLOR_RED)},
-        {vec2(0.5, 0.5), vec3(0.5, 0.5, 0.), vec4(COLOR_GREEN)},
-        {vec2(0.5, 0.5), vec3(-0.5, 0.5, 0.), vec4(COLOR_BLUE)},
-        {vec2(0.25, 0.25), vec3(0.5, -0.5, 0.), vec4(COLOR_YELLOW)}
+    struct{vec2 dims; vec3 pos; vec4 color_primary; vec4 color_secondary;} quads[] ={
+        {vec2(0.5, 0.5), vec3(-0.5, -0.5, 0.), vec4(COLOR_RED), vec4(COLOR_WHITE) },
+        {vec2(0.5, 0.5), vec3(0.5, 0.5, 0.), vec4(COLOR_GREEN), vec4(COLOR_WHITE)},
+        {vec2(0.5, 0.5), vec3(-0.5, 0.5, 0.), vec4(COLOR_BLUE), vec4(COLOR_WHITE)},
+        {vec2(0.25, 0.25), vec3(0.5, -0.5, 0.), vec4(COLOR_YELLOW),vec4(COLOR_WHITE) }
     };
 
     size_t quad_count = static_array_size(quads);
@@ -216,16 +257,23 @@ bool init(glh::App* app)
         auto n = add_quad_to_scene(gm, *sp_colored_program, s.dims);
         n->location_ = s.pos;
         n->name_ = name;
-        set_material(*n, FIXED_COLOR,  s.color);
+        set_material(*n, FIXED_COLOR,    s.color_primary);
+        set_material(*n, PRIMARY_COLOR,  s.color_primary);
+        set_material(*n, SECONDARY_COLOR,s.color_secondary);
+        set_material(*n, COLOR_DELTA, 0.f);
         add(nodes, n);
         add(ui_entities, UiEntity(n));
+        add_color_interpolation_to_graph(app, n);
     }
+    graph.solve_dependencies();
 
     for(auto& e:ui_entities){
         render_picker->add(&e);
     }
 
     init_uniform_data();
+
+
 
     return true;
 }
@@ -237,6 +285,8 @@ bool update(glh::App* app)
     float t = (float) app->time();
 
     dynamics.update(t);
+
+    graph.execute();
 
     Eigen::Affine3f transform;
     transform = Eigen::AngleAxis<float>(0.f, glh::vec3(0.f, 0.f, 1.f));

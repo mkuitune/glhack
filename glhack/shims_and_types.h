@@ -15,6 +15,7 @@
 #include<map>
 #include<utility>
 #include<functional>
+#include<stack>
 
 #include "allocators.h"
 
@@ -65,6 +66,7 @@ bool none_of(const T& val, const T& ref0, const T& ref1, const T& ref2, const T&
 
 //////// Helpfull small types /////////
 
+
 /** A (usually) immutable accessor to a valid or non-valid pointer. */
 template<class T>
 class ConstOption
@@ -114,6 +116,7 @@ bool contains(const std::string& str, const T& t){
 /** String sorting comparator.*/
 bool elements_are_ordered(const std::string& first, const std::string& second);
 ///////////// Container operations ////////////////
+
 
 /** If container has last element, compare it with the given. */
 template<class Container, class value_type>
@@ -752,6 +755,54 @@ private:
     size_t                  size_;
     size_t                  max_size_;
     std::vector<value_type> queue_;
+
+};
+
+class StringNumerator{
+public:
+
+    std::map<std::string, std::tuple<int, std::vector<int>>> seeds_;
+
+#define INDSTACK(string_param) (std::get<1>(seeds_[string]))
+#define INDVAL(string_param) (std::get<0>(seeds_[string]))
+#define HASKEY(string_param) (seeds_.count(string) != 0)
+
+    StringNumerator(){}
+
+    int get_next_index(const std::string& string){
+        if(INDSTACK(string).empty()){return INDVAL(string)++;}
+        else{
+            const int result = INDSTACK(string).back();
+            INDSTACK(string).pop_back();
+            return result;
+        }
+    }
+
+    std::string get(const std::string& string){
+        if(!HASKEY(string)){
+            seeds_[string] = std::make_tuple(1, std::vector<int>());
+        }
+        int var = get_next_index(string);
+        return string + std::string(".") + std::to_string(var);
+    }
+
+    /** If the string before the last dot is parsed into existing string,
+    *   free the index for future use.*/
+    void release(const std::string& string){
+        auto period = string.rfind(".");
+        if(period != std::string::npos){
+            auto intstring = string.substr(period + 1, std::string::npos);
+            int index = atoi(intstring.c_str());
+            if(HASKEY(string)){
+                std::vector<int>& s(INDSTACK(string));
+                if(std::find(s.begin(), s.end(), index) == s.end()){
+                    INDSTACK(string).push_back(index);}
+            }
+        }
+    }
+#undef INDLIST
+#undef INDVAL
+#undef HASKEY
 
 };
 

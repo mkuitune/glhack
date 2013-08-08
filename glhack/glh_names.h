@@ -20,7 +20,9 @@ namespace glh{
 #define GLH_CHANNEL_SCALE        "GLH_CHANNEL_SCALE"
                                  
 #define GLH_CHANNEL_TIME         "GLH_CHANNEL_TIME"
-                                 
+#define GLH_PROPERTY_TIME_DELTA  "GLH_PROPERTY_TIME_DELTA"
+
+
 #define GLH_PROPERTY_COLOR       "GLH_PROPERTY_COLOR"
 
 #define GLH_PROPERTY_1           "GLH_PROPERTY_1"
@@ -29,6 +31,8 @@ namespace glh{
 #define GLH_PROPERTY_BIAS        "GLH_PROPERTY_BIAS"
 #define GLH_PROPERTY_SCALE       "GLH_PROPERTY_SCALE"
 #define GLH_PROPERTY_INTERPOLANT "GLH_PROPERTY_INTERPOLANT"
+#define GLH_PROPERTY_DELTA       "GLH_PROPERTY_DELTA"
+
 
     //////////////// Color constants. ////////////////
 // Can be used as eg. 
