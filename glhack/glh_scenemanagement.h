@@ -307,8 +307,12 @@ public:
         idgen_.release(id);
         e->node_->material_.remove(UICTX_SELECT_NAME);
     }
-
-    std::tuple<Box<int,2>, bool> setup_context(){
+    // TODO: To support multiple pointer handling, either
+    // a) calculate bounding box for all pointers and render the entire box
+    // b) render scene multiple times with scissors set around each pointer
+    // We probably need some sane test load for profiling before making the change
+    // and figure out which technique we want to use based on the findings.
+    std::tuple<Box<int,2>, bool> setup_context(int pointer_x, int pointer_y){
          // set up scene
          RenderPassSettings settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT,
                                             glh::vec4(0.0f,0.0f,0.0f,1.f), 1);
@@ -317,8 +321,8 @@ public:
         const int h = app_.config().height;
 
         Box<int,2> screen_bounds = make_box2(0, 0, w, h);
-        int mousey = h - pointer_y_;
-        Box<int,2> mouse_bounds  = make_box2(pointer_x_ - 1, mousey - 1, pointer_x_ + 2, mousey + 2);
+        int mousey = h - pointer_y;
+        Box<int,2> mouse_bounds  = make_box2(pointer_x - 1, mousey - 1, pointer_x + 2, mousey + 2);
         Box<int,2> read_bounds;
         bool       bounds_ok;
 
@@ -362,14 +366,14 @@ public:
          glDisable(GL_SCISSOR_TEST);
     }
 
-    PickedContext render_selectables(RenderEnvironment& env){
+    PickedContext render_selectables(RenderEnvironment& env, int pointer_x, int pointer_y){
         GraphicsManager* gm = app_.graphics_manager();
         Box<int,2> read_bounds;
         bool bounds_ok;
 
         picked_.clear();
 
-        std::tie(read_bounds, bounds_ok) = setup_context();
+        std::tie(read_bounds, bounds_ok) = setup_context(pointer_x, pointer_y);
 
         if(bounds_ok){
             for(auto& id_uientity: entity_to_id_){
@@ -394,19 +398,6 @@ public:
 
         return PickedContext(*this);
     }
-
-    void pointer_move_cb(int x, int y){
-       pointer_x_ = x;
-       pointer_y_ = y;
-    }
-
-    static std::function<void(int,int)> get_pointer_move_cb(RenderPicker& ctx){
-        using namespace std::placeholders;
-        return std::bind(&RenderPicker::pointer_move_cb, ctx, _1, _2);
-    }
-
-    int pointer_x_;
-    int pointer_y_;
 
     std::map<UiEntity*, int> entity_to_id_;
     std::map<int, UiEntity*> id_to_entity_;

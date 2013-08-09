@@ -251,9 +251,8 @@ bool init(glh::App* app)
     };
 
     size_t quad_count = static_array_size(quads);
-    int ind =  0;
     for(auto& s: quads){
-        string name = string("node") + std::to_string(ind++);
+        string name = string_numerator("node");
         auto n = add_quad_to_scene(gm, *sp_colored_program, s.dims);
         n->location_ = s.pos;
         n->name_ = name;
@@ -275,6 +274,92 @@ bool init(glh::App* app)
 
     return true;
 }
+
+std::set<glh::SceneTree::Node*> focused;
+
+void mouse_move_node(glh::App* app, glh::SceneTree::Node* node, vec2i delta)
+{
+    glh::mat4 screen_to_view = app_orthographic_pixel_projection(app);
+
+    // should be replaced with view specific change vector...
+    // projection of the view change vector onto the workplane...
+    // etc.
+
+    glh::vec4 v(delta[0], delta[1], 0, 0);
+    glh::vec3 nd = glh::decrease_dim<float, 4>(screen_to_view * v);
+
+    node->location_ = node->location_ + nd;
+}
+
+// TODO: Figure out a more elegant formulation for this.
+// State machines are state machines...
+struct Mouse{
+
+    struct Event{
+        enum t{LeftButtonActivated, LeftButtonDeactivated, MouseMoved};
+    };
+
+    std::stack<Event::t> events_;
+    std::vector<glh::SceneTree::Node*> grabbed;
+
+    bool left_button_down_;
+
+
+    Mouse():left_button_down_(false){
+        current_ = glh::vec2i(0,0);
+        prev_ = glh::vec2i(0,0);
+    }
+
+    void left_button_is_down(){
+        if(!left_button_down_){
+            left_button_down_ = true;
+            events_.push(Event::LeftButtonActivated);
+        }
+    }
+
+    void left_button_up(){
+        left_button_down_ = false;
+        events_.push(Event::LeftButtonDeactivated);
+    }
+
+    void move(int x, int y){
+        prev_ = current_;
+        current_[0] = x;
+        current_[1] = y;
+        events_.push(Event::MouseMoved);
+    }
+
+    // Must call only after selection context has been filled
+    void update(){
+        // Handle events
+        while(!events_.empty()){
+            Event::t e = events_.top();
+            events_.pop();
+            if(e == Event::LeftButtonActivated){
+                for(glh::SceneTree::Node* node: focused){
+                    grabbed.push_back(node);
+                }
+            }
+            else if(e == Event::LeftButtonDeactivated){
+                grabbed.clear();
+            }
+            else if(e == Event::MouseMoved){
+                vec2i delta = current_ - prev_;
+                for(glh::SceneTree::Node* node: grabbed){
+                    mouse_move_node(app_, node, delta);
+                }
+            }
+        }
+    }
+
+    glh::App* app_;
+
+    glh::vec2i current_;
+    glh::vec2i prev_;
+}; 
+
+Mouse mouse;
+
 
 bool update(glh::App* app)
 {
@@ -311,17 +396,14 @@ void do_selection_pass(glh::App* app){
 
     glh::FocusContext::Focus focus = focus_context.start_event_handling();
 
-    // TODO MUSTFIX: render_selectables and pick_selectables should be two different functions
-    //       pick_selectables should accept as input parameters pixel coordinates to pick onto
-    //       this way we can support multiple pickers.
-    //       Do not store mouse coordinates in render_picker, rather pass them as parameters.
     if(g_read_color_at_mouse){
-        auto picked = render_picker->render_selectables(env);
+        auto picked = render_picker->render_selectables(env, g_mouse_x, g_mouse_y);
 
         for(auto& p: picked){
             focus.on_focus(p);
         }
         focus.update_event_state();
+
         g_read_color_at_mouse = false;
     }
 }
@@ -342,18 +424,22 @@ Eigen::aligned_allocator<std::pair<glh::UiEntity*, glh::vec4>>> prev_color;
 void node_focus_gained(glh::App* app, glh::SceneTree::Node* node){
     std::cout << "Focus gained:" << node->name_<< std::endl;
     node->material_.scalar_[COLOR_DELTA] = 5.0f;
+    focused.insert(node);
 }
 
 void node_focus_lost(glh::App* app, glh::SceneTree::Node* node){
     std::cout << "Focus lost:" << node->name_<< std::endl;
     node->material_.scalar_[COLOR_DELTA] = -1.0f;
+    focused.erase(node);
 }
 
-void render(glh::App* app)
-{
+void render(glh::App* app){
     do_selection_pass(app);
     do_render_pass(app);
 
+    // Kinda not rendering anymore, now were doing UI handling.
+    // TODO: Figure this out. All this is because picking is tied to rendering.
+    // Maybe need third pass. Or then do update after render pass?
     if(focus_context.event_handling_done_){
         for(auto& g:focus_context.focus_gained_){
             node_focus_gained(app, g->node_);
@@ -363,36 +449,35 @@ void render(glh::App* app)
             node_focus_lost(app, l->node_);
         }
     }
+
+    mouse.update();
 }
 
-void resize(glh::App* app, int width, int height)
-{
+void resize(glh::App* app, int width, int height){
     std::cout << "Resize:" << width << " " << height << std::endl;
 }
 
-void print_mouse_position()
-{
-}
-
-void read_color_at_mouse(){
-    //std::cout << "Mouse:"  << x << " " << y << std::endl;
-    
-}
 
 void mouse_move_callback(int x, int y)
 {
     g_mouse_x = x;
     g_mouse_y = y;
     //std::cout << "Mouse:"  << x << " " << y << std::endl;
-    render_picker->pointer_move_cb(x,y);
     g_read_color_at_mouse = true;
+    mouse.move(x,y);
 }
 
 void mouse_button_callback(int key, const glh::Input::ButtonState& s)
 {
     using namespace glh;
 
-    if(s == glh::Input::Held) std::cout << "Mouse down." << std::endl;
+    if(s == glh::Input::Held){
+        std::cout << "Mouse down." << std::endl;
+        mouse.left_button_is_down();
+    }
+    else if(s == glh::Input::Released){
+        mouse.left_button_up();
+    }
 
     //if(key == Input::LeftButton && (s == glh::Input::Held)) g_read_color_at_mouse = true;
 }
@@ -416,6 +501,7 @@ int main(int arch, char* argv)
 
     glh::App app(config);
 
+    mouse.app_ = &app;
     render_picker = std::make_shared<glh::RenderPicker>(app);
 
     GLH_LOG_EXPR("Logger started");

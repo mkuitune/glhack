@@ -17,6 +17,7 @@
 
 namespace glh {
 
+/** Generalized wrapper for system input library. */
 class Input
 {
 public:
