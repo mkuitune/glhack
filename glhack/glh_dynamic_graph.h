@@ -86,6 +86,7 @@ struct NodeReciever{
 
 #include "glh_typedefs.h"
 #include "glh_timebased_signals.h"
+#include "glh_scenemanagement.h"
 
 #include<tuple>
 #include<functional>
@@ -260,6 +261,7 @@ public:
 
     struct Value{
         enum t{Empty, Scalar, Vector3, Vector4};
+
         Value():type_(Empty){}
         Value(t type):type_(type){}
         Value(t type, float value):type_(type){
@@ -267,6 +269,13 @@ public:
         }
         Value(t type, const array4& value):type_(type), value_(value){}
         Value(t type, const vec4& value):type_(type), value_(value){}
+
+        /** The Scalar type can be used as a bool
+        *   in some cases. Think it as a driving voltage over a diode.
+        *   In these instances 0.f is returned for false and 1.f for true.
+        *   The value can then be used e.g. for mixing nodes and they are converted
+        *   into gates. This simplifies handling various context based events etc.*/
+        static bool is_truthy(float f){return f > 0.9999f;}
 
         void get(float& res) const {res = value_[0];}
         void get(vec3& res) const {res = value_.change_dim<3>();}
@@ -701,6 +710,55 @@ public:
 
         set_output(GLH_CHANNEL_TIME, DynamicGraph::Value::Scalar, (float) time);
         set_output(GLH_PROPERTY_TIME_DELTA, DynamicGraph::Value::Scalar, (float) delta);
+    }
+};
+
+/**  */
+class EventFilter : public DynamicGraph::DynamicNode{
+public:
+
+    enum FilteredChannel{Focused, FocusGained, FocusLost};
+
+    std::vector<int> filtered_ids_;
+    FocusContext&    context_;
+    FilteredChannel  channel_;
+
+    EventFilter(FocusContext& context, std::vector<int> filtered_ids, FilteredChannel channel):
+        context_(context), filtered_ids_(filtered_ids), channel_(channel){
+        set_output(GLH_PROPERTY_INTERPOLANT, DynamicGraph::Value::Scalar, 0.f);
+    }
+
+    bool is_in(FocusContext::entity_container_t& ent){
+        for(auto id:filtered_ids_){
+
+        }
+    }
+
+    void eval() override {
+        bool result = false;
+        if(channel_ == Focused){
+        }
+        else if(channel_ == FocusGained){
+        }
+        else if(channel_ == FocusLost){
+        }
+    }
+
+};
+
+struct DynamicNodeRef{
+    DynamicGraph::dynamic_node_ptr_t node_;
+    std::string name_;
+
+    DynamicNodeRef(DynamicGraph::DynamicNode* node, const std::string& name):node_(node), name_(name){}
+
+    DynamicNodeRef(DynamicGraph::DynamicNode* node, const std::string& name, glh::DynamicGraph& graph)
+        :node_(node), name_(name){
+            add(graph);
+        }
+
+    void add(glh::DynamicGraph& graph){
+        graph.add_node(name_, node_);
     }
 };
 

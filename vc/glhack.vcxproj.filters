@@ -30,6 +30,7 @@
     <ClCompile Include="..\glhack\glh_names.cpp" />
     <ClCompile Include="..\glhack\glh_timebased_signals.cpp" />
     <ClCompile Include="..\glhack\glh_dynamic_graph.cpp" />
+    <ClCompile Include="..\glhack\glh_uicontext.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\glhack\glbase.h" />
@@ -62,5 +63,6 @@
     <ClInclude Include="..\glhack\glh_names.h" />
     <ClInclude Include="..\glhack\glh_timebased_signals.h" />
     <ClInclude Include="..\glhack\glh_dynamic_graph.h" />
+    <ClInclude Include="..\glhack\glh_uicontext.h" />
   </ItemGroup>
 </Project>

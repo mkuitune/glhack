@@ -10,9 +10,8 @@
 #include "glh_font.h"
 #include "shims_and_types.h"
 #include "math_tools.h"
-#include "glh_scenemanagement.h"
-#include "glh_timebased_signals.h"
-#include "glh_dynamic_graph.h"
+#include "glh_uicontext.h"
+
 
 //////////////// Program stuff ////////////////
 
@@ -71,7 +70,7 @@ const char* sh_fragment_tex =
 
 const char* sh_vertex_obj   = 
 "#version 150               \n"
-"uniform mat4 LocalToWorld;"
+"uniform mat4 LocalToWorld;" // TODO add world to screen
 "in vec3      VertexPosition;    "
 "in vec3      VertexColor;       "
 "out vec3 Color;            "
@@ -142,6 +141,8 @@ glh::DynamicSystem      dynamics;
 glh::FocusContext       focus_context;
 glh::StringNumerator    string_numerator;
 
+std::unique_ptr<glh::UiContext> ui_context;
+
 #define COLOR_DELTA "ColorDelta"
 #define PRIMARY_COLOR "PrimaryColor"
 #define SECONDARY_COLOR "SecondaryColor"
@@ -150,42 +151,31 @@ glh::DynamicGraph graph;
 
 void add_color_interpolation_to_graph(glh::App* app, glh::SceneTree::Node* node){
     using namespace glh;
-    struct noderef_t{DynamicGraph::dynamic_node_ptr_t node; std::string name;};
-    auto addnode = [&](noderef_t& n){graph.add_node(n.name, n.node);};
-
-    noderef_t sys    = {DynamicGraph::dynamic_node_ptr_t(new SystemInput(app)), "sys"};
-    addnode(sys);
-    noderef_t ramp   = {DynamicGraph::dynamic_node_ptr_t(new ScalarRamp()),     string_numerator("ramp")};
-    addnode(ramp);
-
-    noderef_t dynvalue   = {DynamicGraph::dynamic_node_ptr_t(new LimitedIncrementalValue(0.0, 0.0, 1.0)), string_numerator("dynvalue")};
-    addnode(dynvalue);
-
-    noderef_t offset = {DynamicGraph::dynamic_node_ptr_t(new ScalarOffset()),   string_numerator("offset")};
-    addnode(offset);
-    noderef_t mix    = {DynamicGraph::dynamic_node_ptr_t(new MixNode()),        string_numerator("mix")};
-    addnode(mix);
+    
+    auto sys      = DynamicNodeRef(new SystemInput(app), "sys", graph);
+    auto ramp     = DynamicNodeRef(new ScalarRamp(), string_numerator("ramp"), graph);
+    auto dynvalue = DynamicNodeRef(new LimitedIncrementalValue(0.0, 0.0, 1.0), string_numerator("dynvalue"), graph);
+    auto offset   = DynamicNodeRef(new ScalarOffset(), string_numerator("offset"), graph);
+    auto mix      = DynamicNodeRef(new MixNode(), string_numerator("mix"), graph);
 
     std::list<std::string> vars = list(std::string(COLOR_DELTA), 
                                        std::string(PRIMARY_COLOR),
                                        std::string(SECONDARY_COLOR));
 
-    noderef_t nodesource = {DynamicGraph::dynamic_node_ptr_t(new NodeSource(node, vars)),   string_numerator("nodesource")};
-    addnode(nodesource);
-    noderef_t nodereciever = {DynamicGraph::dynamic_node_ptr_t(new NodeReciever(node)),   string_numerator("nodereciever")};
-    addnode(nodereciever);
+    auto nodesource = DynamicNodeRef(new NodeSource(node, vars),string_numerator("nodesource"), graph);
+    auto nodereciever = DynamicNodeRef(new NodeReciever(node),string_numerator("nodereciever"), graph);
 
-    graph.add_link(sys.name, GLH_PROPERTY_TIME_DELTA, offset.name, GLH_PROPERTY_INTERPOLANT);
-    graph.add_link(nodesource.name, COLOR_DELTA, offset.name, GLH_PROPERTY_SCALE);
+    graph.add_link(sys.name_, GLH_PROPERTY_TIME_DELTA, offset.name_, GLH_PROPERTY_INTERPOLANT);
+    graph.add_link(nodesource.name_, COLOR_DELTA, offset.name_, GLH_PROPERTY_SCALE);
 
-    graph.add_link(offset.name, GLH_PROPERTY_INTERPOLANT, dynvalue.name, GLH_PROPERTY_DELTA);
-    graph.add_link(dynvalue.name, GLH_PROPERTY_INTERPOLANT,  ramp.name, GLH_PROPERTY_INTERPOLANT);
+    graph.add_link(offset.name_, GLH_PROPERTY_INTERPOLANT, dynvalue.name_, GLH_PROPERTY_DELTA);
+    graph.add_link(dynvalue.name_, GLH_PROPERTY_INTERPOLANT,  ramp.name_, GLH_PROPERTY_INTERPOLANT);
 
-    graph.add_link(ramp.name, GLH_PROPERTY_INTERPOLANT, mix.name, GLH_PROPERTY_INTERPOLANT);
-    graph.add_link(nodesource.name, PRIMARY_COLOR, mix.name, GLH_PROPERTY_1);
-    graph.add_link(nodesource.name, SECONDARY_COLOR, mix.name, GLH_PROPERTY_2);
+    graph.add_link(ramp.name_, GLH_PROPERTY_INTERPOLANT, mix.name_, GLH_PROPERTY_INTERPOLANT);
+    graph.add_link(nodesource.name_, PRIMARY_COLOR, mix.name_, GLH_PROPERTY_1);
+    graph.add_link(nodesource.name_, SECONDARY_COLOR, mix.name_, GLH_PROPERTY_2);
 
-    graph.add_link(mix.name, GLH_PROPERTY_COLOR, nodereciever.name, FIXED_COLOR);
+    graph.add_link(mix.name_, GLH_PROPERTY_COLOR, nodereciever.name_, FIXED_COLOR);
 }
 
 void init_uniform_data(){
@@ -237,6 +227,8 @@ bool init(glh::App* app)
 
     GraphicsManager* gm = app->graphics_manager();
 
+    ui_context.reset(new UiContext(*gm, *app, graph, string_numerator));
+
     //sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment);
     sp_select_program  = gm->create_program(sp_select, sh_geometry, sh_vertex_obj, sh_fragment_selection_color);
     sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment_fix_color);
@@ -277,16 +269,20 @@ bool init(glh::App* app)
 
 std::set<glh::SceneTree::Node*> focused;
 
+//TODO: Into a graph node 
 void mouse_move_node(glh::App* app, glh::SceneTree::Node* node, vec2i delta)
 {
-    glh::mat4 screen_to_view = app_orthographic_pixel_projection(app);
+    glh::mat4 screen_to_view   = app_orthographic_pixel_projection(app);
+    glh::mat4 view_to_world    = glh::mat4::Identity();
+    glh::mat4 world_to_object  = glh::mat4::Identity();
+    glh::mat4 screen_to_object = world_to_object * view_to_world * screen_to_view ;
 
     // should be replaced with view specific change vector...
     // projection of the view change vector onto the workplane...
     // etc.
 
-    glh::vec4 v(delta[0], delta[1], 0, 0);
-    glh::vec3 nd = glh::decrease_dim<float, 4>(screen_to_view * v);
+    glh::vec4 v((float) delta[0], (float) delta[1], 0, 0);
+    glh::vec3 nd = glh::decrease_dim<float, 4>(screen_to_object * v);
 
     node->location_ = node->location_ + nd;
 }
@@ -421,15 +417,17 @@ void do_render_pass(glh::App* app){
 std::map<glh::SceneTree::Node*, glh::vec4, std::less<glh::SceneTree::Node*>,
 Eigen::aligned_allocator<std::pair<glh::UiEntity*, glh::vec4>>> prev_color;
 
+// TODO: Move UI handling to separate class that accepts callbacks
+// for submitted high-level elements.
 void node_focus_gained(glh::App* app, glh::SceneTree::Node* node){
     std::cout << "Focus gained:" << node->name_<< std::endl;
-    node->material_.scalar_[COLOR_DELTA] = 5.0f;
+    node->material_.scalar_[COLOR_DELTA] = 7.0f;
     focused.insert(node);
 }
 
 void node_focus_lost(glh::App* app, glh::SceneTree::Node* node){
     std::cout << "Focus lost:" << node->name_<< std::endl;
-    node->material_.scalar_[COLOR_DELTA] = -1.0f;
+    node->material_.scalar_[COLOR_DELTA] = -2.0f;
     focused.erase(node);
 }
 
@@ -441,6 +439,17 @@ void render(glh::App* app){
     // TODO: Figure this out. All this is because picking is tied to rendering.
     // Maybe need third pass. Or then do update after render pass?
     if(focus_context.event_handling_done_){
+
+        // TODO: Extract to UiContextManager or such
+        // These sequences are particular events.
+        // specific callbacks could be attached to nodes themselves.
+        // The vanilla version here is equivalent to formulation where
+        // each node would have a callback attached to the focus_gained_ event
+        // and this message was passed to each node. Since this can result in pretty
+        // highlevel stuff it's perhaps best that UI dynamics is handled aggergated
+        // in a highlevel form, while actions outside of this visual context are handled
+        // by callbacks attached to particular elements and events. TODO: Figure out how
+        // a window pane would work. How a text field / draggable slider would work.
         for(auto& g:focus_context.focus_gained_){
             node_focus_gained(app, g->node_);
         }

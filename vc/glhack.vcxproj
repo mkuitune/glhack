@@ -27,6 +27,7 @@
     <ClCompile Include="..\glhack\glh_scenemanagement.cpp" />
     <ClCompile Include="..\glhack\glh_timebased_signals.cpp" />
     <ClCompile Include="..\glhack\glh_typedefs.cpp" />
+    <ClCompile Include="..\glhack\glh_uicontext.cpp" />
     <ClCompile Include="..\glhack\glprogramvars.cpp" />
     <ClCompile Include="..\glhack\glsystem.cpp" />
     <ClCompile Include="..\glhack\gltexture.cpp" />
@@ -65,6 +66,7 @@
     <ClInclude Include="..\glhack\glh_scenemanagement.h" />
     <ClInclude Include="..\glhack\glh_timebased_signals.h" />
     <ClInclude Include="..\glhack\glh_typedefs.h" />
+    <ClInclude Include="..\glhack\glh_uicontext.h" />
     <ClInclude Include="..\glhack\glprogramvars.h" />
     <ClInclude Include="..\glhack\glsystem.h" />
     <ClInclude Include="..\glhack\gltexture.h" />

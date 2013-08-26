@@ -603,7 +603,6 @@ public:
     std::list<DefaultMeshPtr>               meshes_;
     std::list<FullRenderablePtr>            renderables_;
 
-
     ShaderProgram* current_program_;
 
 //////// Internal: Texture unit stuff //////// 
