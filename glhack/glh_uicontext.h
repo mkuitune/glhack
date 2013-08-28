@@ -13,6 +13,7 @@ namespace glh{
 class UiContext{
 public:
 
+    // TODO: Probably want to lift techniques away from here at some point.
     struct Technique{
         enum t{ColorInterpolation};
         static void color_interpolation(App& app, DynamicGraph& graph,
@@ -26,7 +27,7 @@ public:
 
     FocusContext        focus_context_;
     RenderPicker        render_picker_;
-    std::list<UiEntity> ui_entities_;
+    std::list<SceneTree::Node*> ui_entities_;
 
     std::set<SceneTree::Node*> focused;
 
@@ -40,14 +41,14 @@ public:
     
     void init_assets();
 
+    // TODO: Add add_render_queue or such routine
+    //void add_node(SceneTree::Node* n){
+    //    add(ui_entities_, n);
+    //    render_picker_.add(&ui_entities_.back());
 
-    void add_node(SceneTree::Node* n){
-        add(ui_entities_, UiEntity(n));
-        render_picker_.add(&ui_entities_.back());
-
-        // TODO: Remove technique forcing
-        add_technique(Technique::ColorInterpolation, n);
-    }
+    //    // TODO: Remove technique forcing
+    //    add_technique(Technique::ColorInterpolation, n);
+    //}
 
     // Techniques - fixed interaction forms.
     void add_technique(Technique::t technique, SceneTree::Node* node){

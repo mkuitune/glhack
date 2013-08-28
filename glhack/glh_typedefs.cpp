@@ -8,8 +8,8 @@
 
 namespace glh {
 
-vec4 ColorSelection::color_of_id(int id){
-    if(id > max_id) throw GraphicsException("ColorSelection::Id above max");
+vec4 ObjectRoster::color_of_id(int id){
+    if(id > max_id) throw GraphicsException("ObjectRoster::Id above max");
     uint8_t r = (id >> 16)&0xff;
     uint8_t g = (id >> 8)&0xff;
     uint8_t b = (id >> 0)&0xff;
@@ -23,7 +23,7 @@ vec4 ColorSelection::color_of_id(int id){
     return vec4(fr,fg,fb, 1.f);
 }
 
-int ColorSelection::id_of_color(const vec4& color){
+int ObjectRoster::id_of_color(const vec4& color){
     uint8_t r = Math<uint8_t>::to_type<float>(color[0] * 255.f);
     uint8_t g = Math<uint8_t>::to_type<float>(color[1] * 255.f);
     uint8_t b = Math<uint8_t>::to_type<float>(color[2] * 255.f);
@@ -31,22 +31,22 @@ int ColorSelection::id_of_color(const vec4& color){
     return id_of_color(r,g,b);
 }
 
-int ColorSelection::id_of_color(uint8_t r, uint8_t g, uint8_t b){
+int ObjectRoster::id_of_color(uint8_t r, uint8_t g, uint8_t b){
     int id = (r << 16) + (g << 8) + b;
-    if(id > max_id) throw GraphicsException("ColorSelection::Id above max");
+    if(id > max_id) throw GraphicsException("ObjectRoster::Id above max");
     return id;
 }
 
-ColorSelection::IdGenerator::IdGenerator(){
+ObjectRoster::IdGenerator::IdGenerator(){
     m_next = null_id + 1;
 }
 
-int ColorSelection::IdGenerator::new_id(){
+int ObjectRoster::IdGenerator::new_id(){
     int id;
 
     if(m_unused.empty()){
         id = m_next++;
-        if(id > max_id) throw GraphicsException("ColorSelection::IdGenerator new id above max");
+        if(id > max_id) throw GraphicsException("ObjectRoster::IdGenerator new id above max");
     } else{
         id = m_unused.top();
         m_unused.pop();
@@ -54,7 +54,7 @@ int ColorSelection::IdGenerator::new_id(){
     return id;
 }
 
-void ColorSelection::IdGenerator::release(int id){
+void ObjectRoster::IdGenerator::release(int id){
     m_unused.push(id);
 }
 

@@ -43,7 +43,7 @@ public:
 ///////////// Selection ID:s /////////////
 
 /** Utilities for color/id based selection buffer. */
-class ColorSelection {
+class ObjectRoster {
 public:
     static const int max_id = 16777215;
 

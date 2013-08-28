@@ -20,6 +20,7 @@ public:
         mat4  local_to_parent_;
 
         std::string name_;
+        int         id_;
 
         RenderEnvironment material_;
 
@@ -34,12 +35,13 @@ public:
         FullRenderable* renderable_;
 
         Node(FullRenderable* renderable):renderable_(renderable){
-            reset_data();
-        }
+            reset_data();}
+
+        Node(FullRenderable* renderable, int id):renderable_(renderable), id_(id){
+            reset_data();}
 
         Node():renderable_(0){
-            reset_data();
-        }
+            reset_data();}
 
         void reset_data(){
 
@@ -158,11 +160,18 @@ public:
     SceneTree(){
        nodes_.push_back(Node(0));
        root_ = &nodes_.back();
+       root_->id_ = id_generator_.new_id();
+       vec4 color = ObjectRoster::color_of_id(root_->id_);
+       root_->material_.set_vec4(UICTX_SELECT_NAME, color);
     }
 
     Node* add_node(Node* parent){
         nodes_.push_back(Node());
         Node* newnode = &nodes_.back();
+        newnode->id_ = id_generator_.new_id();
+        // TODO: It's kinda hacky to create UI context colors here as well. Figure out a better way.
+        vec4 color = ObjectRoster::color_of_id(newnode->id_);
+        newnode->material_.set_vec4(UICTX_SELECT_NAME, color);
         if(parent) parent->add_child(newnode);
         return newnode;
     }
@@ -190,7 +199,8 @@ public:
 
 private:
     std::deque<Node, Eigen::aligned_allocator<Node>> nodes_;
-    Node*           root_;
+    Node*                     root_;
+    ObjectRoster::IdGenerator id_generator_;
 };
 
 ///////////// Utility functions for scene elements /////////////
@@ -203,6 +213,8 @@ void set_material(SceneTree::Node& node, cstring& name, const float var);
 
 class RenderQueue{
 public:
+
+    typedef ArenaQueue<SceneTree::Node*> node_ptr_sequence_t;
 
     RenderQueue(){}
 
@@ -225,7 +237,13 @@ public:
 
     void clear(){renderables_.clear();}
 
-    ArenaQueue<SceneTree::Node*> renderables_;
+    node_ptr_sequence_t::iterator begin(){
+        return renderables_.begin();}
+
+    node_ptr_sequence_t::iterator end(){
+        return renderables_.end();}
+
+    node_ptr_sequence_t renderables_;
 };
 
 ///////////// UiEvents //////////////
@@ -244,16 +262,11 @@ public:
 
 class UiEntity{
 public:
-
-    SceneTree::Node* node_;
-
-    UiEntity(SceneTree::Node* node):node_(node){}
-
     // TODO: Do not store selection color in node material?
-    void render(GraphicsManager& gm, ProgramHandle& selection_program, RenderEnvironment& env){
-        FullRenderable* r = node_->renderable();
+    static void render(SceneTree::Node* node, GraphicsManager& gm, ProgramHandle& selection_program, RenderEnvironment& env){
+        FullRenderable* r = node->renderable();
         if(r){
-            gm.render(*r, selection_program, node_->material_, env);
+            gm.render(*r, selection_program, node->material_, env);
         }
     }
 };
@@ -281,32 +294,37 @@ public:
     // In this case set scissor bounds to full screen, render once,
     // then for each picker location pick id.
 
-    typedef std::vector<UiEntity*> uientity_container_t;
+    typedef ArenaQueue<SceneTree::Node*> node_ptr_container_t;
 
     struct PickedContext{
         RenderPicker& picker_;
         PickedContext(RenderPicker& picker):picker_(picker){}
 
-        uientity_container_t::iterator begin(){return picker_.picked_.begin();}
-        uientity_container_t::iterator end(){return picker_.picked_.end();}
+        node_ptr_container_t::iterator begin(){return picker_.picked_.begin();}
+        node_ptr_container_t::iterator end(){return picker_.picked_.end();}
     };
 
     RenderPicker(App& app):app_(app){}
 
-    void add(UiEntity* e){
-        int id = idgen_.new_id();
-        vec4 color = ColorSelection::color_of_id(id);
-        e->node_->material_.set_vec4(UICTX_SELECT_NAME, color);
-        entity_to_id_[e] = id;
-        id_to_entity_[id] = e;
+    void add_node(SceneTree::Node* node){
+        id_to_entity_[node->id_] = node;
     }
 
-     void remove(UiEntity* e){
-        int id = entity_to_id_[e];
-        entity_to_id_.erase(e);
-        idgen_.release(id);
-        e->node_->material_.remove(UICTX_SELECT_NAME);
+    void detach_node(SceneTree::Node* node){
+        int id = node->id_;
+        id_to_entity_.erase(id);
     }
+
+     void attach_render_queue(RenderQueue* queue){
+         render_queue_ = queue;
+         for(auto r:(*render_queue_)) add_node(r);
+    }
+
+     void detach_queue(){
+         render_queue_ = 0;
+         for(auto r:(*render_queue_)) detach_node(r);
+    }
+
     // TODO: To support multiple pointer handling, either
     // a) calculate bounding box for all pointers and render the entire box
     // b) render scene multiple times with scissors set around each pointer
@@ -359,7 +377,7 @@ public:
         //sprintf(buf, "r%hhu g%hhu b%hhu a%hhu", *r, *g, *b, *a);
         //std::cout << "Mouse read:" << buf << std::endl;
 
-        return ColorSelection::id_of_color(*r,*g,*b);
+        return ObjectRoster::id_of_color(*r,*g,*b);
     }
 
     void reset_context(){
@@ -376,8 +394,8 @@ public:
         std::tie(read_bounds, bounds_ok) = setup_context(pointer_x, pointer_y);
 
         if(bounds_ok){
-            for(auto& id_uientity: entity_to_id_){
-                id_uientity.first->render(*gm, *selection_program_, env);}
+            for(auto node: (*render_queue_)){
+                UiEntity::render(node, *gm, *selection_program_, env);}
 
             //Once all the items are rendered do picking
             selected_id_ = do_picking(read_bounds);
@@ -385,7 +403,7 @@ public:
 
         reset_context();
 
-        UiEntity* picked = 0;
+        SceneTree::Node* picked = 0;
 
         auto ie = id_to_entity_.find(selected_id_);
         if(ie != id_to_entity_.end()){
@@ -393,22 +411,22 @@ public:
 
             if(picked == 0) throw GraphicsException("Trying to pick null entity!");
 
-            picked_.push_back(picked);
+            picked_.push(picked);
         }
 
         return PickedContext(*this);
     }
 
-    std::map<UiEntity*, int> entity_to_id_;
-    std::map<int, UiEntity*> id_to_entity_;
+    RenderQueue*                    render_queue_;
+    std::map<int, SceneTree::Node*> id_to_entity_;
 
-    ColorSelection::IdGenerator idgen_;
+    ObjectRoster::IdGenerator idgen_;
 
     App& app_;
 
     ProgramHandle* selection_program_;
 
-    uientity_container_t picked_;
+     node_ptr_container_t picked_;
 
     int selected_id_;
 };
@@ -420,7 +438,7 @@ typedef std::shared_ptr<RenderPicker> RenderPickerPtr;
 class FocusContext{
 public:
 
-    typedef SortedArray<UiEntity*> entity_container_t;
+    typedef SortedArray<SceneTree::Node*> entity_container_t;
 
     struct Focus{
         FocusContext& ctx_;
@@ -428,7 +446,7 @@ public:
         Focus(FocusContext& ctx):ctx_(ctx){}
         ~Focus(){}
 
-        void on_focus(UiEntity* e){
+        void on_focus(SceneTree::Node* e){
             ctx_.currently_focused_.insert(e);
         }
 

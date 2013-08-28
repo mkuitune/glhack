@@ -126,16 +126,15 @@ std::shared_ptr<glh::FontContext> fontcontext;
 int g_mouse_x;
 int g_mouse_y;
 
-glh::ColorSelection::IdGenerator idgen;
+glh::ObjectRoster::IdGenerator idgen;
 
-int obj_id = glh::ColorSelection::max_id / 2;
+int obj_id = glh::ObjectRoster::max_id / 2;
 
 glh::RenderPickerPtr render_picker;
 
 glh::SceneTree                     scene;
 glh::RenderQueue                   render_queueue;
 std::vector<glh::SceneTree::Node*> nodes;
-std::list<glh::UiEntity>           ui_entities;
 
 glh::DynamicSystem      dynamics;
 glh::FocusContext       focus_context;
@@ -180,7 +179,7 @@ void add_color_interpolation_to_graph(glh::App* app, glh::SceneTree::Node* node)
 
 void init_uniform_data(){
     //env.set_vec4("ObjColor", glh::vec4(0.f, 1.f, 0.f, 0.2f));
-    glh::vec4 obj_color_sel = glh::ColorSelection::color_of_id(obj_id);
+    glh::vec4 obj_color_sel = glh::ObjectRoster::color_of_id(obj_id);
     env.set_vec4(UICTX_SELECT_NAME,     obj_color_sel);
     env.set_vec4(FIXED_COLOR, glh::vec4(0.28f, 0.024f, 0.024f, 1.0));
 }
@@ -253,14 +252,9 @@ bool init(glh::App* app)
         set_material(*n, SECONDARY_COLOR,s.color_secondary);
         set_material(*n, COLOR_DELTA, 0.f);
         add(nodes, n);
-        add(ui_entities, UiEntity(n));
         add_color_interpolation_to_graph(app, n);
     }
     graph.solve_dependencies();
-
-    for(auto& e:ui_entities){
-        render_picker->add(&e);
-    }
 
     init_uniform_data();
 
@@ -381,6 +375,7 @@ bool update(glh::App* app)
 
     render_queueue.clear();
     render_queueue.add(scene);
+    render_picker->attach_render_queue(&render_queueue);
 
     return g_run;
 }
@@ -395,7 +390,7 @@ void do_selection_pass(glh::App* app){
     if(g_read_color_at_mouse){
         auto picked = render_picker->render_selectables(env, g_mouse_x, g_mouse_y);
 
-        for(auto& p: picked){
+        for(auto p: picked){
             focus.on_focus(p);
         }
         focus.update_event_state();
@@ -450,12 +445,12 @@ void render(glh::App* app){
         // in a highlevel form, while actions outside of this visual context are handled
         // by callbacks attached to particular elements and events. TODO: Figure out how
         // a window pane would work. How a text field / draggable slider would work.
-        for(auto& g:focus_context.focus_gained_){
-            node_focus_gained(app, g->node_);
+        for(auto& node:focus_context.focus_gained_){
+            node_focus_gained(app, node);
         }
 
-        for(auto& l:focus_context.focus_lost_){
-            node_focus_lost(app, l->node_);
+        for(auto& node:focus_context.focus_lost_){
+            node_focus_lost(app, node);
         }
     }
 
