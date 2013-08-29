@@ -188,13 +188,13 @@ void add_focus_action(glh::App* app, glh::SceneTree::Node* node, glh::FocusConte
     float incrspeed = 7.f;
 
     auto focus    = f(new NodeFocusState(node, focus_context), string_numerator("node_focus"));
-    auto ramp     = f(new ScalarRamp(decspeed, incrspeed), string_numerator("ramp"));
+    auto mix     = f(new MixScalar(decspeed, incrspeed), string_numerator("mix"));
     auto noderes  = f(new NodeReciever(node), string_numerator("node_reciever"));
 
     auto lnk = DynamicNodeRef::linker(graph);
 
-    lnk(focus, GLH_PROPERTY_INTERPOLANT, ramp, GLH_PROPERTY_INTERPOLANT);
-    lnk(ramp, GLH_PROPERTY_INTERPOLANT, noderes, COLOR_DELTA);
+    lnk(focus, GLH_PROPERTY_INTERPOLANT, mix, GLH_PROPERTY_INTERPOLANT);
+    lnk(mix, GLH_PROPERTY_INTERPOLANT, noderes, COLOR_DELTA);
 }
 
 void init_uniform_data(){
@@ -273,6 +273,7 @@ bool init(glh::App* app)
         set_material(*n, COLOR_DELTA, 0.f);
         add(nodes, n);
         add_color_interpolation_to_graph(app, n);
+        add_focus_action(app, n, focus_context, graph, string_numerator);
     }
     graph.solve_dependencies();
 
@@ -407,7 +408,7 @@ void do_selection_pass(glh::App* app){
 
     glh::FocusContext::Focus focus = focus_context.start_event_handling();
 
-    if(g_read_color_at_mouse){
+    //if(g_read_color_at_mouse){
         auto picked = render_picker->render_selectables(env, g_mouse_x, g_mouse_y);
 
         for(auto p: picked){
@@ -415,8 +416,8 @@ void do_selection_pass(glh::App* app){
         }
         focus.update_event_state();
 
-        g_read_color_at_mouse = false;
-    }
+       // g_read_color_at_mouse = false;
+    //}
 }
 
 void do_render_pass(glh::App* app){
@@ -436,13 +437,13 @@ Eigen::aligned_allocator<std::pair<glh::UiEntity*, glh::vec4>>> prev_color;
 // for submitted high-level elements.
 void node_focus_gained(glh::App* app, glh::SceneTree::Node* node){
     std::cout << "Focus gained:" << node->name_<< std::endl;
-    node->material_.scalar_[COLOR_DELTA] = 7.0f;
+    //node->material_.scalar_[COLOR_DELTA] = 7.0f;
     focused.insert(node);
 }
 
 void node_focus_lost(glh::App* app, glh::SceneTree::Node* node){
     std::cout << "Focus lost:" << node->name_<< std::endl;
-    node->material_.scalar_[COLOR_DELTA] = -2.0f;
+    //node->material_.scalar_[COLOR_DELTA] = -2.0f;
     focused.erase(node);
 }
 
@@ -466,11 +467,11 @@ void render(glh::App* app){
         // by callbacks attached to particular elements and events. TODO: Figure out how
         // a window pane would work. How a text field / draggable slider would work.
         for(auto& node:focus_context.focus_gained_){
-            node_focus_gained(app, node);
+           node_focus_gained(app, node);
         }
 
         for(auto& node:focus_context.focus_lost_){
-            node_focus_lost(app, node);
+          node_focus_lost(app, node);
         }
     }
 

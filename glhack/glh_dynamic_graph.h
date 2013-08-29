@@ -618,6 +618,40 @@ public:
     }
 };
 
+/** Mix inputs of scalar. */
+class MixScalar : public DynamicGraph::DynamicNode{
+public:
+
+    MixScalar(){
+        set_output(GLH_PROPERTY_INTERPOLANT, DynamicGraph::Value::Scalar, 0.f);
+
+        add_input(GLH_PROPERTY_1,  DynamicGraph::Value::Scalar, 0.f);
+        add_input(GLH_PROPERTY_2,  DynamicGraph::Value::Scalar, 1.f);
+
+        add_input(GLH_PROPERTY_INTERPOLANT, DynamicGraph::Value::Scalar, 0.0f);
+    }
+
+     MixScalar(float fst, float snd){
+        set_output(GLH_PROPERTY_INTERPOLANT, DynamicGraph::Value::Scalar, 0.f);
+
+        add_input(GLH_PROPERTY_1,  DynamicGraph::Value::Scalar, fst);
+        add_input(GLH_PROPERTY_2,  DynamicGraph::Value::Scalar, snd);
+
+        add_input(GLH_PROPERTY_INTERPOLANT, DynamicGraph::Value::Scalar, 0.0f);
+    }
+
+    void eval() override {
+        float out;
+        float color1       = read_input<float>(GLH_PROPERTY_1);
+        float color2       = read_input<float>(GLH_PROPERTY_2);
+        float interpolant = read_input<float>(GLH_PROPERTY_INTERPOLANT);
+        interpolant = constrain(interpolant, 0.0f, 1.0f);
+        out = lerp(interpolant, color1, color2);
+
+        set_output(GLH_PROPERTY_INTERPOLANT, DynamicGraph::Value::Scalar, out);
+    }
+};
+
 /** Offset: bias, scale */
 class ScalarOffset : public DynamicGraph::DynamicNode{
 public:
@@ -725,7 +759,9 @@ public:
     SceneTree::Node* node_;
     FocusContext&    context_;
 
-    NodeFocusState(SceneTree::Node* node, FocusContext& context):node_(node), context_(context){}
+    NodeFocusState(SceneTree::Node* node, FocusContext& context):node_(node), context_(context){
+        set_output(GLH_PROPERTY_INTERPOLANT, DynamicGraph::Value::Scalar, 0.0f);
+    }
 
     bool is_focused(){
         return context_.currently_focused_.contains(node_);}
