@@ -274,7 +274,8 @@ public:
         *   in some cases. Think it as a driving voltage over a diode.
         *   In these instances 0.f is returned for false and 1.f for true.
         *   The value can then be used e.g. for mixing nodes and they are converted
-        *   into gates. This simplifies handling various context based events etc.*/
+        *   into gates. This simplifies handling various context based events etc. 
+        *   Do not let this leak beyond the DynamicGraph.*/
         static bool is_truthy(float f){return f > 0.9999f;}
 
         void get(float& res) const {res = value_[0];}
@@ -652,6 +653,11 @@ public:
        set_output(GLH_PROPERTY_INTERPOLANT, 0.f);
     }
 
+    ScalarRamp(float lower, float higher):lower_(lower), higher_(higher), easing_(Animation::Easing::Linear){
+       add_input(GLH_PROPERTY_INTERPOLANT, 0.f); 
+       set_output(GLH_PROPERTY_INTERPOLANT, 0.f);
+    }
+
     void eval() override {
         float value = read_input<float>(GLH_PROPERTY_INTERPOLANT);
 
@@ -714,36 +720,21 @@ public:
 };
 
 /**  */
-class EventFilter : public DynamicGraph::DynamicNode{
+class NodeFocusState : public DynamicGraph::DynamicNode{
 public:
-
-    enum FilteredChannel{Focused, FocusGained, FocusLost};
-
-    std::vector<int> filtered_ids_;
+    SceneTree::Node* node_;
     FocusContext&    context_;
-    FilteredChannel  channel_;
 
-    EventFilter(FocusContext& context, std::vector<int> filtered_ids, FilteredChannel channel):
-        context_(context), filtered_ids_(filtered_ids), channel_(channel){
-        set_output(GLH_PROPERTY_INTERPOLANT, DynamicGraph::Value::Scalar, 0.f);
-    }
+    NodeFocusState(SceneTree::Node* node, FocusContext& context):node_(node), context_(context){}
 
-    bool is_in(FocusContext::entity_container_t& ent){
-        for(auto id:filtered_ids_){
-
-        }
-    }
+    bool is_focused(){
+        return context_.currently_focused_.contains(node_);}
 
     void eval() override {
-        bool result = false;
-        if(channel_ == Focused){
-        }
-        else if(channel_ == FocusGained){
-        }
-        else if(channel_ == FocusLost){
-        }
+        bool focused = is_focused();
+        if(focused){set_output(GLH_PROPERTY_INTERPOLANT, DynamicGraph::Value::Scalar, 1.0f);}
+        else{set_output(GLH_PROPERTY_INTERPOLANT, DynamicGraph::Value::Scalar, 0.0f);}
     }
-
 };
 
 struct DynamicNodeRef{
@@ -760,7 +751,20 @@ struct DynamicNodeRef{
     void add(glh::DynamicGraph& graph){
         graph.add_node(name_, node_);
     }
+
+    static std::function<DynamicNodeRef(DynamicGraph::DynamicNode* node, const std::string& name)> factory(glh::DynamicGraph& graph){
+        return [&graph](DynamicGraph::DynamicNode* node, const std::string& name)->DynamicNodeRef{
+            return DynamicNodeRef(node, name, graph);
+        };
+    }
+    static std::function<void(DynamicNodeRef, const DynamicGraph::var_id_t&, DynamicNodeRef, const DynamicGraph::var_id_t&)> linker(glh::DynamicGraph& graph){
+        return [&graph](DynamicNodeRef src, const DynamicGraph::var_id_t& srcvar, DynamicNodeRef dst, const DynamicGraph::var_id_t& dstvar){
+            graph.add_link(src.name_, srcvar, dst.name_, dstvar);
+        };
+    }
+
 };
+
 
 
 } // namespace glh

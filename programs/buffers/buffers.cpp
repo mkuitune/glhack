@@ -150,31 +150,51 @@ glh::DynamicGraph graph;
 
 void add_color_interpolation_to_graph(glh::App* app, glh::SceneTree::Node* node){
     using namespace glh;
-    
-    auto sys      = DynamicNodeRef(new SystemInput(app), "sys", graph);
-    auto ramp     = DynamicNodeRef(new ScalarRamp(), string_numerator("ramp"), graph);
-    auto dynvalue = DynamicNodeRef(new LimitedIncrementalValue(0.0, 0.0, 1.0), string_numerator("dynvalue"), graph);
-    auto offset   = DynamicNodeRef(new ScalarOffset(), string_numerator("offset"), graph);
-    auto mix      = DynamicNodeRef(new MixNode(), string_numerator("mix"), graph);
+    auto f = DynamicNodeRef::factory(graph);
+
+    auto sys      = f(new SystemInput(app), "sys");
+    auto ramp     = f(new ScalarRamp(), string_numerator("ramp"));
+    auto dynvalue = f(new LimitedIncrementalValue(0.0, 0.0, 1.0), string_numerator("dynvalue"));
+    auto offset   = f(new ScalarOffset(), string_numerator("offset"));
+    auto mix      = f(new MixNode(), string_numerator("mix"));
 
     std::list<std::string> vars = list(std::string(COLOR_DELTA), 
                                        std::string(PRIMARY_COLOR),
                                        std::string(SECONDARY_COLOR));
 
-    auto nodesource = DynamicNodeRef(new NodeSource(node, vars),string_numerator("nodesource"), graph);
-    auto nodereciever = DynamicNodeRef(new NodeReciever(node),string_numerator("nodereciever"), graph);
+    auto nodesource = f(new NodeSource(node, vars),string_numerator("nodesource"));
+    auto nodereciever = f(new NodeReciever(node),string_numerator("nodereciever"));
 
-    graph.add_link(sys.name_, GLH_PROPERTY_TIME_DELTA, offset.name_, GLH_PROPERTY_INTERPOLANT);
-    graph.add_link(nodesource.name_, COLOR_DELTA, offset.name_, GLH_PROPERTY_SCALE);
+    auto lnk = DynamicNodeRef::linker(graph);
 
-    graph.add_link(offset.name_, GLH_PROPERTY_INTERPOLANT, dynvalue.name_, GLH_PROPERTY_DELTA);
-    graph.add_link(dynvalue.name_, GLH_PROPERTY_INTERPOLANT,  ramp.name_, GLH_PROPERTY_INTERPOLANT);
+    lnk(sys, GLH_PROPERTY_TIME_DELTA, offset, GLH_PROPERTY_INTERPOLANT);
+    lnk(nodesource, COLOR_DELTA, offset, GLH_PROPERTY_SCALE);
 
-    graph.add_link(ramp.name_, GLH_PROPERTY_INTERPOLANT, mix.name_, GLH_PROPERTY_INTERPOLANT);
-    graph.add_link(nodesource.name_, PRIMARY_COLOR, mix.name_, GLH_PROPERTY_1);
-    graph.add_link(nodesource.name_, SECONDARY_COLOR, mix.name_, GLH_PROPERTY_2);
+    lnk(offset, GLH_PROPERTY_INTERPOLANT, dynvalue, GLH_PROPERTY_DELTA);
+    lnk(dynvalue, GLH_PROPERTY_INTERPOLANT,  ramp, GLH_PROPERTY_INTERPOLANT);
 
-    graph.add_link(mix.name_, GLH_PROPERTY_COLOR, nodereciever.name_, FIXED_COLOR);
+    lnk(ramp, GLH_PROPERTY_INTERPOLANT, mix, GLH_PROPERTY_INTERPOLANT);
+    lnk(nodesource, PRIMARY_COLOR, mix, GLH_PROPERTY_1);
+    lnk(nodesource, SECONDARY_COLOR, mix, GLH_PROPERTY_2);
+
+    lnk(mix, GLH_PROPERTY_COLOR, nodereciever, FIXED_COLOR);
+}
+
+void add_focus_action(glh::App* app, glh::SceneTree::Node* node, glh::FocusContext& focus_context, glh::DynamicGraph& graph, glh::StringNumerator& string_numerator){
+    using namespace glh;
+    auto f = DynamicNodeRef::factory(graph);
+
+    float decspeed = -2.f;
+    float incrspeed = 7.f;
+
+    auto focus    = f(new NodeFocusState(node, focus_context), string_numerator("node_focus"));
+    auto ramp     = f(new ScalarRamp(decspeed, incrspeed), string_numerator("ramp"));
+    auto noderes  = f(new NodeReciever(node), string_numerator("node_reciever"));
+
+    auto lnk = DynamicNodeRef::linker(graph);
+
+    lnk(focus, GLH_PROPERTY_INTERPOLANT, ramp, GLH_PROPERTY_INTERPOLANT);
+    lnk(ramp, GLH_PROPERTY_INTERPOLANT, noderes, COLOR_DELTA);
 }
 
 void init_uniform_data(){

@@ -608,6 +608,10 @@ struct SortedArray
         return i == end() || cmp_(t, *i) ? end() : i;
     }
 
+    bool contains(const T& t) const {
+        return find(t) != end();
+    }
+
     void erase(const T& t)
     {
         data_.erase(std::remove(begin(), end(), t), end());
