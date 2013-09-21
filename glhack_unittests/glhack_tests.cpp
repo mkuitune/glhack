@@ -187,6 +187,10 @@ UTEST(scene, scene_rai_test)
     SceneTree::Node* n1 = scene.add_node(n0);   add_counts(n1);
     SceneTree::Node* n2 = scene.add_node(n0);   add_counts(n2);
     SceneTree::Node* n3 = scene.add_node(n1);   add_counts(n3);
+    SceneTree::Node* n4 = scene.add_node(n1);   add_counts(n4);
+    SceneTree::Node* n5 = scene.add_node(root); add_counts(n5);
+    SceneTree::Node* n6 = scene.add_node(n5); add_counts(n6);
+    SceneTree::Node* n7 = scene.add_node(n5); add_counts(n7);
 
     scene.update();
 

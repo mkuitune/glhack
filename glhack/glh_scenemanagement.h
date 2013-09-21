@@ -21,6 +21,7 @@ public:
 
         std::string name_;
         int         id_;
+        bool        pickable_; // TODO: Preferably, remove from here (UI stuff)
 
         RenderEnvironment material_;
 
@@ -44,7 +45,7 @@ public:
             reset_data();}
 
         void reset_data(){
-
+            pickable_ = true;
             location_ = vec3(0.f, 0.f, 0.f);
             scale_    = vec3(1.f, 1.f, 1.f);
             rotation_ = quaternion(1.f, 0.f, 0.f, 0.f);
@@ -120,7 +121,7 @@ public:
         Node* operator->(){return current_;}
 
         // Non-Stl-like utility function to get node parent
-        Node* parent(){}
+        Node* parent(){/*??? do we need this*/}
 
         Iterator& top(){return stack_.top();}
 
@@ -139,16 +140,12 @@ public:
             if(stack_.empty()){current_ = 0;}
             else if(!next_from_top()){
                 stack_.pop();
-                next_from_stack();
-            }
-        }
+                next_from_stack();}}
 
         void operator++(){
             if(current_){
                 push();
-                next_from_stack();
-            }
-        }
+                next_from_stack();}}
 
         bool operator!=(const tree_iterator& other){
             return current_ != other.current_;
@@ -228,12 +225,12 @@ public:
     // Render items in queue
     void render(GraphicsManager* manager, glh::RenderEnvironment& env){
         for(auto n:renderables_){
-            manager->render(*n->renderable_, n->material_,env);}}
+            if(n->pickable_) manager->render(*n->renderable_, n->material_,env);}}
 
     // Render items in queue by overloading program
     void render(GraphicsManager* manager, ProgramHandle& program, glh::RenderEnvironment& env){
         for(auto n:renderables_){
-            manager->render(*n->renderable_, program, n->material_, env);}}
+            if(n->pickable_) manager->render(*n->renderable_, program, n->material_, env);}}
 
     void clear(){renderables_.clear();}
 
@@ -395,7 +392,7 @@ public:
 
         if(bounds_ok){
             for(auto node: (*render_queue_)){
-                UiEntity::render(node, *gm, *selection_program_, env);}
+                if(node->pickable_) UiEntity::render(node, *gm, *selection_program_, env);}
 
             //Once all the items are rendered do picking
             selected_id_ = do_picking(read_bounds);
