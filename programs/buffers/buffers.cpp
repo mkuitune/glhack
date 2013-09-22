@@ -133,7 +133,9 @@ int obj_id = glh::ObjectRoster::max_id / 2;
 glh::RenderPickerPtr render_picker;
 
 glh::SceneTree                     scene;
+glh::RenderQueue                   selectable_queue;
 glh::RenderQueue                   render_queueue;
+glh::RenderQueue                   top_queue;
 std::vector<glh::SceneTree::Node*> nodes;
 
 glh::DynamicSystem      dynamics;
@@ -282,8 +284,6 @@ bool init(glh::App* app)
     return true;
 }
 
-std::set<glh::SceneTree::Node*> focused;
-
 //TODO: Into a graph node 
 void mouse_move_node(glh::App* app, glh::SceneTree::Node* node, vec2i delta)
 {
@@ -302,8 +302,11 @@ void mouse_move_node(glh::App* app, glh::SceneTree::Node* node, vec2i delta)
     node->location_ = node->location_ + nd;
 }
 
+
+
 // TODO: Figure out a more elegant formulation for this.
 // State machines are state machines...
+namespace glh {
 struct Mouse{
 
     struct Event{
@@ -311,12 +314,14 @@ struct Mouse{
     };
 
     std::stack<Event::t> events_;
-    std::vector<glh::SceneTree::Node*> grabbed;
+    std::vector<SceneTree::Node*> dragged;
+
 
     bool left_button_down_;
 
 
-    Mouse():left_button_down_(false){
+    Mouse(FocusContext& focus_context):
+        left_button_down_(false), focus_context_(focus_context){
         current_ = glh::vec2i(0,0);
         prev_ = glh::vec2i(0,0);
     }
@@ -340,6 +345,11 @@ struct Mouse{
         events_.push(Event::MouseMoved);
     }
 
+    // TODO: Add events!
+    // - when draggins stops to element, the element gets the color of the dragged
+    // - when an item is selected, assign a new random color to it by pressing r
+    // - add new dynamic action when dragged - scale the node a little bit smaller when dragging - scale back when released
+
     // Must call only after selection context has been filled
     void update(){
         // Handle events
@@ -347,30 +357,46 @@ struct Mouse{
             Event::t e = events_.top();
             events_.pop();
             if(e == Event::LeftButtonActivated){
-                for(glh::SceneTree::Node* node: focused){
-                    grabbed.push_back(node);
+                for(SceneTree::Node* node: focus_context_.currently_focused_){
+                    dragged.push_back(node);
+                    node->interaction_lock_ = true;
                 }
             }
             else if(e == Event::LeftButtonDeactivated){
-                grabbed.clear();
+                // TODO: End drag events.
+                // If a dragging stops on a node, figure out
+                // a) is there a rule to handle this specific dragged on-to situation
+                // b) apply the rule.
+                for(auto node:dragged) node->interaction_lock_ = false;
+                dragged.clear();
             }
             else if(e == Event::MouseMoved){
                 vec2i delta = current_ - prev_;
-                for(glh::SceneTree::Node* node: grabbed){
+                // TODO: Replace with dynamic graph network attached to each renderable node
+                for(SceneTree::Node* node: dragged){
                     mouse_move_node(app_, node, delta);
                 }
             }
         }
     }
 
-    glh::App* app_;
+    App* app_;
+    FocusContext& focus_context_;
 
-    glh::vec2i current_;
-    glh::vec2i prev_;
+    vec2i current_;
+    vec2i prev_;
 }; 
+}
 
-Mouse mouse;
+glh::Mouse mouse(focus_context);
 
+
+bool pass_pickable(glh::SceneTree::Node* node){return node->pickable_;}
+bool pass_unpickable(glh::SceneTree::Node* node){return !node->pickable_;}
+bool pass_interaction_unlocked(glh::SceneTree::Node* node){return !node->interaction_lock_;}
+bool pass_interaction_locked(glh::SceneTree::Node* node){return node->interaction_lock_;}
+
+bool pass_pickable_and_unlocked(glh::SceneTree::Node* node){return pass_pickable(node) && pass_interaction_unlocked(node);}
 
 bool update(glh::App* app)
 {
@@ -395,9 +421,15 @@ bool update(glh::App* app)
     scene.apply_to_renderables();
 
     render_queueue.clear();
-    render_queueue.add(scene);
-    render_picker->attach_render_queue(&render_queueue);
+    render_queueue.add(scene, pass_interaction_unlocked);
 
+    selectable_queue.clear();
+    selectable_queue.add(scene, pass_pickable_and_unlocked);
+    render_picker->attach_render_queue(&selectable_queue);
+
+    top_queue.clear();
+    top_queue.add(scene, pass_interaction_locked);
+    
     return g_run;
 }
 
@@ -428,54 +460,19 @@ void do_render_pass(glh::App* app){
     apply(g_renderpass_settings);
     //render_queueue.render(gm, env);
     render_queueue.render(gm, *sp_colored_program, env);
+    top_queue.render(gm, *sp_colored_program, env);
 }
 
 std::map<glh::SceneTree::Node*, glh::vec4, std::less<glh::SceneTree::Node*>,
 Eigen::aligned_allocator<std::pair<glh::UiEntity*, glh::vec4>>> prev_color;
 
-// TODO: Move UI handling to separate class that accepts callbacks
-// for submitted high-level elements.
-void node_focus_gained(glh::App* app, glh::SceneTree::Node* node){
-    std::cout << "Focus gained:" << node->name_<< std::endl;
-    //node->material_.scalar_[COLOR_DELTA] = 7.0f;
-    focused.insert(node);
-}
-
-void node_focus_lost(glh::App* app, glh::SceneTree::Node* node){
-    std::cout << "Focus lost:" << node->name_<< std::endl;
-    //node->material_.scalar_[COLOR_DELTA] = -2.0f;
-    focused.erase(node);
-}
-
 void render(glh::App* app){
+
+    mouse.update();
+
     do_selection_pass(app);
     do_render_pass(app);
 
-    // Kinda not rendering anymore, now were doing UI handling.
-    // TODO: Figure this out. All this is because picking is tied to rendering.
-    // Maybe need third pass. Or then do update after render pass?
-    if(focus_context.event_handling_done_){
-
-        // TODO: Extract to UiContextManager or such
-        // These sequences are particular events.
-        // specific callbacks could be attached to nodes themselves.
-        // The vanilla version here is equivalent to formulation where
-        // each node would have a callback attached to the focus_gained_ event
-        // and this message was passed to each node. Since this can result in pretty
-        // highlevel stuff it's perhaps best that UI dynamics is handled aggergated
-        // in a highlevel form, while actions outside of this visual context are handled
-        // by callbacks attached to particular elements and events. TODO: Figure out how
-        // a window pane would work. How a text field / draggable slider would work.
-        for(auto& node:focus_context.focus_gained_){
-           node_focus_gained(app, node);
-        }
-
-        for(auto& node:focus_context.focus_lost_){
-          node_focus_lost(app, node);
-        }
-    }
-
-    mouse.update();
 }
 
 void resize(glh::App* app, int width, int height){

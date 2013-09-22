@@ -22,6 +22,7 @@ public:
         std::string name_;
         int         id_;
         bool        pickable_; // TODO: Preferably, remove from here (UI stuff)
+        bool        interaction_lock_; // Lock for when dragged and so on. TODO: Preferably, remove from here (UI stuff)
 
         RenderEnvironment material_;
 
@@ -46,6 +47,7 @@ public:
 
         void reset_data(){
             pickable_ = true;
+            interaction_lock_ = false;
             location_ = vec3(0.f, 0.f, 0.f);
             scale_    = vec3(1.f, 1.f, 1.f);
             rotation_ = quaternion(1.f, 0.f, 0.f, 0.f);
@@ -213,6 +215,8 @@ public:
 
     typedef ArenaQueue<SceneTree::Node*> node_ptr_sequence_t;
 
+    typedef std::function<bool(SceneTree::Node*)> node_filter_fun_t;
+
     RenderQueue(){}
 
     void add(SceneTree::Node* node){
@@ -222,15 +226,20 @@ public:
         for(SceneTree::Node* node: scene){
             if(node->renderable()) add(node);}}
 
+    void add(SceneTree& scene, node_filter_fun_t filter){
+        for(SceneTree::Node* node: scene){
+            if(node->renderable() && filter(node)) add(node);}}
+
+
     // Render items in queue
     void render(GraphicsManager* manager, glh::RenderEnvironment& env){
         for(auto n:renderables_){
-            if(n->pickable_) manager->render(*n->renderable_, n->material_,env);}}
+            manager->render(*n->renderable_, n->material_,env);}}
 
     // Render items in queue by overloading program
     void render(GraphicsManager* manager, ProgramHandle& program, glh::RenderEnvironment& env){
         for(auto n:renderables_){
-            if(n->pickable_) manager->render(*n->renderable_, program, n->material_, env);}}
+            manager->render(*n->renderable_, program, n->material_, env);}}
 
     void clear(){renderables_.clear();}
 
@@ -241,6 +250,13 @@ public:
         return renderables_.end();}
 
     node_ptr_sequence_t renderables_;
+};
+
+// TODO: Do we need this?
+class RenderPass{
+public:
+    RenderPassSettings settings_;
+    RenderQueue queue_;
 };
 
 ///////////// UiEvents //////////////
