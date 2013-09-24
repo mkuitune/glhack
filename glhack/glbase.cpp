@@ -213,13 +213,6 @@ bool App::start()
 
         if(glfwOpenWindow(width, height, 0,0,0,0,0,0, mode))
         {
-            // Bind event callbacks
-            glfwSetKeyCallback(local_key_callback);
-            glfwSetMouseWheelCallback(local_mousewheel_callback);
-            glfwSetMousePosCallback(local_mouseposition_callback);
-            glfwSetMouseButtonCallback(local_mousebutton_callback);
-            glfwSetWindowSizeCallback(local_windows_resize_callback);
-
 
             // Init glew
             GLint GlewInitResult = glewInit();
@@ -250,7 +243,18 @@ bool App::start()
         }
     }
 
-    if(initialized && config_.init) initialized = config_.init(this);
+    if(initialized && config_.init)
+    {
+        // Initialize app resources and bind callback adapters.
+        initialized = config_.init(this);
+
+        // Bind event callbacks
+        glfwSetKeyCallback(local_key_callback);
+        glfwSetMouseWheelCallback(local_mousewheel_callback);
+        glfwSetMousePosCallback(local_mouseposition_callback);
+        glfwSetMouseButtonCallback(local_mousebutton_callback);
+        glfwSetWindowSizeCallback(local_windows_resize_callback);
+    }
 
     return initialized;
 }

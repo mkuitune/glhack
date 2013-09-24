@@ -33,6 +33,8 @@ const char* uictx_sh_fragment_selection_color =
 
 void UiContext::init_assets(){
 
+    add_mouse_move_callback(app_, std::bind( &UiContext::move, this, std::placeholders::_1, std::placeholders::_2));
+
     sp_select_program_  = manager_.create_program(uictx_sp_select, sh_geometry,
             uictx_sh_vertex_obj, uictx_sh_fragment_selection_color);
 

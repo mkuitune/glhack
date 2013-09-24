@@ -123,9 +123,6 @@ glh::RenderEnvironment env;
 
 std::shared_ptr<glh::FontContext> fontcontext;
 
-int g_mouse_x;
-int g_mouse_y;
-
 glh::ObjectRoster::IdGenerator idgen;
 
 int obj_id = glh::ObjectRoster::max_id / 2;
@@ -139,7 +136,6 @@ glh::RenderQueue                   top_queue;
 std::vector<glh::SceneTree::Node*> nodes;
 
 glh::DynamicSystem      dynamics;
-glh::FocusContext       focus_context;
 glh::StringNumerator    string_numerator;
 
 std::unique_ptr<glh::UiContext> ui_context;
@@ -221,12 +217,6 @@ void load_screenquad(vec2 size, glh::DefaultMesh& mesh)
     mesh_load_quad_xy(low, high, mesh);
 }
 
-void init_graph(){
-}
-
-void init_single_node_callback_chain(){
-}
-
 glh::SceneTree::Node* add_quad_to_scene(glh::GraphicsManager* gm, glh::ProgramHandle& program, glh::vec2 dims){
 
     glh::DefaultMesh* mesh = gm->create_mesh();
@@ -248,7 +238,7 @@ bool init(glh::App* app)
 
     GraphicsManager* gm = app->graphics_manager();
 
-    ui_context.reset(new UiContext(*gm, *app, graph, string_numerator));
+    ui_context.reset(new glh::UiContext(*gm, *app, graph, string_numerator));
 
     //sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment);
     sp_select_program  = gm->create_program(sp_select, sh_geometry, sh_vertex_obj, sh_fragment_selection_color);
@@ -275,7 +265,7 @@ bool init(glh::App* app)
         set_material(*n, COLOR_DELTA, 0.f);
         add(nodes, n);
         add_color_interpolation_to_graph(app, n);
-        add_focus_action(app, n, focus_context, graph, string_numerator);
+        add_focus_action(app, n, ui_context->focus_context_, graph, string_numerator);
     }
     graph.solve_dependencies();
 
@@ -283,112 +273,6 @@ bool init(glh::App* app)
 
     return true;
 }
-
-//TODO: Into a graph node 
-void mouse_move_node(glh::App* app, glh::SceneTree::Node* node, vec2i delta)
-{
-    glh::mat4 screen_to_view   = app_orthographic_pixel_projection(app);
-    glh::mat4 view_to_world    = glh::mat4::Identity();
-    glh::mat4 world_to_object  = glh::mat4::Identity();
-    glh::mat4 screen_to_object = world_to_object * view_to_world * screen_to_view ;
-
-    // should be replaced with view specific change vector...
-    // projection of the view change vector onto the workplane...
-    // etc.
-
-    glh::vec4 v((float) delta[0], (float) delta[1], 0, 0);
-    glh::vec3 nd = glh::decrease_dim<float, 4>(screen_to_object * v);
-
-    node->location_ = node->location_ + nd;
-}
-
-
-
-// TODO: Figure out a more elegant formulation for this.
-// State machines are state machines...
-namespace glh {
-struct Mouse{
-
-    struct Event{
-        enum t{LeftButtonActivated, LeftButtonDeactivated, MouseMoved};
-    };
-
-    std::stack<Event::t> events_;
-    std::vector<SceneTree::Node*> dragged;
-
-
-    bool left_button_down_;
-
-
-    Mouse(FocusContext& focus_context):
-        left_button_down_(false), focus_context_(focus_context){
-        current_ = glh::vec2i(0,0);
-        prev_ = glh::vec2i(0,0);
-    }
-
-    void left_button_is_down(){
-        if(!left_button_down_){
-            left_button_down_ = true;
-            events_.push(Event::LeftButtonActivated);
-        }
-    }
-
-    void left_button_up(){
-        left_button_down_ = false;
-        events_.push(Event::LeftButtonDeactivated);
-    }
-
-    void move(int x, int y){
-        prev_ = current_;
-        current_[0] = x;
-        current_[1] = y;
-        events_.push(Event::MouseMoved);
-    }
-
-    // TODO: Add events!
-    // - when draggins stops to element, the element gets the color of the dragged
-    // - when an item is selected, assign a new random color to it by pressing r
-    // - add new dynamic action when dragged - scale the node a little bit smaller when dragging - scale back when released
-
-    // Must call only after selection context has been filled
-    void update(){
-        // Handle events
-        while(!events_.empty()){
-            Event::t e = events_.top();
-            events_.pop();
-            if(e == Event::LeftButtonActivated){
-                for(SceneTree::Node* node: focus_context_.currently_focused_){
-                    dragged.push_back(node);
-                    node->interaction_lock_ = true;
-                }
-            }
-            else if(e == Event::LeftButtonDeactivated){
-                // TODO: End drag events.
-                // If a dragging stops on a node, figure out
-                // a) is there a rule to handle this specific dragged on-to situation
-                // b) apply the rule.
-                for(auto node:dragged) node->interaction_lock_ = false;
-                dragged.clear();
-            }
-            else if(e == Event::MouseMoved){
-                vec2i delta = current_ - prev_;
-                // TODO: Replace with dynamic graph network attached to each renderable node
-                for(SceneTree::Node* node: dragged){
-                    mouse_move_node(app_, node, delta);
-                }
-            }
-        }
-    }
-
-    App* app_;
-    FocusContext& focus_context_;
-
-    vec2i current_;
-    vec2i prev_;
-}; 
-}
-
-glh::Mouse mouse(focus_context);
 
 
 bool pass_pickable(glh::SceneTree::Node* node){return node->pickable_;}
@@ -433,23 +317,20 @@ bool update(glh::App* app)
     return g_run;
 }
 
-bool g_read_color_at_mouse = false;
-
 void do_selection_pass(glh::App* app){
     using namespace glh;
 
-    glh::FocusContext::Focus focus = focus_context.start_event_handling();
+    glh::FocusContext::Focus focus = ui_context->focus_context_.start_event_handling();
 
-    //if(g_read_color_at_mouse){
-        auto picked = render_picker->render_selectables(env, g_mouse_x, g_mouse_y);
+    vec2i mouse = ui_context->mouse_current_;
 
-        for(auto p: picked){
-            focus.on_focus(p);
-        }
-        focus.update_event_state();
+    auto picked = render_picker->render_selectables(env, mouse[0], mouse[1]);
+    
+    for(auto p: picked){
+        focus.on_focus(p);
+    }
+    focus.update_event_state();
 
-       // g_read_color_at_mouse = false;
-    //}
 }
 
 void do_render_pass(glh::App* app){
@@ -458,7 +339,6 @@ void do_render_pass(glh::App* app){
     GraphicsManager* gm = app->graphics_manager();
 
     apply(g_renderpass_settings);
-    //render_queueue.render(gm, env);
     render_queueue.render(gm, *sp_colored_program, env);
     top_queue.render(gm, *sp_colored_program, env);
 }
@@ -468,7 +348,7 @@ Eigen::aligned_allocator<std::pair<glh::UiEntity*, glh::vec4>>> prev_color;
 
 void render(glh::App* app){
 
-    mouse.update();
+    ui_context->update();
 
     do_selection_pass(app);
     do_render_pass(app);
@@ -479,29 +359,17 @@ void resize(glh::App* app, int width, int height){
     std::cout << "Resize:" << width << " " << height << std::endl;
 }
 
-
-void mouse_move_callback(int x, int y)
-{
-    g_mouse_x = x;
-    g_mouse_y = y;
-    //std::cout << "Mouse:"  << x << " " << y << std::endl;
-    g_read_color_at_mouse = true;
-    mouse.move(x,y);
-}
-
 void mouse_button_callback(int key, const glh::Input::ButtonState& s)
 {
     using namespace glh;
 
     if(s == glh::Input::Held){
         std::cout << "Mouse down." << std::endl;
-        mouse.left_button_is_down();
+        ui_context->left_button_is_down();
     }
     else if(s == glh::Input::Released){
-        mouse.left_button_up();
+        ui_context->left_button_up();
     }
-
-    //if(key == Input::LeftButton && (s == glh::Input::Held)) g_read_color_at_mouse = true;
 }
 
 void key_callback(int key, const glh::Input::ButtonState& s)
@@ -523,13 +391,14 @@ int main(int arch, char* argv)
 
     glh::App app(config);
 
-    mouse.app_ = &app;
     render_picker = std::make_shared<glh::RenderPicker>(app);
 
     GLH_LOG_EXPR("Logger started");
     add_key_callback(app, key_callback);
     add_mouse_button_callback(app, mouse_button_callback);
-    add_mouse_move_callback(app, mouse_move_callback);
+
+    // Cannot initialize gl resources here. Must go into init().
+
     glh::default_main(app);
 
     return 0;
