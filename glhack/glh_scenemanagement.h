@@ -9,6 +9,22 @@
 
 namespace glh{
 
+struct Transform{
+
+    vec3       position_;
+    vec3       scale_;
+    quaternion rotation_;
+
+    Transform(){initialize();}
+
+    void initialize(){
+        position_ = vec3(0.f, 0.f, 0.f);
+        scale_    = vec3(1.f, 1.f, 1.f);
+        rotation_ = quaternion(1.f, 0.f, 0.f, 0.f);
+    }
+
+    mat4 matrix(){return generate_transform<float>(position_, rotation_, scale_).matrix();}
+};
 
 class SceneTree{
 public:
@@ -17,7 +33,6 @@ public:
         typedef std::vector<Node*> ChildContainer;
 
         mat4  local_to_world_;
-        mat4  local_to_parent_;
 
         std::string name_;
         int         id_;
@@ -26,9 +41,7 @@ public:
 
         RenderEnvironment material_;
 
-        vec3       location_;
-        vec3       scale_;
-        quaternion rotation_;
+        Transform transform_; // local to parent transform
 
         Box3f local_bounds_AAB_;
         Box3f world_bounds_AAB_;
@@ -48,12 +61,9 @@ public:
         void reset_data(){
             pickable_ = true;
             interaction_lock_ = false;
-            location_ = vec3(0.f, 0.f, 0.f);
-            scale_    = vec3(1.f, 1.f, 1.f);
-            rotation_ = quaternion(1.f, 0.f, 0.f, 0.f);
+            transform_.initialize();
 
             local_to_world_ = mat4::Identity();
-            local_to_parent_ = mat4::Identity();
         }
 
         // TODO: Must update bounds!
@@ -70,12 +80,7 @@ public:
         }
 
         void update_transforms(const mat4& parent_local_to_world){
-
-            transform3 t = generate_transform<float>(location_, rotation_, scale_);
-
-            local_to_parent_ = t.matrix();
-
-            local_to_world_ = local_to_parent_ * parent_local_to_world;
+            local_to_world_ = transform_.matrix() * parent_local_to_world;
             update_transforms();
         }
 

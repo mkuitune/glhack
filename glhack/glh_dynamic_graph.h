@@ -529,9 +529,9 @@ public:
 
     void read_in_val( const std::string& name, DynamicGraph::constvalue_t_ptr val){
         if(val->type_ != DynamicGraph::Value::Empty){
-                 if(name == GLH_CHANNEL_ROTATION){val->get(node_->rotation_);}
-            else if(name == GLH_CHANNEL_POSITION){val->get(node_->location_);} //TODO MUSTFIX rename node location_ to position_
-            else if(name == GLH_CHANNEL_SCALE)   {val->get(node_->scale_);}
+                 if(name == GLH_CHANNEL_ROTATION){val->get(node_->transform_.rotation_);}
+            else if(name == GLH_CHANNEL_POSITION){val->get(node_->transform_.position_);}
+            else if(name == GLH_CHANNEL_SCALE)   {val->get(node_->transform_.scale_);}
 
             else{
                 // Handle:

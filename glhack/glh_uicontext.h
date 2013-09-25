@@ -99,7 +99,7 @@ public:
         glh::vec4 v((float) delta[0], (float) delta[1], 0, 0);
         glh::vec3 nd = glh::decrease_dim<float, 4>(screen_to_object * v);
     
-        node->location_ = node->location_ + nd;
+        node->transform_.position_ = node->transform_.position_ + nd;
     }
 
 

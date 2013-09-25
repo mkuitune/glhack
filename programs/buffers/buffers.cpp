@@ -257,7 +257,7 @@ bool init(glh::App* app)
     for(auto& s: quads){
         string name = string_numerator("node");
         auto n = add_quad_to_scene(gm, *sp_colored_program, s.dims);
-        n->location_ = s.pos;
+        n->transform_.position_ = s.pos;
         n->name_ = name;
         set_material(*n, FIXED_COLOR,    s.color_primary);
         set_material(*n, PRIMARY_COLOR,  s.color_primary);
