@@ -359,19 +359,6 @@ void resize(glh::App* app, int width, int height){
     std::cout << "Resize:" << width << " " << height << std::endl;
 }
 
-void mouse_button_callback(int key, const glh::Input::ButtonState& s)
-{
-    using namespace glh;
-
-    if(s == glh::Input::Held){
-        std::cout << "Mouse down." << std::endl;
-        ui_context->left_button_is_down();
-    }
-    else if(s == glh::Input::Released){
-        ui_context->left_button_up();
-    }
-}
-
 void key_callback(int key, const glh::Input::ButtonState& s)
 {
     using namespace glh;
@@ -395,7 +382,6 @@ int main(int arch, char* argv)
 
     GLH_LOG_EXPR("Logger started");
     add_key_callback(app, key_callback);
-    add_mouse_button_callback(app, mouse_button_callback);
 
     // Cannot initialize gl resources here. Must go into init().
 

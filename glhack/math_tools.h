@@ -103,13 +103,27 @@ struct ArrayN{
 
     T data_[N];
 
-    ArrayN(){memset(data_, sizeof(data_), 0);}
+    ArrayN(T x){
+        set_zero();
+        data_[0] = x;}
+    ArrayN(T x, T y){
+        set_zero();
+        data_[0] = x; data_[1] = y;}
+    ArrayN(T x, T y, T z){
+        set_zero();
+        data_[0] = x; data_[1] = y; data_[2] = z;}
+    ArrayN(T x, T y, T z, T w){
+        set_zero();
+        data_[0] = x; data_[1] = y; data_[2] = z; data_[3] = w;}
+    ArrayN(){set_zero();}
     ArrayN(const complement_t& in){
         for(int i = 0; i < N; ++i) data_[i] = in[i];}
     ArrayN(const ArrayN& in){
         for(int i = 0; i < N; ++i) data_[i] = in[i];}
     ArrayN(const T* data){
         for(int i = 0; i < N; ++i) data_[i] = data[i];}
+
+    void set_zero(){memset(data_, sizeof(data_), 0);}
 
     T& operator[](size_t i){return data_[i];}
     const T& operator[](size_t i) const {return data_[i];}

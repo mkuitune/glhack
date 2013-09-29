@@ -9,6 +9,35 @@
 
 namespace glh{
 
+class TransformGadget{
+public:
+
+    glh::App& app_;
+
+    TransformGadget(glh::App& app):app_(app){
+
+    }
+
+     //TODO: Into a graph node 
+    void mouse_move_node(vec2i mouse_delta, glh::SceneTree::Node* node)
+    {
+        glh::mat4 screen_to_view   = app_orthographic_pixel_projection(&app_);
+        glh::mat4 view_to_world    = glh::mat4::Identity();
+        glh::mat4 world_to_object  = glh::mat4::Identity();
+        glh::mat4 screen_to_object = world_to_object * view_to_world * screen_to_view ;
+    
+        // should be replaced with view specific change vector...
+        // projection of the view change vector onto the workplane...
+        // etc.
+    
+        glh::vec4 v((float) mouse_delta[0], (float) mouse_delta[1], 0, 0);
+        glh::vec3 node_pos_delta = glh::decrease_dim<float, 4>(screen_to_object * v);
+    
+        node->transform_.position_ = node->transform_.position_ + node_pos_delta;
+    }
+
+};
+
 /** Class that draws together several existing lower level system to create a UI context. */
 class UiContext{
 public:
@@ -21,8 +50,11 @@ public:
     };
 
 
+
     UiContext(GraphicsManager& manager, glh::App& app, DynamicGraph& graph, StringNumerator& string_numerator):
-        manager_(manager),app_(app), graph_(graph),string_numerator_(string_numerator), render_picker_(app){
+        manager_(manager),app_(app), graph_(graph),string_numerator_(string_numerator), render_picker_(app),
+        transform_gadget_(app)
+    {
         init_assets();
 
         left_button_down_ = false;
@@ -57,26 +89,37 @@ public:
         enum t{LeftButtonActivated, LeftButtonDeactivated, MouseMoved};
     };
 
-
-
-    void left_button_is_down(){
-        if(!left_button_down_){
-            left_button_down_ = true;
-            events_.push(Event::LeftButtonActivated);
-        }
-    }
-
-    void left_button_up(){
-        left_button_down_ = false;
-        events_.push(Event::LeftButtonDeactivated);
-    }
-
-    void move(int x, int y){
+    void mouse_move(int x, int y){
         mouse_prev_ = mouse_current_;
         mouse_current_[0] = x;
         mouse_current_[1] = y;
         events_.push(Event::MouseMoved);
     }
+
+    void mouse_button_callback(int key, const glh::Input::ButtonState& s)
+    {
+        using namespace glh;
+
+#define CASE_(key_param, state_param) (key == key_param && s == state_param)
+#define START_CASE(key_param, state_param) if CASE_(key_param, state_param) 
+#define CASE(key_param, state_param) else if CASE_(key_param, state_param)
+
+        START_CASE(Input::LeftButton, Input::Held){
+            if(!left_button_down_){
+                left_button_down_ = true;
+                events_.push(Event::LeftButtonActivated);
+            }
+        }
+        CASE(Input::LeftButton, glh::Input::Released){
+            left_button_down_ = false;
+            events_.push(Event::LeftButtonDeactivated);
+        }
+
+#undef CASE_
+#undef START_CASE_
+#undef CASE
+    }
+
 
     // TODO: Add events!
     // - when draggins stops to element, the element gets the color of the dragged
@@ -127,7 +170,7 @@ public:
                 vec2i delta = mouse_current_ - mouse_prev_;
                 // TODO: Replace with dynamic graph network attached to each renderable node
                 for(SceneTree::Node* node: dragged){
-                    mouse_move_node(app_, node, delta);
+                    transform_gadget_.mouse_move_node(delta, node);
                 }
             }
         }
@@ -136,6 +179,8 @@ public:
 //
 // Member variables
 //
+    TransformGadget transform_gadget_;
+
     vec2i mouse_current_;
     vec2i mouse_prev_;
 

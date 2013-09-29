@@ -260,13 +260,15 @@ class DynamicGraph{
 public:
 
     struct Value{
-        enum t{Empty, Scalar, Vector3, Vector4};
+        enum t{Empty, Scalar, Vector2, Vector3, Vector4};
 
         Value():type_(Empty){}
         Value(t type):type_(type){}
         Value(t type, float value):type_(type){
             value_.fill(value);
         }
+        Value(float x, float y):type_(Vector2), value_(x, y, 0.f, 0.f){}
+        Value(float x, float y, float z):type_(Vector3), value_(x, y, z, 0.f){}
         Value(t type, const array4& value):type_(type), value_(value){}
         Value(t type, const vec4& value):type_(type), value_(value){}
 
@@ -280,6 +282,7 @@ public:
 
         void get(float& res) const {res = value_[0];}
         void get(vec3& res) const {res = value_.change_dim<3>();}
+        void get(vec2& res) const {res = value_.change_dim<2>();}
         void get(vec4& res) const {res = value_.to_vec();}
         void get(quaternion& res) const {res = quaternion(value_.data_);}
 
@@ -772,6 +775,38 @@ public:
         else{set_output(GLH_PROPERTY_INTERPOLANT, DynamicGraph::Value::Scalar, 0.0f);}
     }
 };
+
+#if 0 // TODO figure this out.
+class TransformGadget : public DynamicGraph::DynamicNode{
+public:
+
+    mat4 input_to_target_;
+    vec3 transformer_centroid_;
+
+    TransformGadget(mat4 input_to_target, vec3 transformer_centroid_):input_to_target_(input_to_target){
+        add_input(GLH_PROPERTY_POSITION_DELTA, DynamicGraph::Value::Vector2, 0.f);
+
+        set_output(GLH_CHANNEL_ROTATION, DynamicGraph::Value::Vector3, 0.0f);
+        set_output(GLH_CHANNEL_SCALE, DynamicGraph::Value::Vector3, 0.0f);
+        set_output(GLH_CHANNEL_POSITION, DynamicGraph::Value::Vector3, 0.0f);
+    }
+
+    void eval() override {
+        vec2 dp_in  = read_input<vec2>(GLH_PROPERTY_POSITION_DELTA);
+
+        // ds: either distance dp to all or ... to specific dim
+        // dr: dp dot rotator tangent
+        vec3 dp;
+        vec3 ds;
+        vec3 dr;
+
+        set_output(GLH_CHANNEL_ROTATION, DynamicGraph::Value::Vector3, dr);
+        set_output(GLH_CHANNEL_SCALE, DynamicGraph::Value::Vector3, ds);
+        set_output(GLH_CHANNEL_POSITION, DynamicGraph::Value::Vector3, dp);
+
+    }
+};
+#endif
 
 struct DynamicNodeRef{
     DynamicGraph::dynamic_node_ptr_t node_;

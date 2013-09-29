@@ -33,7 +33,7 @@ public:
         typedef std::vector<Node*> ChildContainer;
 
         mat4  local_to_world_;
-
+        // Might have still need for local to parent transform in shaders?
         std::string name_;
         int         id_;
         bool        pickable_; // TODO: Preferably, remove from here (UI stuff)
