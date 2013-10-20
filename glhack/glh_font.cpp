@@ -73,6 +73,44 @@ BakedFontHandle FontContext::render_bitmap(
     return handle;
 }
 
+BakedFontHandle FontContext::render_bitmap(const FontConfig& config)
+{
+    std::string              path(font_directory_);
+    auto fontfile          = path_join(path, config.name_);  
+    BakedFontHandle handle = std::make_pair(config.name_, config.glyph_size_);
+    
+    std::vector<uint8_t> fontdata;
+    bool              data_found;
+    
+    std::tie(fontdata, data_found) = file_to_bytes(fontfile.c_str());
+
+    if(data_found)
+    {
+
+        const int pw = config.texture_width_;
+        const int ph = config.texture_height_;
+
+        bitmaps_.emplace(handle, Image8(pw, ph, 1));
+        chardata_.emplace(handle, new FontCharData());
+
+        const uint8_t *data = &fontdata[0];
+        int offset         = 0;
+        float pixel_height = to_float(config.glyph_size_);
+        uint8_t *pixels    = bitmaps_[handle].data();
+
+        int first_char     = 32;
+        int num_chars      = 96;
+
+        stbtt_bakedchar* chardata = chardata_[handle]->cdata;
+
+        stbtt_BakeFontBitmap(data, offset, pixel_height, pixels, pw,ph, first_char, num_chars, chardata);
+
+    }
+    else throw GraphicsException(std::string("render_bitmap_from_file: Fontfile ") + fontfile + std::string(" not found."));
+
+    return handle;
+}
+
 Image8* FontContext::get_font_map(const BakedFontHandle& handle) {
     return &bitmaps_[std::make_pair(handle.first, handle.second)];
 }
@@ -80,7 +118,6 @@ Image8* FontContext::get_font_map(const BakedFontHandle& handle) {
 FontCharData* FontContext::get_font_char_data(const BakedFontHandle& handle) {
     return chardata_[handle];
 }
-
 
 std::tuple<float, float> FontContext::write_pixel_coords_for_string(const std::string& string,
                                           const BakedFontHandle& handle, 
@@ -121,9 +158,5 @@ std::tuple<float, float> FontContext::write_pixel_coords_for_string(const std::s
     return std::make_tuple(xx, yy);
 }
 
-void print_string_to_image(Image8& image, vec2i position, Font& font, std::string& str)
-{
-    //TODO if needed at some point
-}
 
 }

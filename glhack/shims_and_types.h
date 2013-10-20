@@ -89,6 +89,10 @@ struct TextLine
     std::string string;
     int         line_number;
 
+    TextLine(const char* bfr, int lineno):string(bfr), line_number(lineno){}
+    TextLine(const std::string str, int lineno):string(str), line_number(lineno){}
+    TextLine():line_number(0){}
+
     const char* begin() const {return string.c_str();}
     const char* end() const {return string.c_str() + string.size();}
     int length(){return string.size();}

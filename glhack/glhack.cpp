@@ -660,25 +660,6 @@ public:
         return a;
     }
 
-    //virtual void GraphicsManagerInt::render(FullRenderable& r, RenderEnvironment& env) override {
-
-    //    if(!r.mesh()) throw GraphicsException("FullRenderable: trying to render without bound mesh.");
-
-    //    if(!r.meshdata_on_gpu_) r.transfer_vertexdata_to_gpu(); // TODO MUSTFIX: Store on-gpu status in buffers
-    //                                                            // So that FullRenderables may instantiate
-    //                                                            // meshes in stead of transferring them to gpu.
-
-    //    // TODO: Should here be transfer_texture_data_to_gpu
-
-    //    auto active = make_active(r.program_);
-    //    active.bind_vertex_input(r.device_buffers_.buffers_);
-
-    //    program_params_from_env(active, env);
-    //    program_params_from_env(active, r.material_);
-
-    //    active.draw();
-    //}
-
     virtual void GraphicsManagerInt::render(FullRenderable& r, RenderEnvironment& material, RenderEnvironment& env) override {
         render(r, *r.program_, material, env);
     }
@@ -718,6 +699,30 @@ public:
     virtual FullRenderable* create_renderable() override {
         renderables_.emplace_back(FullRenderablePtr(new glh::FullRenderable()));
         return renderables_.rbegin()->get();
+    }
+
+    template<class Collection, class Elem>
+    typename Collection::const_iterator try_find_referenced(const Collection& c, const Elem& e){
+        Collection::const_iterator end = c.end();
+        Collection::const_iterator iter = end;
+        for(auto fiter = c.begin(); fiter != end; ++fiter){
+            if(fiter->get() == e) {iter = fiter; break;}
+        }
+        return iter;
+    }
+
+    /** Erase mesh from context. Any fullrenderable references will not remain live
+    *   but result in corrupt state. TODO: REDESIGN so this does not happen. */
+    virtual void release_mesh(DefaultMesh* mesh) override
+    {
+        auto iter = try_find_referenced(meshes_, mesh);
+        if(iter != meshes_.end()){meshes_.erase(iter);}
+    }
+
+    virtual void release_renderable(FullRenderable* renderable) override 
+    {
+        auto iter = try_find_referenced(renderables_, renderable);
+        if(iter != renderables_.end()){renderables_.erase(iter);}
     }
 
 };

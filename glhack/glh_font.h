@@ -15,6 +15,14 @@ typedef std::pair<std::string, double> BakedFontHandle;
 
 struct FontCharData;
 
+/** Configures one face size of one font kind. */
+struct FontConfig{
+    double      glyph_size_; //> Size in pixels.
+    std::string name_;
+    int         texture_width_;
+    int         texture_height_;
+};
+
 /** Contains font rendering related state and data. */
 class FontContext {
 public:
@@ -24,6 +32,7 @@ public:
     std::list<std::string> list_fonts() const;
 
     BakedFontHandle render_bitmap(std::string& fontname, double font_size, int texture_size);
+    BakedFontHandle render_bitmap(const FontConfig& config);
 
     Image8*         get_font_map(const BakedFontHandle& handle);
     FontCharData*   get_font_char_data(const BakedFontHandle& handle);
@@ -39,7 +48,6 @@ public:
                                                            const BakedFontHandle& handle,
                                                            const float x, const float y,
                                                            std::vector<std::tuple<vec2, vec2>>& coords);
-
 private:
 
     const std::string font_directory_;
@@ -49,10 +57,6 @@ private:
 
 };
 
-struct Font{
-    int size;
-};
 
-void print_string_to_image(Image8& image, vec2i position, Font& font, std::string& str);
 
 }

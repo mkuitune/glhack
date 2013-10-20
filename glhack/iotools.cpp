@@ -33,12 +33,43 @@ bool file_exists(const char* path)
     return result;
 }
 
-std::list<std::string> list_dir(const char* path)
+static FilesystemReference::t typeof_entry(dirent *entry){
+
+    if(entry->d_type == DT_REG)      return FilesystemReference::File;
+    else if(entry->d_type == DT_DIR) return FilesystemReference::Directory;
+    else                             return FilesystemReference::Unsupported;
+}
+
+std::vector<FilesystemReference> list_dir(const char* path)
 {
-    std::list<std::string> contents;
+    std::vector<FilesystemReference> contents;
+
+    DIR *pdir     = 0;
+    dirent *entry = 0;
+
+    pdir = opendir(path); // opendir(".") for current directory
+
+    if(pdir){
+        while (entry = readdir (pdir)){
+
+            if (!entry) continue;
+
+            if(strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+                continue;
+
+            const std::string name(entry->d_name);
+            const std::string fullpath = path_join(std::string(path), name);
+            const FilesystemReference::t type = typeof_entry(entry);
+
+            if(type != FilesystemReference::Unsupported)
+                contents.push_back(FilesystemReference(name, fullpath, type));
+        }
+    }
 
     return contents;
 }
+
+
 
 bool is_file(const char* path)
 {
@@ -87,10 +118,25 @@ std::string path_join(const std::string& head, const std::string& tail)
     else return normalized_tail;
 }
 
-std::list<std::string> path_split(const std::string& path)
+std::vector<std::string> path_split(const std::string& path)
 {
-    std::list<std::string> segments;
-    segments.push_back(std::string("TODO IMPLEMENT"));
+    std::vector<std::string> segments;
+    char separator = platform_separator();
+    bool start_new_string = true;
+
+    for(auto i = path.begin(); i != path.end(); ++i)
+    {
+        if(*i != separator){
+            if(start_new_string){
+                segments.push_back(std::string());
+                start_new_string = false;
+            }
+
+            segments.back().push_back(*i);
+        } else {
+            start_new_string = true;
+        }
+    }
     return segments;
 }
 
@@ -193,3 +239,78 @@ bool OutputFile::write(const char* str)
 }
 
 std::ofstream& OutputFile::file(){return file_;}
+
+
+#if 0
+//
+// Main to test directory tools.
+//
+template<class ST>
+std::vector<std::string> split_stream_to_tokens(ST& stream_in)
+{
+    using namespace std;
+    vector<string> tokens;
+    copy(istream_iterator<string>(stream_in), istream_iterator<string>(), back_inserter(tokens));
+
+    return tokens;
+}
+
+std::vector<std::string> split_to_tokens(const std::string& in)
+{
+    std::istringstream iss(in);
+    return split_stream_to_tokens(iss);
+}
+
+void cmd_ls(const char* path)
+{
+    std::cout << "Directory contents:" << std::endl;
+
+    auto dircontent = list_dir(path);
+    for(auto d: dircontent){
+        if(d.type_ == FilesystemReference::File){
+            std::cout << d.name_ << std::endl;
+        }
+        else if (d.type_ == FilesystemReference::Directory){
+            std::cout << d.name_ << "/" <<std::endl;
+        }
+    }
+
+}
+
+#define CASE(string_param, match_param)if(string_param == std::string(match_param))
+
+void do_cmd(const std::string& cmd){
+    CASE(cmd, "ls") cmd_ls(".");
+}
+
+void do_cmd(const std::string& cmd, const std::string& param){
+    CASE(cmd, "ls") cmd_ls(param.c_str());
+}
+
+int main(int argc, char* argv[])
+{
+    std::string cmd;
+
+    while(cmd != std::string("q"))
+    {
+        std::getline(std::cin, cmd);
+        auto tokens = split_to_tokens(cmd);
+       
+        std::cout << "Tokens:";
+        if(tokens.size() > 0){
+            
+            std::cout << tokens[0];
+            auto begin = std::next(tokens.begin());
+            std::for_each(begin, tokens.end(), 
+                [](const std::string& str){std::cout << ", " << str;});
+        }
+        std::cout << std::endl;
+
+        if(tokens.size() == 1) do_cmd(tokens[0]);
+        if(tokens.size() == 2) do_cmd(tokens[0], tokens[1]);
+
+    }
+}
+
+
+#endif

@@ -14,8 +14,21 @@
 #include<vector>
 #include <cstdint>
 
+struct FilesystemReference{
+    enum t{File, Directory, Unsupported};
+
+    std::string name_;
+    std::string fullpath_;
+    t type_;
+
+    FilesystemReference(std::string name, std::string fullpath, t type):
+        name_(name), fullpath_(fullpath), type_(type)
+    {}
+
+};
+
 bool file_exists(const char* path);
-std::list<std::string> list_dir(const char* path);
+std::vector<FilesystemReference> list_dir(const char* path);
 bool is_file(const char* path);
 bool is_directory(const char* path);
 
@@ -30,7 +43,7 @@ bool string_to_file(const char* path, const char* string);
 std::string path_join(const std::string& head, const std::string& tail);
 
 /** Split path on '/ ' - to segments.*/
-std::list<std::string> path_split(const std::string& path);
+std::vector<std::string> path_split(const std::string& path);
 
 /** Return platform directory separator.*/
 char platform_separator();

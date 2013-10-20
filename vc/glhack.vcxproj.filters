@@ -64,5 +64,7 @@
     <ClInclude Include="..\glhack\glh_timebased_signals.h" />
     <ClInclude Include="..\glhack\glh_dynamic_graph.h" />
     <ClInclude Include="..\glhack\glh_uicontext.h" />
+    <ClInclude Include="..\glhack\directory_browser.h" />
+    <ClInclude Include="..\glhack\win32_dirent.h" />
   </ItemGroup>
 </Project>

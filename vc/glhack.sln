@@ -35,6 +35,9 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "buffers", "buffers.vcxproj"
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "vec_edit_a", "vec_edit_a.vcxproj", "{93BF68E8-1DED-4EAA-8CE0-A28C8A4ABED8}"
+	ProjectSection(ProjectDependencies) = postProject
+		{44F323EF-6A0E-4F1C-989F-ED5CEE4FC70F} = {44F323EF-6A0E-4F1C-989F-ED5CEE4FC70F}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -52,6 +52,7 @@
     <ClInclude Include="..\glhack\allocators.h" />
     <ClInclude Include="..\glhack\annotated_result.h" />
     <ClInclude Include="..\glhack\asset_manager.h" />
+    <ClInclude Include="..\glhack\directory_browser.h" />
     <ClInclude Include="..\glhack\geometry.h" />
     <ClInclude Include="..\glhack\glbase.h" />
     <ClInclude Include="..\glhack\glbuffers.h" />
@@ -80,6 +81,7 @@
     <ClInclude Include="..\glhack\shims_and_types.h" />
     <ClInclude Include="..\glhack\tinymt32.h" />
     <ClInclude Include="..\glhack\tinymt64.h" />
+    <ClInclude Include="..\glhack\win32_dirent.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{44F323EF-6A0E-4F1C-989F-ED5CEE4FC70F}</ProjectGuid>

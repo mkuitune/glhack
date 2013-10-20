@@ -1,6 +1,8 @@
 /** 
-    Simple vector editing program.
+
+
 */
+
 
 #include "glbase.h"
 #include "asset_manager.h"
@@ -9,8 +11,6 @@
 #include "glh_typedefs.h"
 #include "glh_font.h"
 #include "shims_and_types.h"
-#include "math_tools.h"
-#include "glh_uicontext.h"
 
 
 //////////////// Program stuff ////////////////
@@ -26,18 +26,32 @@ const char* sh_vertex   =
 "    gl_Position = vec4( VertexPosition, 1.0 );"
 "}";
 
+#define OBJ2WORLD "ObjectToWorld"
+
+const char* sh_vertex_obj   = 
+"#version 150               \n"
+"uniform mat4 ObjectToWorld;"
+"in vec3      VertexPosition;    "
+"in vec3      VertexColor;       "
+"out vec3 Color;            "
+"void main()                "
+"{                          "
+"    Color = VertexColor;   "
+"    gl_Position = ObjectToWorld * vec4( VertexPosition, 1.0 );"
+"}";
+
 const char* sh_vertex_obj_pos   = 
 "#version 150               \n"
-"uniform mat4 LocalToWorld;"
+"uniform mat4 ObjectToWorld;"
 "in vec3      VertexPosition;    "
 "void main()                "
 "{                          "
-"    gl_Position = LocalToWorld * vec4( VertexPosition, 1.0 );"
+"    gl_Position = ObjectToWorld * vec4( VertexPosition, 1.0 );"
 "}";
 
 const char* sh_vertex_obj_tex   = 
 "#version 150               \n"
-"uniform mat4 LocalToWorld;"
+"uniform mat4 ObjectToWorld;"
 "in vec3      VertexPosition;    "
 "in vec3      TexCoord;"
 "out vec3 v_color;            "
@@ -45,8 +59,9 @@ const char* sh_vertex_obj_tex   =
 "void main()                "
 "{                          "
 "    v_texcoord = TexCoord.xy;"
-"    gl_Position = LocalToWorld * vec4( VertexPosition, 1.0 );"
+"    gl_Position = ObjectToWorld * vec4( VertexPosition, 1.0 );"
 "}";
+
 
 const char* sh_fragment = 
 "#version 150                  \n"
@@ -54,6 +69,14 @@ const char* sh_fragment =
 "out vec4 FragColor;           "
 "void main() {                 "
 "    FragColor = vec4(Color, 1.0); "
+"}";
+
+const char* sh_fragment_fix_color = 
+"#version 150                  \n"
+"uniform vec4 ObjColor;        "
+"out vec4 FragColor;           "
+"void main() {                 "
+"    FragColor = ObjColor; "
 "}";
 
 const char* sh_fragment_tex = 
@@ -67,308 +90,269 @@ const char* sh_fragment_tex =
 //"    FragColor = vec4(Color, 1.0); "
 "}";
 
-
-const char* sh_vertex_obj   = 
-"#version 150               \n"
-"uniform mat4 LocalToWorld;" // TODO add world to screen
-"in vec3      VertexPosition;    "
-"in vec3      VertexColor;       "
-"out vec3 Color;            "
-"void main()                "
-"{                          "
-"    Color = VertexColor;   "
-"    gl_Position = LocalToWorld * vec4( VertexPosition, 1.0 );"
-"}";
-
-#define FIXED_COLOR "FixedColor"
-
-const char* sh_fragment_fix_color = 
+const char* sh_fragment_tex_alpha = 
 "#version 150                  \n"
-"uniform vec4 FixedColor;"
+"uniform sampler2D Sampler;    "
+"uniform vec4      Albedo;    "
+"in vec2 v_texcoord;           "
 "out vec4 FragColor;           "
 "void main() {                 "
-"    FragColor = FixedColor;   "
+"    vec4 texColor = vec4(Albedo.rgb, Albedo.a * texture( Sampler, v_texcoord ).r);"
+"    FragColor = texColor;"
+//"    FragColor = vec4(Color, 1.0); "
 "}";
-
-const char* sh_fragment_selection_color = 
-"#version 150                  \n"
-"uniform vec4 " UICTX_SELECT_NAME ";"
-"out vec4 FragColor;           "
-"void main() {                 "
-"    FragColor = " UICTX_SELECT_NAME "; "
-"}";
-
 
 const char* sh_geometry = "";
-const char* sp_obj     = "sp_colored";
-const char* sp_select  = "sp_selecting";
 
-glh::ProgramHandle* sp_colored_program;
-glh::ProgramHandle* sp_select_program;
+glh::ProgramHandle* sp_vcolor_handle;
+glh::ProgramHandle* sp_tex_handle;
+glh::ProgramHandle* sp_fonts_handle;
+glh::ProgramHandle* sp_colorcoded;
 
 glh::Texture* texture;
+glh::Texture* fonttexture;
 
 // App state
 
 glh::RenderPassSettings g_renderpass_settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT,
-                                            glh::vec4(0.0f,0.0f,0.0f,1.f), 1);
-//glh::RenderPassSettings g_color_mask_settings(glh::RenderPassSettings::ColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE));
-//glh::RenderPassSettings g_blend_settings(glh::RenderPassSettings::BlendSettings(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
-//glh::RenderPassSettings g_blend_settings(glh::RenderPassSettings::BlendSettings(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+                                            glh::vec4(0.76f,0.71f,0.5f,1.0f), 1);
+glh::RenderPassSettings g_blend_settings(glh::RenderPassSettings::BlendSettings(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
 bool g_run = true;
 
+std::shared_ptr<glh::DefaultMesh> mesh(new glh::DefaultMesh()); // ram vertex data
+
+// Screen quad shader
+const char* sp_vcolors = "screen";
+const char* sp_obj     = "screen_obj";
+const char* sp_obj_tex = "screen_obj_tex";
+const char* sp_obj_font = "screen_obj_font";
+const char* sp_obj_colored = "screen_obj_colored";
+
+float tprev = 0;
+float angle = 0.f;
+float radial_speed = 0.0f * PIf;
+
+glh::Image8 image_test;
+glh::Image8 image_bubble;
+glh::Image8 font_target;
+glh::Image8 noise_target;
+
 glh::AssetManagerPtr manager;
+
 glh::RenderEnvironment env;
+
+
+glh::FullRenderable font_renderable;
 
 std::shared_ptr<glh::FontContext> fontcontext;
 
-glh::ObjectRoster::IdGenerator idgen;
+int tex_unit_0 = 0;
+int tex_unit_1 = 1;
 
-int obj_id = glh::ObjectRoster::max_id / 2;
 
-glh::RenderPickerPtr render_picker;
+glh::TextLine text_line;
 
-glh::SceneTree                     scene;
-glh::RenderQueue                   selectable_queue;
-glh::RenderQueue                   render_queueue;
-glh::RenderQueue                   top_queue;
-std::vector<glh::SceneTree::Node*> nodes;
 
-glh::DynamicSystem      dynamics;
-glh::StringNumerator    string_numerator;
-
-std::unique_ptr<glh::UiContext> ui_context;
-
-#define COLOR_DELTA "ColorDelta"
-#define PRIMARY_COLOR "PrimaryColor"
-#define SECONDARY_COLOR "SecondaryColor"
-
-glh::DynamicGraph graph;
-
-void add_color_interpolation_to_graph(glh::App* app, glh::SceneTree::Node* node){
+void transfer_position_data_to_mesh(glh::DefaultMesh* fontmesh,
+                                    std::vector<std::tuple<glh::vec2, glh::vec2>>& text_coords)
+{
     using namespace glh;
-    auto f = DynamicNodeRef::factory(graph);
+    // TODO: All of these can be reserved from a arena that is filled per frame
+    // (never deallocated, just held for reserve at each frame)
+    // Use an arena-allocator getter at app or gm (probably app or app::resources or
+    // something like that).
+    std::vector<float> posdata;
+    std::vector<float> texdata;
+    // transfer tex_coords to mesh
+    for(auto& pt : text_coords){
+        vec2 pos;
+        vec2 tex;
+        std::tie(pos,tex) = pt;
+        posdata.push_back(pos[0]);
+        posdata.push_back(pos[1]);
+        posdata.push_back(0.f);
 
-    auto sys      = f(new SystemInput(app), "sys");
-    auto ramp     = f(new ScalarRamp(), string_numerator("ramp"));
-    auto dynvalue = f(new LimitedIncrementalValue(0.0, 0.0, 1.0), string_numerator("dynvalue"));
-    auto offset   = f(new ScalarOffset(), string_numerator("offset"));
-    auto mix      = f(new MixNode(), string_numerator("mix"));
+        texdata.push_back(tex[0]);
+        texdata.push_back(tex[1]);
+        texdata.push_back(0.f);
+    }
 
-    std::list<std::string> vars = list(std::string(COLOR_DELTA), 
-                                       std::string(PRIMARY_COLOR),
-                                       std::string(SECONDARY_COLOR));
-
-    auto nodesource = f(new NodeSource(node, vars),string_numerator("nodesource"));
-    auto nodereciever = f(new NodeReciever(node),string_numerator("nodereciever"));
-
-    auto lnk = DynamicNodeRef::linker(graph);
-
-    lnk(sys, GLH_PROPERTY_TIME_DELTA, offset, GLH_PROPERTY_INTERPOLANT);
-    lnk(nodesource, COLOR_DELTA, offset, GLH_PROPERTY_SCALE);
-
-    lnk(offset, GLH_PROPERTY_INTERPOLANT, dynvalue, GLH_PROPERTY_DELTA);
-    lnk(dynvalue, GLH_PROPERTY_INTERPOLANT,  ramp, GLH_PROPERTY_INTERPOLANT);
-
-    lnk(ramp, GLH_PROPERTY_INTERPOLANT, mix, GLH_PROPERTY_INTERPOLANT);
-    lnk(nodesource, PRIMARY_COLOR, mix, GLH_PROPERTY_1);
-    lnk(nodesource, SECONDARY_COLOR, mix, GLH_PROPERTY_2);
-
-    lnk(mix, GLH_PROPERTY_COLOR, nodereciever, FIXED_COLOR);
+    fontmesh->get(glh::ChannelType::Position).set(&posdata[0], posdata.size());
+    fontmesh->get(glh::ChannelType::Texture).set(&texdata[0], texdata.size());
 }
 
-void add_focus_action(glh::App* app, glh::SceneTree::Node* node, glh::FocusContext& focus_context, glh::DynamicGraph& graph, glh::StringNumerator& string_numerator){
-    using namespace glh;
-    auto f = DynamicNodeRef::factory(graph);
+void init_font_context(glh::GraphicsManager* gm)
+{
+    // TODO: gm->fontmanager
 
-    float decspeed = -2.f;
-    float incrspeed = 7.f;
-
-    auto focus    = f(new NodeFocusState(node, focus_context), string_numerator("node_focus"));
-    auto mix     = f(new MixScalar(decspeed, incrspeed), string_numerator("mix"));
-    auto noderes  = f(new NodeReciever(node), string_numerator("node_reciever"));
-
-    auto lnk = DynamicNodeRef::linker(graph);
-
-    lnk(focus, GLH_PROPERTY_INTERPOLANT, mix, GLH_PROPERTY_INTERPOLANT);
-    lnk(mix, GLH_PROPERTY_INTERPOLANT, noderes, COLOR_DELTA);
 }
 
-void init_uniform_data(){
-    //env.set_vec4("ObjColor", glh::vec4(0.f, 1.f, 0.f, 0.2f));
-    glh::vec4 obj_color_sel = glh::ObjectRoster::color_of_id(obj_id);
-    env.set_vec4(UICTX_SELECT_NAME,     obj_color_sel);
-    env.set_vec4(FIXED_COLOR, glh::vec4(0.28f, 0.024f, 0.024f, 1.0));
-}
 
-using glh::vec2i;
-using glh::vec2;
 
-void load_screenquad(vec2 size, glh::DefaultMesh& mesh)
+void load_font_image(glh::GraphicsManager* gm)
 {
     using namespace glh;
 
-    vec2 halfsize = 0.5f * size;
+    std::string old_goudy("OFLGoudyStMTT.ttf");
+    std::string junction("Junction-webfont.ttf");
 
-    vec2 low  = - halfsize;
-    vec2 high = halfsize;
+    std::string fontpath = manager->fontpath();
 
-    mesh_load_quad_xy(low, high, mesh);
+    fontcontext.reset(new glh::FontContext(fontpath));
+
+    float fontsize = 15.0f;
+
+    BakedFontHandle handle;
+    glh::Image8* fontimage;
+    FontConfig config = {(double) fontsize, junction, 1024, 256};
+
+    try{
+        handle = fontcontext->render_bitmap(config);
+        fontimage = fontcontext->get_font_map(handle);
+        // TODO: write font image to file.
+        write_image_png(*fontimage, "font.png");
+    }
+    catch(glh::GraphicsException& e){
+        GLH_LOG_EXPR(e.get_message());
+    }
+
+    TextLine line1("Hello, world.", 0);
+    TextLine line2("This should be another line, then.", 5);
+
+    std::vector<std::tuple<vec2, vec2>> text_coords;
+    //float x = 0.f;
+    //float y = 0.f;
+    float x = 100.f;
+    float y = 100.f;
+    float line_height = fontsize;
+
+    auto writeline = [&](TextLine& line){
+        fontcontext->write_pixel_coords_for_string(line.string, handle, x, y + line.line_number * line_height, text_coords);
+    };
+
+    writeline(line1);
+    writeline(line2);
+
+    // Create font material and renderable.
+    DefaultMesh* fontmesh = gm->create_mesh();
+
+    fonttexture->attach_image(*fontimage);
+
+    font_renderable.bind_program(*sp_fonts_handle);
+    font_renderable.set_mesh(fontmesh);
+
+    // TODO: Need to drop mesh data in gpu, when text changes recreate
+    // mesh data for the changed text
+    // Perhaps mesh per line?
+    // Should meshdata be recycled or not?
+    // Scenegraph 'textwidget' node that contains the resources
+    // necessary to render text.
+
+    transfer_position_data_to_mesh(fontmesh, text_coords);
+
 }
 
-glh::SceneTree::Node* add_quad_to_scene(glh::GraphicsManager* gm, glh::ProgramHandle& program, glh::vec2 dims){
-
-    glh::DefaultMesh* mesh = gm->create_mesh();
-    load_screenquad(dims, *mesh);
-
-    auto renderable = gm->create_renderable();
-
-    renderable->bind_program(program);
-    renderable->set_mesh(mesh);
-
-    auto root = scene.root();
-    return scene.add_node(root, renderable);
+void init_uniform_data(){
+    env.set_vec4("ObjColor", glh::vec4(0.f, 1.f, 0.f, 1.f));
+    env.set_vec4("Albedo", glh::vec4(0.28f, 0.024f, 0.024f, 1.0));
+    //env.set_texture2d("Sampler", texture);
+    env.set_texture2d("Sampler", fonttexture);
 }
 
 bool init(glh::App* app)
 {
-    using namespace glh;
-    using std::string;
+    glh::GraphicsManager* gm = app->graphics_manager();
 
-    GraphicsManager* gm = app->graphics_manager();
+    fonttexture = gm->create_texture();
 
-    ui_context.reset(new glh::UiContext(*gm, *app, graph, string_numerator));
+    sp_fonts_handle      = gm->create_program(sp_obj_font, sh_geometry, sh_vertex_obj_tex, sh_fragment_tex_alpha);
 
-    //sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment);
-    sp_select_program  = gm->create_program(sp_select, sh_geometry, sh_vertex_obj, sh_fragment_selection_color);
-    sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment_fix_color);
+   // mesh_load_screenquad(*mesh);
+    int width = app->config().width;
+    int height = app->config().height;
+    mesh_load_screenquad((float) width, (float) height, *mesh);
 
-    render_picker->selection_program_ = sp_select_program;
+    //mesh_load_screenquad(0.5f, 0.5f, *mesh);
 
-    struct{vec2 dims; vec3 pos; vec4 color_primary; vec4 color_secondary;} quads[] ={
-        {vec2(0.5, 0.5), vec3(-0.5, -0.5, 0.), vec4(COLOR_RED), vec4(COLOR_WHITE) },
-        {vec2(0.5, 0.5), vec3(0.5, 0.5, 0.), vec4(COLOR_GREEN), vec4(COLOR_WHITE)},
-        {vec2(0.5, 0.5), vec3(-0.5, 0.5, 0.), vec4(COLOR_BLUE), vec4(COLOR_WHITE)},
-        {vec2(0.25, 0.25), vec3(0.5, -0.5, 0.), vec4(COLOR_YELLOW),vec4(COLOR_WHITE) }
-    };
-
-    size_t quad_count = static_array_size(quads);
-    for(auto& s: quads){
-        string name = string_numerator("node");
-        auto n = add_quad_to_scene(gm, *sp_colored_program, s.dims);
-        n->transform_.position_ = s.pos;
-        n->name_ = name;
-        set_material(*n, FIXED_COLOR,    s.color_primary);
-        set_material(*n, PRIMARY_COLOR,  s.color_primary);
-        set_material(*n, SECONDARY_COLOR,s.color_secondary);
-        set_material(*n, COLOR_DELTA, 0.f);
-        add(nodes, n);
-        add_color_interpolation_to_graph(app, n);
-        add_focus_action(app, n, ui_context->focus_context_, graph, string_numerator);
-    }
-    graph.solve_dependencies();
-
+    load_font_image(gm);
     init_uniform_data();
+
 
     return true;
 }
 
-
-bool pass_pickable(glh::SceneTree::Node* node){return node->pickable_;}
-bool pass_unpickable(glh::SceneTree::Node* node){return !node->pickable_;}
-bool pass_interaction_unlocked(glh::SceneTree::Node* node){return !node->interaction_lock_;}
-bool pass_interaction_locked(glh::SceneTree::Node* node){return node->interaction_lock_;}
-
-bool pass_pickable_and_unlocked(glh::SceneTree::Node* node){return pass_pickable(node) && pass_interaction_unlocked(node);}
 
 bool update(glh::App* app)
 {
     using namespace glh;
 
     float t = (float) app->time();
-
-    dynamics.update(t);
-
-    graph.execute();
-
+    angle += (t - tprev) * radial_speed;
+    tprev = t;
     Eigen::Affine3f transform;
-    transform = Eigen::AngleAxis<float>(0.f, glh::vec3(0.f, 0.f, 1.f));
+    transform = Eigen::AngleAxis<float>(angle, glh::vec3(0.f, 0.f, 1.f));
 
     mat4 screen_to_view = app_orthographic_pixel_projection(app);
 
-    env.set_mat4(GLH_LOCAL_TO_WORLD, transform.matrix());
+    env.set_mat4(OBJ2WORLD, screen_to_view);
 
-    env.set_vec4("Albedo", glh::vec4(0.28f, 0.024f, 0.024f, 1.0));
+    float albedo_alpha = 1.0f - (t - floor(t));
+    env.set_vec4("Albedo", glh::vec4(0.28f, 0.024f, 0.024f,albedo_alpha));
 
-    scene.update();
-    scene.apply_to_renderables();
 
-    render_queueue.clear();
-    render_queueue.add(scene, pass_interaction_unlocked);
 
-    selectable_queue.clear();
-    selectable_queue.add(scene, pass_pickable_and_unlocked);
-    render_picker->attach_render_queue(&selectable_queue);
-
-    top_queue.clear();
-    top_queue.add(scene, pass_interaction_locked);
-    
     return g_run;
 }
 
-void do_selection_pass(glh::App* app){
-    using namespace glh;
-
-    glh::FocusContext::Focus focus = ui_context->focus_context_.start_event_handling();
-
-    vec2i mouse = ui_context->mouse_current_;
-
-    auto picked = render_picker->render_selectables(env, mouse[0], mouse[1]);
-    
-    for(auto p: picked){
-        focus.on_focus(p);
-    }
-    focus.update_event_state();
-
-}
-
-void do_render_pass(glh::App* app){
-    using namespace glh;
-
-    GraphicsManager* gm = app->graphics_manager();
-
+void render_font(glh::App* app)
+{
+    glh::GraphicsManager* gm = app->graphics_manager();
     apply(g_renderpass_settings);
-    render_queueue.render(gm, *sp_colored_program, env);
-    top_queue.render(gm, *sp_colored_program, env);
+    apply(g_blend_settings);
+    gm->render(font_renderable, env, env);
 }
 
-std::map<glh::SceneTree::Node*, glh::vec4, std::less<glh::SceneTree::Node*>,
-Eigen::aligned_allocator<std::pair<glh::UiEntity*, glh::vec4>>> prev_color;
-
-void render(glh::App* app){
-
-    ui_context->update();
-
-    do_selection_pass(app);
-    do_render_pass(app);
-
-}
-
-void resize(glh::App* app, int width, int height){
+void resize(glh::App* app, int width, int height)
+{
     std::cout << "Resize:" << width << " " << height << std::endl;
+}
+
+void print_mouse_position()
+{
+}
+
+int g_mouse_x;
+int g_mouse_y;
+
+void mouse_move_callback(int x, int y)
+{
+    g_mouse_x = x;
+    g_mouse_y = y;
+
+    std::cout << "Mouse:"  << x << " " << y << std::endl;
+}
+
+char key_to_char(int key){
+    if(key < CHAR_MAX && key > 0) return static_cast<char>(key);
+    else return 0;
 }
 
 void key_callback(int key, const glh::Input::ButtonState& s)
 {
     using namespace glh;
+
     if(key == Input::Esc) { g_run = false;}
+    else if(key == Input::Left){ radial_speed -= 0.1f * PIf;}
+    else if(key == Input::Right){ radial_speed += 0.1f * PIf;}
+    else if(key == 'T'){ texture->attach_image(image_test);}
+    else if(key == 'B'){ texture->attach_image(image_bubble);}
 }
 
 int main(int arch, char* argv)
 {
-    glh::AppConfig config = glh::app_config_default(init, update, render, resize);
-    //glh::AppConfig config = glh::app_config_default(init, update, render_with_selection_pass, resize);
+    glh::AppConfig config = glh::app_config_default(init, update, render_font, resize);
+
     config.width = 1024;
     config.height = 640;
 
@@ -378,13 +362,9 @@ int main(int arch, char* argv)
 
     glh::App app(config);
 
-    render_picker = std::make_shared<glh::RenderPicker>(app);
-
     GLH_LOG_EXPR("Logger started");
     add_key_callback(app, key_callback);
-
-    // Cannot initialize gl resources here. Must go into init().
-
+    add_mouse_move_callback(app, mouse_move_callback);
     glh::default_main(app);
 
     return 0;

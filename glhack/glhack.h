@@ -116,6 +116,7 @@ public:
 
     void set_mesh(DefaultMesh* meshptr){
         mesh_ = meshptr;
+        // TODO handle program bindings etc?
     }
 
     DefaultMesh* mesh(){return mesh_;}
@@ -177,6 +178,12 @@ DeclInterface(GraphicsManager,
 
     virtual DefaultMesh*    create_mesh() = 0;
     virtual FullRenderable* create_renderable() = 0;
+
+    virtual void release_mesh(DefaultMesh*) = 0;
+    virtual void release_renderable(FullRenderable*) = 0;
+
+    // TODO free mesh, free renderable
+
 
     /** Mark asset dirty. */
     // TODO: Need this? virtual void image8_data_modified(int texture_unit, Image8& image);

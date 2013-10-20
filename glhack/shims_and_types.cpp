@@ -11,7 +11,7 @@ namespace glh {
 
 TextLine make_text_line(const char* buffer, int begin, int end, int line)
 {
-    TextLine t = {std::string(buffer + begin, buffer + end), line};
+    TextLine t(std::string(buffer + begin, buffer + end), line);
     return t;
 }
 
