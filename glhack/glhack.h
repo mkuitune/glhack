@@ -114,6 +114,11 @@ public:
         }
     }
 
+    void reset_buffers(){
+        device_buffers_.reset();
+        meshdata_on_gpu_ = false;
+    }
+
     void set_mesh(DefaultMesh* meshptr){
         mesh_ = meshptr;
         // TODO handle program bindings etc?

@@ -99,6 +99,14 @@ public:
 
     ~BufferHandle(){if(handle_) glDeleteBuffers(1, &handle_);}
 
+    void reset()
+    {
+        glDeleteBuffers(1, &handle_);
+        handle_ = 0;
+        on_gpu_= false;
+        glGenBuffers(1, &handle_);
+    }
+
     void map_to_gpu(VertexChunk& chunk){
         assert(chunk.sig_.type_ == mapped_sig_.type_);
         on_gpu_      = true;
@@ -146,6 +154,13 @@ public:
         buffers_[name] = std::make_shared<BufferHandle>(sig);
     }
 
+    void reset(){
+        for(auto& b:buffers_){
+            b.second->reset();
+        }
+
+        /// must eventually call assign
+    }
     NamedBufferHandles buffers_;
 };
 

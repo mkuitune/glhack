@@ -310,6 +310,7 @@ void render_font(glh::App* app)
     glh::GraphicsManager* gm = app->graphics_manager();
     apply(g_renderpass_settings);
     apply(g_blend_settings);
+    //font_renderable.reset_buffers(); 'light torture'
     gm->render(font_renderable, env, env);
 }
 
@@ -347,6 +348,9 @@ void key_callback(int key, const glh::Input::ButtonState& s)
     else if(key == Input::Right){ radial_speed += 0.1f * PIf;}
     else if(key == 'T'){ texture->attach_image(image_test);}
     else if(key == 'B'){ texture->attach_image(image_bubble);}
+    else if(key == 'R') {
+        font_renderable.reset_buffers();
+    } 
 }
 
 int main(int arch, char* argv)
