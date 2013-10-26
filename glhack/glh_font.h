@@ -13,6 +13,9 @@ namespace glh{
 
 typedef std::pair<std::string, double> BakedFontHandle;
 
+inline BakedFontHandle invalid_font_handle(){return std::make_pair(std::string(""), 0.0);}
+inline bool handle_valid(BakedFontHandle& h){return h.first != "" && h.second > 0.;}
+
 struct FontCharData;
 
 /** Configures one face size of one font kind. */
@@ -48,6 +51,7 @@ public:
                                                            const BakedFontHandle& handle,
                                                            const float x, const float y,
                                                            std::vector<std::tuple<vec2, vec2>>& coords);
+
 private:
 
     const std::string font_directory_;
@@ -56,7 +60,5 @@ private:
     std::map<BakedFontHandle, FontCharData*> chardata_;
 
 };
-
-
 
 }

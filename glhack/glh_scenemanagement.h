@@ -79,6 +79,10 @@ public:
             children_.push_back(node);
         }
 
+        void remove_child(Node* node){
+            erase(children_, node);
+        }
+
         void update_transforms(const mat4& parent_local_to_world){
             local_to_world_ = transform_.matrix() * parent_local_to_world;
             update_transforms();
@@ -170,8 +174,15 @@ public:
     }
 
     Node* add_node(Node* parent){
-        nodes_.push_back(Node());
-        Node* newnode = &nodes_.back();
+        Node* newnode;
+        if(recycled_nodes_.empty()){
+            nodes_.push_back(Node());
+            newnode = &nodes_.back();
+        }else{
+            newnode = recycled_nodes_.back();
+            recycled_nodes_.pop_back();
+            newnode->reset_data();
+        }
         newnode->id_ = id_generator_.new_id();
         // TODO: It's kinda hacky to create UI context colors here as well. Figure out a better way.
         vec4 color = ObjectRoster::color_of_id(newnode->id_);
@@ -201,8 +212,15 @@ public:
     iterator begin() {return tree_iterator(root_);}
     iterator end() {return tree_iterator(0);}
 
+    void finalize(Node* node){
+        node->children_.clear();
+        recycled_nodes_.push_back(node);
+    }
+
 private:
     std::deque<Node, Eigen::aligned_allocator<Node>> nodes_;
+    std::list<Node*> recycled_nodes_;
+
     Node*                     root_;
     ObjectRoster::IdGenerator id_generator_;
 };

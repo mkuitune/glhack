@@ -9,9 +9,9 @@
 #include "glh_generators.h"
 #include "glh_image.h"
 #include "glh_typedefs.h"
-#include "glh_font.h"
 #include "shims_and_types.h"
-
+#include "glh_scene_extensions.h"
+#include <vector>
 
 //////////////// Program stuff ////////////////
 
@@ -106,7 +106,6 @@ const char* sh_geometry = "";
 
 glh::ProgramHandle* sp_vcolor_handle;
 glh::ProgramHandle* sp_tex_handle;
-glh::ProgramHandle* sp_fonts_handle;
 glh::ProgramHandle* sp_colorcoded;
 
 glh::Texture* texture;
@@ -126,7 +125,7 @@ std::shared_ptr<glh::DefaultMesh> mesh(new glh::DefaultMesh()); // ram vertex da
 const char* sp_vcolors = "screen";
 const char* sp_obj     = "screen_obj";
 const char* sp_obj_tex = "screen_obj_tex";
-const char* sp_obj_font = "screen_obj_font";
+const char* font_program_name = "screen_obj_font";
 const char* sp_obj_colored = "screen_obj_colored";
 
 float tprev = 0;
@@ -147,40 +146,8 @@ glh::FullRenderable font_renderable;
 
 std::shared_ptr<glh::FontContext> fontcontext;
 
-int tex_unit_0 = 0;
-int tex_unit_1 = 1;
-
-
 glh::TextLine text_line;
 
-
-void transfer_position_data_to_mesh(glh::DefaultMesh* fontmesh,
-                                    std::vector<std::tuple<glh::vec2, glh::vec2>>& text_coords)
-{
-    using namespace glh;
-    // TODO: All of these can be reserved from a arena that is filled per frame
-    // (never deallocated, just held for reserve at each frame)
-    // Use an arena-allocator getter at app or gm (probably app or app::resources or
-    // something like that).
-    std::vector<float> posdata;
-    std::vector<float> texdata;
-    // transfer tex_coords to mesh
-    for(auto& pt : text_coords){
-        vec2 pos;
-        vec2 tex;
-        std::tie(pos,tex) = pt;
-        posdata.push_back(pos[0]);
-        posdata.push_back(pos[1]);
-        posdata.push_back(0.f);
-
-        texdata.push_back(tex[0]);
-        texdata.push_back(tex[1]);
-        texdata.push_back(0.f);
-    }
-
-    fontmesh->get(glh::ChannelType::Position).set(&posdata[0], posdata.size());
-    fontmesh->get(glh::ChannelType::Texture).set(&texdata[0], texdata.size());
-}
 
 void init_font_context(glh::GraphicsManager* gm)
 {
@@ -188,6 +155,7 @@ void init_font_context(glh::GraphicsManager* gm)
 
 }
 
+std::shared_ptr<glh::GlyphPane> glyph_pane;
 
 
 void load_font_image(glh::GraphicsManager* gm)
@@ -217,47 +185,38 @@ void load_font_image(glh::GraphicsManager* gm)
         GLH_LOG_EXPR(e.get_message());
     }
 
-    TextLine line1("Hello, world.", 0);
-    TextLine line2("This should be another line, then.", 5);
-
-    std::vector<std::tuple<vec2, vec2>> text_coords;
-    //float x = 0.f;
-    //float y = 0.f;
-    float x = 100.f;
-    float y = 100.f;
-    float line_height = fontsize;
-
-    auto writeline = [&](TextLine& line){
-        fontcontext->write_pixel_coords_for_string(line.string, handle, x, y + line.line_number * line_height, text_coords);
-    };
-
-    writeline(line1);
-    writeline(line2);
-
-    // Create font material and renderable.
-    DefaultMesh* fontmesh = gm->create_mesh();
-
     fonttexture->attach_image(*fontimage);
 
-    font_renderable.bind_program(*sp_fonts_handle);
-    font_renderable.set_mesh(fontmesh);
-
-    // TODO: Need to drop mesh data in gpu, when text changes recreate
-    // mesh data for the changed text
-    // Perhaps mesh per line?
-    // Should meshdata be recycled or not?
-    // Scenegraph 'textwidget' node that contains the resources
-    // necessary to render text.
-
-    transfer_position_data_to_mesh(fontmesh, text_coords);
-
+    glyph_pane = std::make_shared<GlyphPane>(gm, font_program_name, fontcontext.get());
+    glyph_pane->font_handle_ = handle;
+    glyph_pane->origin_ = vec2(100.f, 100.f);
+    glyph_pane->text_field_.push_line("Hello, world.");
+    glyph_pane->text_field_.push_line("This is another line, then.");
+    glyph_pane->update_representation();
 }
+    // TODO
+    //    Use scene tree to render. Attach glyph pane to parent node
+    //    Use parent node material to render glyph_pane mesh
+    //    Attach a dark background mesh to glyph pane
+    //    Make text in glyph pane selectable
+    //    Move font context as part of app or graphics manager so no need to init piece by piece
+    //    Store and generate these 'default material' like the font material in sentral place
+    //    Use even a global singleton to get them or something. Only rendering thread will access
+    //    them and the default assets should be created on init.
+    //    ie. GraphicsManager->default_assets or something.
+    //    Figure out a nice way to handle the mapping. Now the matrix screen_to_view
+    //      is just used to transform the mesh to pixel coordinates. 
+    //    As a first step in centralized assets management impelement a monolithic
+    //      asset owner and initializer class that just load and holds all the expected defaults.
+    //      Later do something more sophisticated.
 
 void init_uniform_data(){
     env.set_vec4("ObjColor", glh::vec4(0.f, 1.f, 0.f, 1.f));
     env.set_vec4("Albedo", glh::vec4(0.28f, 0.024f, 0.024f, 1.0));
     //env.set_texture2d("Sampler", texture);
-    env.set_texture2d("Sampler", fonttexture);
+    env.set_texture2d("Sampler", fonttexture); // TODO: Do we need material instance
+                                               // that would allocate the sampler resources
+                                               // to it's map?
 }
 
 bool init(glh::App* app)
@@ -266,7 +225,7 @@ bool init(glh::App* app)
 
     fonttexture = gm->create_texture();
 
-    sp_fonts_handle      = gm->create_program(sp_obj_font, sh_geometry, sh_vertex_obj_tex, sh_fragment_tex_alpha);
+    gm->create_program(font_program_name, sh_geometry, sh_vertex_obj_tex, sh_fragment_tex_alpha);
 
    // mesh_load_screenquad(*mesh);
     int width = app->config().width;
@@ -276,6 +235,7 @@ bool init(glh::App* app)
     //mesh_load_screenquad(0.5f, 0.5f, *mesh);
 
     load_font_image(gm);
+
     init_uniform_data();
 
 
@@ -311,7 +271,7 @@ void render_font(glh::App* app)
     apply(g_renderpass_settings);
     apply(g_blend_settings);
     //font_renderable.reset_buffers(); 'light torture'
-    gm->render(font_renderable, env, env);
+    gm->render(*glyph_pane->renderable_, env, env);
 }
 
 void resize(glh::App* app, int width, int height)
@@ -370,6 +330,9 @@ int main(int arch, char* argv)
     add_key_callback(app, key_callback);
     add_mouse_move_callback(app, mouse_move_callback);
     glh::default_main(app);
+
+    // TODO resource manager
+    glyph_pane.reset();
 
     return 0;
 }

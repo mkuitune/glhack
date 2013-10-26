@@ -158,5 +158,4 @@ std::tuple<float, float> FontContext::write_pixel_coords_for_string(const std::s
     return std::make_tuple(xx, yy);
 }
 
-
 }

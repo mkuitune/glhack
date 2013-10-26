@@ -90,7 +90,7 @@ struct TextLine
     int         line_number;
 
     TextLine(const char* bfr, int lineno):string(bfr), line_number(lineno){}
-    TextLine(const std::string str, int lineno):string(str), line_number(lineno){}
+    TextLine(const std::string& str, int lineno):string(str), line_number(lineno){}
     TextLine():line_number(0){}
 
     const char* begin() const {return string.c_str();}
@@ -100,8 +100,10 @@ struct TextLine
 
 /** Construct a text line instance. */
 TextLine make_text_line(const char* buffer, int begin, int end, int line);
-/** Split string to TextLine instances based on the delimiter. */
+/** Split string to TextLine instances based on the delimiter. 
+*/
 std::list<TextLine> string_split(const char* str, const char* delim);
+
 
 /** Get a string representation from arbitrary value supporting the << -operator. */
 template<class T>
@@ -121,6 +123,11 @@ bool contains(const std::string& str, const T& t){
 bool elements_are_ordered(const std::string& first, const std::string& second);
 ///////////// Container operations ////////////////
 
+template<class T>
+void erase(T& container, typename const T::value_type& v)
+{
+    container.erase(std::remove(container.begin(), container.end(), v), container.end());
+}
 
 /** If container has last element, compare it with the given. */
 template<class Container, class value_type>
