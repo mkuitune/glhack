@@ -81,6 +81,7 @@ public:
         BufferSet     = 6,
         DefaultMesh   = 7,
         SceneTreeNode = 8,
+        Texture       = 9,
         Vec4          = 1008,
         Mat4          = 1009,
         Image8        = 1010,

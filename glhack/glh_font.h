@@ -26,6 +26,16 @@ struct FontConfig{
     int         texture_height_;
 };
 
+/** Approximate required texture size based on the requested glyph_size_. Tweak as necessary */
+inline FontConfig get_font_config(std::string name, double glyph_size){
+    FontConfig f;
+    f.name_ = name;
+    f.glyph_size_ = glyph_size;
+    f.texture_width_ = 1024;
+    f.texture_height_ = 256;
+    return f;
+}
+
 /** Contains font rendering related state and data. */
 class FontContext {
 public:

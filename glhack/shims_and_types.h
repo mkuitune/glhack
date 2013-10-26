@@ -96,6 +96,9 @@ struct TextLine
     const char* begin() const {return string.c_str();}
     const char* end() const {return string.c_str() + string.size();}
     int length(){return string.size();}
+
+    void push_back(const char c){string.push_back(c);}
+
 };
 
 /** Construct a text line instance. */

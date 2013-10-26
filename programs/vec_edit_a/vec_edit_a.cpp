@@ -108,9 +108,6 @@ glh::ProgramHandle* sp_vcolor_handle;
 glh::ProgramHandle* sp_tex_handle;
 glh::ProgramHandle* sp_colorcoded;
 
-glh::Texture* texture;
-glh::Texture* fonttexture;
-
 // App state
 
 glh::RenderPassSettings g_renderpass_settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT,
@@ -132,11 +129,6 @@ float tprev = 0;
 float angle = 0.f;
 float radial_speed = 0.0f * PIf;
 
-glh::Image8 image_test;
-glh::Image8 image_bubble;
-glh::Image8 font_target;
-glh::Image8 noise_target;
-
 glh::AssetManagerPtr manager;
 
 glh::RenderEnvironment env;
@@ -144,15 +136,16 @@ glh::RenderEnvironment env;
 
 glh::FullRenderable font_renderable;
 
-std::shared_ptr<glh::FontContext> fontcontext;
+std::shared_ptr<glh::FontManager> fontmanager;
 
 glh::TextLine text_line;
 
 
-void init_font_context(glh::GraphicsManager* gm)
+void init_font_manager(glh::GraphicsManager* gm)
 {
-    // TODO: gm->fontmanager
-
+    using namespace glh;
+    std::string fontpath = manager->fontpath();
+    fontmanager.reset(new glh::FontManager(gm, fontpath));
 }
 
 std::shared_ptr<glh::GlyphPane> glyph_pane;
@@ -162,39 +155,27 @@ void load_font_image(glh::GraphicsManager* gm)
 {
     using namespace glh;
 
+    init_font_manager(gm);
+
     std::string old_goudy("OFLGoudyStMTT.ttf");
     std::string junction("Junction-webfont.ttf");
 
-    std::string fontpath = manager->fontpath();
-
-    fontcontext.reset(new glh::FontContext(fontpath));
-
     float fontsize = 15.0f;
 
-    BakedFontHandle handle;
-    glh::Image8* fontimage;
-    FontConfig config = {(double) fontsize, junction, 1024, 256};
+    glyph_pane = std::make_shared<GlyphPane>(gm, font_program_name, fontmanager.get());
 
-    try{
-        handle = fontcontext->render_bitmap(config);
-        fontimage = fontcontext->get_font_map(handle);
-        // TODO: write font image to file.
-        write_image_png(*fontimage, "font.png");
-    }
-    catch(glh::GraphicsException& e){
-        GLH_LOG_EXPR(e.get_message());
-    }
+    glyph_pane->set_font(junction, fontsize);
 
-    fonttexture->attach_image(*fontimage);
-
-    glyph_pane = std::make_shared<GlyphPane>(gm, font_program_name, fontcontext.get());
-    glyph_pane->font_handle_ = handle;
     glyph_pane->origin_ = vec2(100.f, 100.f);
     glyph_pane->text_field_.push_line("Hello, world.");
     glyph_pane->text_field_.push_line("This is another line, then.");
     glyph_pane->update_representation();
 }
+
     // TODO
+    //    Really, really attach the glyph pane to a scenetree node and render through that.
+    //    font typeface from context, rules: first, if not present, select some else font present.
+    //    font texture from the env!
     //    Use scene tree to render. Attach glyph pane to parent node
     //    Use parent node material to render glyph_pane mesh
     //    Attach a dark background mesh to glyph pane
@@ -213,17 +194,14 @@ void load_font_image(glh::GraphicsManager* gm)
 void init_uniform_data(){
     env.set_vec4("ObjColor", glh::vec4(0.f, 1.f, 0.f, 1.f));
     env.set_vec4("Albedo", glh::vec4(0.28f, 0.024f, 0.024f, 1.0));
-    //env.set_texture2d("Sampler", texture);
-    env.set_texture2d("Sampler", fonttexture); // TODO: Do we need material instance
-                                               // that would allocate the sampler resources
-                                               // to it's map?
+    env.set_texture2d("Sampler", glyph_pane->fonttexture_);// todo: then env.set "Sampler" texture into glyph_pane
 }
 
 bool init(glh::App* app)
 {
     glh::GraphicsManager* gm = app->graphics_manager();
 
-    fonttexture = gm->create_texture();
+    //fonttexture = gm->create_texture();
 
     gm->create_program(font_program_name, sh_geometry, sh_vertex_obj_tex, sh_fragment_tex_alpha);
 
@@ -302,14 +280,21 @@ char key_to_char(int key){
 void key_callback(int key, const glh::Input::ButtonState& s)
 {
     using namespace glh;
-
+    char c;
     if(key == Input::Esc) { g_run = false;}
     else if(key == Input::Left){ radial_speed -= 0.1f * PIf;}
     else if(key == Input::Right){ radial_speed += 0.1f * PIf;}
-    else if(key == 'T'){ texture->attach_image(image_test);}
-    else if(key == 'B'){ texture->attach_image(image_bubble);}
-    else if(key == 'R') {
-        font_renderable.reset_buffers();
+    else if(key == Input::Enter && s == glh::Input::ButtonState::Held){
+        glyph_pane->text_field_.push_line("");
+        glyph_pane->update_representation();
+    }
+    else if(key == Input::Space && s == glh::Input::ButtonState::Held){
+        glyph_pane->text_field_.last().push_back(' ');
+        glyph_pane->update_representation();
+    }
+    else if((c = key_to_char(key)) && s == glh::Input::ButtonState::Held) {
+        glyph_pane->text_field_.last().push_back(c);
+        glyph_pane->update_representation();
     } 
 }
 

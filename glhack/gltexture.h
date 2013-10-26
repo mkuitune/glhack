@@ -46,7 +46,9 @@ public:
     Target         target;
 };
 
-/** On-device buffers: textures, rendertargets etc. */
+/** On-device buffers: textures, rendertargets etc. 
+// TODO: need offload from GPU command at some point.
+*/
 class Texture {
 private:
     GLuint handle_;

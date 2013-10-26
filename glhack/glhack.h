@@ -130,37 +130,15 @@ public:
 
 typedef std::shared_ptr<FullRenderable> FullRenderablePtr;
 
-/** Interface state for one text field. 
-    // TODO: instantiate font textures to a single cache, share texture
-    // instances between all text-fields.
-*/
-class TextRenderable {
-public:
-    FullRenderable renderable_;
-
-    std::list<TextLine> text_;
-
-    float ppu; // Pixels per display unit.
-                // Fonts are rasterized in pixel coords. Use screen coord system
-                // units for textfield alignment ()
-    mat4  to_screen_;
-    Box2i pixel_bounds_; // bounds of the display area on viewspace in sample coordinates
-
-    // TOOD - how to calculate bounds etc. Display only complete lines? (would make sense)
-    // TODO IMP just show from beginning of text for start
-    // TODO IMP add support for multiline editing.
-
-    FontContext* font_context_;
-
-    //1: 
-
-};
 
 //////////// Graphics context /////////////
 
 /** GraphicsManager handles opengl assets and instances of adapter classes that
  *  require a global state to function (that e.g. require an initialized GL context,
- *  need to synchronize resource usage and so on.)*/
+ *  need to synchronize resource usage and so on.)
+ *  Try to allocate all gpu resources through this. That way we can have an index
+ *  to query all sorts of data from if wanted.
+ */
 DeclInterface(GraphicsManager,
 
     /** This function will create a shader program based on the source files passed to it*/
