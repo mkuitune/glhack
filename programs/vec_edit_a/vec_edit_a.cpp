@@ -280,10 +280,81 @@ void mouse_move_callback(int x, int y)
     std::cout << "Mouse:"  << x << " " << y << std::endl;
 }
 
+// 
+char ascii_tolower(char c){
+
+#define IFN(param, target) case param: return target; break
+    switch(c){
+        IFN('~', '`');
+        IFN('!', '1');
+        IFN('@', '2');
+        IFN('#', '3');
+        IFN('$', '4');
+        IFN('%', '5');
+        IFN('^', '6');
+        IFN('&', '7');
+        IFN('*', '8');
+        IFN('(', '9');
+        IFN(')', '0');
+        IFN('_', '-');
+        IFN('+', '=');
+
+        IFN('{', '[');
+        IFN('}', ']');
+        IFN(':', ';');
+        IFN('"', '\'');
+        IFN('|', '\\');
+        IFN('<', ',');
+        IFN('>', '.');
+        IFN('?', '/');
+        default:{
+            if(c > 64 && c < 91){
+                return c + 32;
+            } else return c;
+        }
+    }
+#undef IFN
+}
+
+char ascii_toupper(char c){
+
+#define IFN(param, target) case target: return param; break
+    switch(c){
+        IFN('~', '`');
+        IFN('!', '1');
+        IFN('@', '2');
+        IFN('#', '3');
+        IFN('$', '4');
+        IFN('%', '5');
+        IFN('^', '6');
+        IFN('&', '7');
+        IFN('*', '8');
+        IFN('(', '9');
+        IFN(')', '0');
+        IFN('_', '-');
+        IFN('+', '=');
+
+        IFN('{', '[');
+        IFN('}', ']');
+        IFN(':', ';');
+        IFN('"', '\'');
+        IFN('|', '\\');
+        IFN('<', ',');
+        IFN('>', '.');
+        IFN('?', '/');
+        default:{    
+            if(c > 96 && c < 123){
+                return c - 32;
+            } else return c;
+        }
+    }
+#undef IFN
+}
+
 char key_to_char(int key, bool shift_down){
     char c = 0;
     if(key < CHAR_MAX && key > 0) c = static_cast<char>(key);
-    if(c) c = shift_down ? toupper(c) : tolower(c);
+    if(c) c = shift_down ? ascii_toupper(c) : ascii_tolower(c);
     return c;
 }
 
