@@ -141,6 +141,8 @@ std::shared_ptr<glh::FontManager> fontmanager;
 
 glh::TextLine text_line;
 
+glh::SceneTree   scene;
+glh::RenderQueue render_queueue;
 
 void init_font_manager(glh::GraphicsManager* gm)
 {
@@ -175,10 +177,15 @@ void load_font_image(glh::GraphicsManager* gm)
     glyph_pane->update_representation();
 
     glyph_pane_dirty = true;
+
+    SceneTree::Node* root = scene.root();
+    glyph_pane->attach(&scene, root);
+
+
 }
 
     // TODO
-    //    Really, really attach the glyph pane to a scenetree node and render through that.
+    //    Really, really attach the glyph pane to a scenetree node and render through that.!!! Next or after implementing cursor.
     //    font typeface from context, rules: first, if not present, select some else font present.
     //    font texture from the env!
     //    Use scene tree to render. Attach glyph pane to parent node
@@ -248,6 +255,9 @@ bool update(glh::App* app)
         glyph_pane->update_representation();
     }
 
+    render_queueue.clear();
+    render_queueue.add(scene, [](SceneTree::Node* n){return true;});
+
     return g_run;
 }
 
@@ -257,7 +267,9 @@ void render_font(glh::App* app)
     apply(g_renderpass_settings);
     apply(g_blend_settings);
     //font_renderable.reset_buffers(); 'light torture'
-    gm->render(*glyph_pane->renderable_, env, env);
+
+    //gm->render(*glyph_pane->renderable_, env, env);
+    render_queueue.render(gm, env);
 }
 
 void resize(glh::App* app, int width, int height)
@@ -363,6 +375,10 @@ void key_callback(int key, const glh::Input::ButtonState& s)
 {
     using namespace glh;
     char c;
+
+    // TODO: here, pipe to internal char buffer. Pipe characters onwards
+    // to all character "listeners".
+
     if(key == Input::Esc) { g_run = false;}
     if(key == Input::Lshift || key == Input::Rshift){
         if(s == glh::Input::Held)

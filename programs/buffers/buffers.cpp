@@ -133,7 +133,6 @@ glh::SceneTree                     scene;
 glh::RenderQueue                   selectable_queue;
 glh::RenderQueue                   render_queueue;
 glh::RenderQueue                   top_queue;
-std::vector<glh::SceneTree::Node*> nodes;
 
 glh::DynamicSystem      dynamics;
 glh::StringNumerator    string_numerator;
@@ -263,7 +262,6 @@ bool init(glh::App* app)
         set_material(*n, PRIMARY_COLOR,  s.color_primary);
         set_material(*n, SECONDARY_COLOR,s.color_secondary);
         set_material(*n, COLOR_DELTA, 0.f);
-        add(nodes, n);
         add_color_interpolation_to_graph(app, n);
         add_focus_action(app, n, ui_context->focus_context_, graph, string_numerator);
     }

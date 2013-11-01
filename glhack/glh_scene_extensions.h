@@ -101,10 +101,10 @@ public:
         fonttexture_ = fontmanager_->get_font_texture(font_handle_);
     }
 
-    void attach(SceneTree& scene, SceneTree::Node& parent){
-        node_ = scene.add_node(&parent, renderable_);
-        parent_ = &parent;
-        scene_ = &scene;
+    void attach(SceneTree* scene, SceneTree::Node* parent){
+        node_ = scene->add_node(parent, renderable_);
+        parent_ = parent;
+        scene_ = scene;
     }
 
     void update_representation()
