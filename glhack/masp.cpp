@@ -5,12 +5,14 @@
 #include "persistent_containers.h"
 #include "iotools.h"
 
+#include "glh_regex.h"
+
+
 #include<stack>
 #include<cstring>
 #include<algorithm>
 #include<cstdlib>
 #include<cctype>
-#include<regex>
 #include<sstream>
 #include<numeric>
 #include<tuple>
@@ -696,17 +698,17 @@ enum DelimEnum{
     QUOTE         = 7
 };
 
-std::regex g_regfloat("^([-+]?[0-9]+(\\.[0-9]*)?|\\.[0-9]+)([eE][-+]?[0-9]+)?$");
-std::regex g_regint("^(?:([-+]?[1-9][0-9]*)|(0)|(0[xX][0-9A-Fa-f]+)|0[bB]([01]+))$");
+regex_t g_regfloat("^([-+]?[0-9]+(\\.[0-9]*)?|\\.[0-9]+)([eE][-+]?[0-9]+)?$");
+regex_t g_regint("^(?:([-+]?[1-9][0-9]*)|(0)|(0[xX][0-9A-Fa-f]+)|0[bB]([01]+))$");
 
 typedef enum ParseResult_t{PARSE_NIL, PARSE_INT, PARSE_FLOAT} ParseResult;
 
 ParseResult parsenum(const char* num, const char* numend, int& intvalue, double& doublevalue)
 {
-    std::cmatch res; 
+    cmatch_t res; 
     ParseResult result = PARSE_NIL;
 
-    if(std::regex_search(num, numend, res, g_regint))
+    if(glh_regex_search(num, numend, res, g_regint))
     {
         std::string is = res[0].str();
 
@@ -722,7 +724,7 @@ ParseResult parsenum(const char* num, const char* numend, int& intvalue, double&
         }
         result = PARSE_INT;
     }
-    else if(std::regex_search(num, numend, res, g_regfloat))
+    else if(glh_regex_search(num, numend, res, g_regfloat))
     {
         std::string sf = res[0].str();
         doublevalue = atof(sf.c_str());

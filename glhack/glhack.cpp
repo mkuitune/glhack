@@ -5,11 +5,12 @@
 #include "shims_and_types.h"
 #include "glbase.h"
 
+#include "glh_regex.h"
+
 #include <stack>
 #include <list>
 #include <sstream>
 #include <iostream>
-#include <regex>
 #include <memory>
 #include <algorithm>
 
