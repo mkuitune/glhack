@@ -317,10 +317,12 @@ public:
         std::map<std::string, Value> sinks_;   //> Available sinks - "prototypes". TODO: use only Value::Type!
         std::map<std::string, Value> sources_; //> Available sources.                    or not. This way we can have a default value inplace.
 
-        std::string                  name_;
+        std::string                  typename_;
 
         inputs_map_t& get_inputs(){return inputs_;}
         const inputs_map_t& get_inputs() const {return inputs_;}
+
+        DynamicNode(const char* typestring):typename_(typestring){}
 
         /** Create a reference from sink var with the specified source var of the given node. */
         void add_link(const std::string& sinkname, const node_id_t& linked_node, const var_id_t& source_var){
@@ -498,7 +500,7 @@ class NodeReciever : public DynamicGraph::DynamicNode{
 public:
     SceneTree::Node* node_;
 
-    NodeReciever(SceneTree::Node* node):node_(node){
+    NodeReciever(SceneTree::Node* node):node_(node), DynamicGraph::DynamicNode("NodeReciever"){
         if(!node) throw GraphicsException("Trying to init NodeReciever with empty node!");
         add_input(GLH_CHANNEL_ROTATION, DynamicGraph::Value::Empty);
         add_input(GLH_CHANNEL_POSITION, DynamicGraph::Value::Empty);
@@ -565,7 +567,7 @@ public:
     SceneTree::Node* node_;
     std::list<std::string> vars_;
 
-    NodeSource(SceneTree::Node* node, std::list<std::string> vars):node_(node), vars_(vars){
+    NodeSource(SceneTree::Node* node, std::list<std::string> vars):node_(node), vars_(vars), DynamicGraph::DynamicNode("NodeSource"){
         if(!node) throw GraphicsException("Trying to init NodeReciever with empty node!");
 
         for(auto& var:vars_){
@@ -596,7 +598,7 @@ public:
 class MixNode : public DynamicGraph::DynamicNode{
 public:
 
-    MixNode(){
+    MixNode():DynamicGraph::DynamicNode("MixNode"){
         vec4 color_out(COLOR_RED);
         set_output(GLH_PROPERTY_COLOR, DynamicGraph::Value::Vector4, color_out);
 
@@ -625,7 +627,7 @@ public:
 class MixScalar : public DynamicGraph::DynamicNode{
 public:
 
-    MixScalar(){
+    MixScalar():DynamicGraph::DynamicNode("MixScalar"){
         set_output(GLH_PROPERTY_INTERPOLANT, DynamicGraph::Value::Scalar, 0.f);
 
         add_input(GLH_PROPERTY_1,  DynamicGraph::Value::Scalar, 0.f);
@@ -634,7 +636,7 @@ public:
         add_input(GLH_PROPERTY_INTERPOLANT, DynamicGraph::Value::Scalar, 0.0f);
     }
 
-     MixScalar(float fst, float snd){
+     MixScalar(float fst, float snd):DynamicGraph::DynamicNode("MixScalar"){
         set_output(GLH_PROPERTY_INTERPOLANT, DynamicGraph::Value::Scalar, 0.f);
 
         add_input(GLH_PROPERTY_1,  DynamicGraph::Value::Scalar, fst);
@@ -658,7 +660,7 @@ public:
 /** Offset: bias, scale */
 class ScalarOffset : public DynamicGraph::DynamicNode{
 public:
-    ScalarOffset(){
+    ScalarOffset():DynamicGraph::DynamicNode("ScalarOffset"){
         add_input(GLH_PROPERTY_INTERPOLANT, DynamicGraph::Value::Scalar, 0.f);
         add_input(GLH_PROPERTY_SCALE, DynamicGraph::Value::Scalar, 1.f);
         add_input(GLH_PROPERTY_BIAS, DynamicGraph::Value::Scalar, 0.f);
@@ -685,12 +687,12 @@ public:
     float higher_;
     Animation::Easing::t easing_;
 
-    ScalarRamp():lower_(0.0f), higher_(1.0f), easing_(Animation::Easing::Linear){
+    ScalarRamp():lower_(0.0f), higher_(1.0f), easing_(Animation::Easing::Linear), DynamicGraph::DynamicNode("ScalarRamp"){
        add_input(GLH_PROPERTY_INTERPOLANT, 0.f); 
        set_output(GLH_PROPERTY_INTERPOLANT, 0.f);
     }
 
-    ScalarRamp(float lower, float higher):lower_(lower), higher_(higher), easing_(Animation::Easing::Linear){
+    ScalarRamp(float lower, float higher):lower_(lower), higher_(higher), easing_(Animation::Easing::Linear), DynamicGraph::DynamicNode("ScalarRamp"){
        add_input(GLH_PROPERTY_INTERPOLANT, 0.f); 
        set_output(GLH_PROPERTY_INTERPOLANT, 0.f);
     }
@@ -711,11 +713,11 @@ public:
     double minimum_;
     double maximum_;
 
-    LimitedIncrementalValue():value_(0.0), minimum_(-1.e37), maximum_(1.e37){
+    LimitedIncrementalValue():value_(0.0), minimum_(-1.e37), maximum_(1.e37), DynamicGraph::DynamicNode("LimitedIncrementalValue"){
         config_node();
     }
 
-    LimitedIncrementalValue(double value, double min, double max):value_(value), minimum_(min), maximum_(max){
+    LimitedIncrementalValue(double value, double min, double max):value_(value), minimum_(min), maximum_(max), DynamicGraph::DynamicNode("LimitedIncrementalValue"){
         config_node();
     }
 
@@ -740,7 +742,7 @@ public:
     App* app_;
     double previous_time_;
 
-    SystemInput(App* app):app_(app), previous_time_(-1.0){
+    SystemInput(App* app):app_(app), previous_time_(-1.0),DynamicGraph::DynamicNode("SystemInput"){
         set_output(GLH_CHANNEL_TIME, DynamicGraph::Value::Scalar, (float) app_->time());
         set_output(GLH_PROPERTY_TIME_DELTA, DynamicGraph::Value::Scalar, 0.f);
     }
@@ -762,7 +764,7 @@ public:
     SceneTree::Node* node_;
     FocusContext&    context_;
 
-    NodeFocusState(SceneTree::Node* node, FocusContext& context):node_(node), context_(context){
+    NodeFocusState(SceneTree::Node* node, FocusContext& context):node_(node), context_(context), DynamicGraph::DynamicNode("NodeFocusState"){
         set_output(GLH_PROPERTY_INTERPOLANT, DynamicGraph::Value::Scalar, 0.0f);
     }
 
@@ -823,11 +825,18 @@ struct DynamicNodeRef{
         graph.add_node(name_, node_);
     }
 
-    static std::function<DynamicNodeRef(DynamicGraph::DynamicNode* node, const std::string& name)> factory(glh::DynamicGraph& graph){
-        return [&graph](DynamicGraph::DynamicNode* node, const std::string& name)->DynamicNodeRef{
-            return DynamicNodeRef(node, name, graph);
+    static std::function<DynamicNodeRef(DynamicGraph::DynamicNode* node)> factory(glh::DynamicGraph& graph){
+        return [&graph](DynamicGraph::DynamicNode* node)->DynamicNodeRef{
+            return DynamicNodeRef(node, node->typename_, graph);
         };
     }
+
+    static std::function<DynamicNodeRef(DynamicGraph::DynamicNode* node)> factory_enumerate_names(glh::DynamicGraph& graph, glh::StringNumerator& string_numerator){
+        return [&graph, &string_numerator](DynamicGraph::DynamicNode* node)->DynamicNodeRef{
+            return DynamicNodeRef(node, string_numerator(node->typename_), graph);
+        };
+    }
+
     static std::function<void(DynamicNodeRef, const DynamicGraph::var_id_t&, DynamicNodeRef, const DynamicGraph::var_id_t&)> linker(glh::DynamicGraph& graph){
         return [&graph](DynamicNodeRef src, const DynamicGraph::var_id_t& srcvar, DynamicNodeRef dst, const DynamicGraph::var_id_t& dstvar){
             graph.add_link(src.name_, srcvar, dst.name_, dstvar);

@@ -180,16 +180,22 @@ void load_font_image(glh::GraphicsManager* gm)
 
     SceneTree::Node* root = scene.root();
     glyph_pane->attach(&scene, root);
-
-
 }
 
     // TODO
-    //    Really, really attach the glyph pane to a scenetree node and render through that.!!! Next or after implementing cursor.
-    //    font typeface from context, rules: first, if not present, select some else font present.
-    //    font texture from the env!
-    //    Use scene tree to render. Attach glyph pane to parent node
+    //    How to render font pane:
+    //     1) - render all fonts to a single texture
+    //        - texture the target pane with this texture
+    //     2) - render background into stencil and depth
+    //        - for fonts: disable depth and write, use stencil.
+    //     3) - at first can just render all fonts in a last pass.
+    //
+    //    * font typeface from context, rules: first, if not present, select some else font present.
+    //
     //    Use parent node material to render glyph_pane mesh
+    //
+    //    
+    //
     //    Attach a dark background mesh to glyph pane
     //    Make text in glyph pane selectable
     //    Move font context as part of app or graphics manager so no need to init piece by piece
@@ -202,6 +208,16 @@ void load_font_image(glh::GraphicsManager* gm)
     //    As a first step in centralized assets management impelement a monolithic
     //      asset owner and initializer class that just load and holds all the expected defaults.
     //      Later do something more sophisticated.
+
+    //
+    // Proto:
+    // Implement a directory browser
+    //
+    // Do two text fields. Select with mouse which one to feed text to.
+    // Do a 'field is active' visualization
+    // In effect, wrap glyph pane/text consumer into a class
+    // Create class to map keyboard events to a nice stream that above can consume.
+    // Implement backspace/del.
 
 void init_uniform_data(){
     env.set_vec4("ObjColor", glh::vec4(0.f, 1.f, 0.f, 1.f));
@@ -228,7 +244,6 @@ bool init(glh::App* app)
 
     init_uniform_data();
 
-
     return true;
 }
 
@@ -254,6 +269,8 @@ bool update(glh::App* app)
     if(glyph_pane_dirty && glyph_pane_update_interval== 0){
         glyph_pane->update_representation();
     }
+
+    glyph_pane->node_->material_.set_vec4("Albedo", glh::vec4(1.f, 1.f, 1.f,1.f));
 
     render_queueue.clear();
     render_queueue.add(scene, [](SceneTree::Node* n){return true;});

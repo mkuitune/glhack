@@ -147,20 +147,20 @@ glh::DynamicGraph graph;
 
 void add_color_interpolation_to_graph(glh::App* app, glh::SceneTree::Node* node){
     using namespace glh;
-    auto f = DynamicNodeRef::factory(graph);
+    auto f = DynamicNodeRef::factory_enumerate_names(graph, string_numerator);
 
-    auto sys      = f(new SystemInput(app), "sys");
-    auto ramp     = f(new ScalarRamp(), string_numerator("ramp"));
-    auto dynvalue = f(new LimitedIncrementalValue(0.0, 0.0, 1.0), string_numerator("dynvalue"));
-    auto offset   = f(new ScalarOffset(), string_numerator("offset"));
-    auto mix      = f(new MixNode(), string_numerator("mix"));
+    auto sys      = DynamicNodeRef::factory(graph)(new SystemInput(app));
+    auto ramp     = f(new ScalarRamp());
+    auto dynvalue = f(new LimitedIncrementalValue(0.0, 0.0, 1.0));
+    auto offset   = f(new ScalarOffset());
+    auto mix      = f(new MixNode());
 
     std::list<std::string> vars = list(std::string(COLOR_DELTA), 
                                        std::string(PRIMARY_COLOR),
                                        std::string(SECONDARY_COLOR));
 
-    auto nodesource = f(new NodeSource(node, vars),string_numerator("nodesource"));
-    auto nodereciever = f(new NodeReciever(node),string_numerator("nodereciever"));
+    auto nodesource = f(new NodeSource(node, vars));
+    auto nodereciever = f(new NodeReciever(node));
 
     auto lnk = DynamicNodeRef::linker(graph);
 
@@ -179,14 +179,14 @@ void add_color_interpolation_to_graph(glh::App* app, glh::SceneTree::Node* node)
 
 void add_focus_action(glh::App* app, glh::SceneTree::Node* node, glh::FocusContext& focus_context, glh::DynamicGraph& graph, glh::StringNumerator& string_numerator){
     using namespace glh;
-    auto f = DynamicNodeRef::factory(graph);
+    auto f = DynamicNodeRef::factory_enumerate_names(graph, string_numerator);
 
     float decspeed = -2.f;
     float incrspeed = 7.f;
 
-    auto focus    = f(new NodeFocusState(node, focus_context), string_numerator("node_focus"));
-    auto mix     = f(new MixScalar(decspeed, incrspeed), string_numerator("mix"));
-    auto noderes  = f(new NodeReciever(node), string_numerator("node_reciever"));
+    auto focus    = f(new NodeFocusState(node, focus_context));
+    auto mix     = f(new MixScalar(decspeed, incrspeed));
+    auto noderes  = f(new NodeReciever(node));
 
     auto lnk = DynamicNodeRef::linker(graph);
 

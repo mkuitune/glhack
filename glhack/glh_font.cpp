@@ -79,11 +79,18 @@ BakedFontHandle FontContext::render_bitmap(const FontConfig& config)
     auto fontfile          = path_join(path, config.name_);  
     BakedFontHandle handle = std::make_pair(config.name_, config.glyph_size_);
     
+    if(chardata_.find(handle) != chardata_.end()){
+        return handle;
+    }
+
+    // If data for handle not found, render it.
+
     std::vector<uint8_t> fontdata;
     bool              data_found;
     
     std::tie(fontdata, data_found) = file_to_bytes(fontfile.c_str());
 
+    // TODO FIXME: Check if handle already exists. If it does, 
     if(data_found)
     {
 
