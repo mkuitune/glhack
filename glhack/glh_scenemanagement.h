@@ -9,22 +9,24 @@
 
 namespace glh{
 
-struct Transform{
+//struct Transform{
+//
+//    vec3       position_;
+//    vec3       scale_;
+//    quaternion rotation_;
+//
+//    Transform(){initialize();}
+//
+//    void initialize(){
+//        position_ = vec3(0.f, 0.f, 0.f);
+//        scale_    = vec3(1.f, 1.f, 1.f);
+//        rotation_ = quaternion(1.f, 0.f, 0.f, 0.f);
+//    }
+//
+//    mat4 matrix(){return generate_transform<float>(position_, rotation_, scale_).matrix();}
+//};
 
-    vec3       position_;
-    vec3       scale_;
-    quaternion rotation_;
-
-    Transform(){initialize();}
-
-    void initialize(){
-        position_ = vec3(0.f, 0.f, 0.f);
-        scale_    = vec3(1.f, 1.f, 1.f);
-        rotation_ = quaternion(1.f, 0.f, 0.f, 0.f);
-    }
-
-    mat4 matrix(){return generate_transform<float>(position_, rotation_, scale_).matrix();}
-};
+typedef ExplicitTransform<float> Transform;
 
 class SceneTree{
 public:
@@ -36,6 +38,7 @@ public:
         // Might have still need for local to parent transform in shaders?
         std::string name_;
         int         id_;
+        int         parent_id_;
         bool        pickable_; // TODO: Preferably, remove from here (UI stuff)
         bool        interaction_lock_; // Lock for when dragged and so on. TODO: Preferably, remove from here (UI stuff)
 
@@ -77,14 +80,16 @@ public:
 
         void add_child(Node* node){
             children_.push_back(node);
+            node->parent_id_ = id_;
         }
 
         void remove_child(Node* node){
             erase(children_, node);
+            node->parent_id_ = node->id_;
         }
 
         void update_transforms(const mat4& parent_local_to_world){
-            local_to_world_ = transform_.matrix() * parent_local_to_world;
+            local_to_world_ = parent_local_to_world * transform_.matrix();
             update_transforms();
         }
 
@@ -188,6 +193,9 @@ public:
         vec4 color = ObjectRoster::color_of_id(newnode->id_);
         newnode->material_.set_vec4(UICTX_SELECT_NAME, color);
         if(parent) parent->add_child(newnode);
+
+        id_to_node_[newnode->id_] = newnode;
+
         return newnode;
     }
 
@@ -210,20 +218,34 @@ public:
                 n.material_.set_mat4(GLH_LOCAL_TO_WORLD, n.local_to_world_);}}
 
     iterator begin() {return tree_iterator(root_);}
+
     iterator end() {return tree_iterator(0);}
 
     void finalize(Node* node){
         node->children_.clear();
         recycled_nodes_.push_back(node);
+        id_to_node_.erase(node->id_);
+        id_generator_.release(node->id_);
+    }
+
+    Node* get(int id){
+        auto n = try_get_value(id_to_node_, id);
+        if(n) return *n;
+        else return 0;
     }
 
 private:
     std::deque<Node, Eigen::aligned_allocator<Node>> nodes_;
     std::list<Node*> recycled_nodes_;
 
+    std::map<int, Node*> id_to_node_;
+
     Node*                     root_;
     ObjectRoster::IdGenerator id_generator_;
 };
+
+SceneTree::iterator begin_iter(SceneTree::Node* node);
+SceneTree::iterator end_iter(SceneTree::Node* node);
 
 ///////////// Utility functions for scene elements /////////////
 
@@ -252,6 +274,18 @@ public:
     void add(SceneTree& scene, node_filter_fun_t filter){
         for(SceneTree::Node* node: scene){
             if(node->renderable() && filter(node)) add(node);}}
+
+    void add_rec(SceneTree::Node* noderoot){
+        auto first = begin_iter(noderoot);
+        auto last  = end_iter(noderoot);
+        for(auto node = first; node != last; ++node){
+            if(node->renderable()) add(*node);}}
+
+    void add_rec(SceneTree::Node* noderoot, node_filter_fun_t filter){
+        auto first = begin_iter(noderoot);
+        auto last  = end_iter(noderoot);
+        for(auto node = first; node != last; ++node){
+            if(node->renderable() && filter(*node)) add(*node);}}
 
 
     // Render items in queue
@@ -515,6 +549,38 @@ public:
 
     bool event_handling_done_ ;
 };
+
+// TODO remove below
+//class TransformGadget{
+//public:
+//
+//    glh::App& app_;
+//
+//    TransformGadget(glh::App& app):app_(app){
+//        // Transforms mouse movement to normalized device coordinates.
+//    }
+//
+//     //TODO: Into a graph node. Graph drives Gadget transform by forwarding mouse/pointer/vec source data
+//    // to it. TransformableSet (add definition and instance) is then transformed through the gadget transform.
+//    // Items are removed from transformable set when items are removed from selection.
+//    void mouse_move_node(vec2i mouse_delta, glh::SceneTree::Node* node)
+//    {
+//        glh::mat4 screen_to_view   = app_orthographic_pixel_projection(&app_);
+//        glh::mat4 view_to_world    = glh::mat4::Identity();
+//        glh::mat4 world_to_object  = glh::mat4::Identity();
+//        glh::mat4 screen_to_object = world_to_object * view_to_world * screen_to_view ;
+//    
+//        // should be replaced with view specific change vector...
+//        // projection of the view change vector onto the workplane...
+//        // etc.
+//    
+//        glh::vec4 v((float) mouse_delta[0], (float) mouse_delta[1], 0, 0);
+//        glh::vec3 node_pos_delta = glh::decrease_dim<float, 4>(screen_to_object * v);
+//    
+//        node->transform_.position_ = node->transform_.position_ + node_pos_delta;
+//    }
+//
+//};
 
 
 } // namespace glh

@@ -67,6 +67,10 @@ class Math
 {
 public:
 
+    typedef Eigen::Matrix<T, 4, 4> matrix4_t;
+    typedef Eigen::Matrix<T, 3, 1> vec3_t;
+    typedef Eigen::Quaternion<T>   quaternion_t;
+
     class span_t {
         T data[2];
     public:
@@ -93,7 +97,6 @@ inline int     to_int(const double d){return static_cast<int>(d);}
 inline bool are_near(const float first, const float second, const float epsilon = 0.001f){
     return fabsf((first - second)) < epsilon;
 }
-
 
 /** Convenience class to store vectors as some types such as Eigen::Vector4f have strict alignment requirements. */
 template<class T, int N>
@@ -197,6 +200,14 @@ inline bool bit_is_on(const uint32_t field, const uint32_t bit)
 
 //////////////////// Linear algebra etc. ///////////////////////////
 
+template<class T, int N, int M>
+Eigen::Matrix<T, N, M> component_wise_product(const Eigen::Matrix<T, N, M>& first, const Eigen::Matrix<T, N, M>& second)
+{
+    Eigen::Matrix<T, N, M> res = Eigen::Matrix<T, N, M>::Zero();
+    for(int j = 0; j < M; ++j) for(int i = 0; i < N; i++) res[i][j] = first[i][j] * second[i][j];
+    return res;
+}
+
 template<class T, int N>
 Eigen::Matrix<T, N+1, 1> increase_dim(const Eigen::Matrix<T, N, 1>& v){
     Eigen::Matrix<T, N+1, 1> out;
@@ -220,6 +231,41 @@ Eigen::Transform<T,3, Eigen::Affine> generate_transform(Eigen::Matrix<T, 3, 1>& 
     Eigen::Transform<T,3, Eigen::Affine> t = Eigen::Translation<T,3>(loc) * rot * Eigen::Scaling(scale);
     return t;
 }
+
+template<class T>
+struct ExplicitTransform{
+
+
+    // TODO FIXME: Store rotations as euler angles
+
+    typename Math<T>::vec3_t       position_;
+    typename Math<T>::vec3_t       scale_;
+    typename Math<T>::quaternion_t rotation_;
+
+    ExplicitTransform(){initialize();}
+
+    static ExplicitTransform ExplicitTransform::position(typename const Math<T>::vec3_t& pos){
+        Transform t;
+        t.position_ = pos;
+        return t;
+    }
+
+    void initialize(){
+        position_ = Math<T>::vec3_t(0.f, 0.f, 0.f);
+        scale_    = Math<T>::vec3_t(1.f, 1.f, 1.f);
+        rotation_ = Math<T>::quaternion_t(1.f, 0.f, 0.f, 0.f);
+    }
+
+    void add_to_each_dim(const ExplicitTransform& e){
+        // TODO FIXME: Store rotations as euler angles
+        position_ += e.position_;
+        scale_ += e.scale_;
+        rotation_ =  e.rotation_ * rotation_;
+        rotation_.normalize();
+    }
+
+    typename Math<T>::matrix4_t matrix(){return generate_transform<T>(position_, rotation_, scale_).matrix();}
+};
 
 //////////////////// Geometric entities ///////////////////////////
 

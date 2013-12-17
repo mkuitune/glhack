@@ -44,6 +44,13 @@ struct Triangle{
 };
 
 
+/////////// Plane /////////////
+/** \section glh_plane Plane*/
+struct Plane{
+    double a_,b_,c_,d_; //> ax + by + cz + d = 0
+    Plane(double a, double b, double c, double d):a_(a), b_(b), c_(c), d_(d){}
+};
+
 /////////// Polygon operations ////////////
 /** \section glh_polygon Polygon */
 

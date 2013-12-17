@@ -99,7 +99,13 @@ public:
 
     enum MouseButton{LeftButton = 0, RightButton = 1, MiddleButton = 2};
     enum ButtonState{Held,Released};
+    enum ButtonSource{Mouse, Keyboard, Custom};
 
+    typedef std::pair<ButtonSource, int> AnyButton;
+
+    static AnyButton    any_button(ButtonSource src, int val){return std::make_pair(src, val);}
+    static ButtonSource any_get_source(const AnyButton& b){return b.first;}
+    static int          any_get_button(const AnyButton& b){return b.second;}
 
     // TODO: maps for key states: std::unordered_map<int, callback_fun>
 };

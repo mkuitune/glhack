@@ -27,6 +27,7 @@
     <ClCompile Include="..\glhack\glh_names.cpp" />
     <ClCompile Include="..\glhack\glh_scenemanagement.cpp" />
     <ClCompile Include="..\glhack\glh_scene_extensions.cpp" />
+    <ClCompile Include="..\glhack\glh_scene_util.cpp" />
     <ClCompile Include="..\glhack\glh_timebased_signals.cpp" />
     <ClCompile Include="..\glhack\glh_typedefs.cpp" />
     <ClCompile Include="..\glhack\glh_uicontext.cpp" />
@@ -69,6 +70,7 @@
     <ClInclude Include="..\glhack\glh_names.h" />
     <ClInclude Include="..\glhack\glh_scenemanagement.h" />
     <ClInclude Include="..\glhack\glh_scene_extensions.h" />
+    <ClInclude Include="..\glhack\glh_scene_util.h" />
     <ClInclude Include="..\glhack\glh_timebased_signals.h" />
     <ClInclude Include="..\glhack\glh_typedefs.h" />
     <ClInclude Include="..\glhack\glh_uicontext.h" />

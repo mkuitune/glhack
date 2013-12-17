@@ -11,7 +11,7 @@
 #include "shims_and_types.h"
 #include "math_tools.h"
 #include "glh_uicontext.h"
-
+#include "glh_scene_util.h"
 
 //////////////// Program stuff ////////////////
 
@@ -204,18 +204,7 @@ void init_uniform_data(){
 using glh::vec2i;
 using glh::vec2;
 
-void load_screenquad(vec2 size, glh::DefaultMesh& mesh)
-{
-    using namespace glh;
-
-    vec2 halfsize = 0.5f * size;
-
-    vec2 low  = - halfsize;
-    vec2 high = halfsize;
-
-    mesh_load_quad_xy(low, high, mesh);
-}
-
+#if 0
 glh::SceneTree::Node* add_quad_to_scene(glh::GraphicsManager* gm, glh::ProgramHandle& program, glh::vec2 dims){
 
     glh::DefaultMesh* mesh = gm->create_mesh();
@@ -237,7 +226,7 @@ bool init(glh::App* app)
 
     GraphicsManager* gm = app->graphics_manager();
 
-    ui_context.reset(new glh::UiContext(*gm, *app, graph, string_numerator));
+    ui_context.reset(new glh::UiContext(*gm, *app, graph, string_numerator, scene));
 
     //sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment);
     sp_select_program  = gm->create_program(sp_select, sh_geometry, sh_vertex_obj, sh_fragment_selection_color);
@@ -255,6 +244,7 @@ bool init(glh::App* app)
     size_t quad_count = static_array_size(quads);
     for(auto& s: quads){
         string name = string_numerator("node");
+
         auto n = add_quad_to_scene(gm, *sp_colored_program, s.dims);
         n->transform_.position_ = s.pos;
         n->name_ = name;
@@ -271,6 +261,85 @@ bool init(glh::App* app)
 
     return true;
 }
+#else
+
+//TODO: Move into application code. Init 
+static glh::MovementMapper get_pixel_space_movement_mapper(glh::App* app, glh::SceneTree* scene, glh::SceneTree::Node* node)
+{
+    return [=](glh::vec3 delta, glh::SceneTree::Node* node){
+
+        auto parent = scene->get(node->parent_id_);
+
+        glh::mat4 screen_to_view   = glh::app_orthographic_pixel_projection(app);
+        glh::mat4 view_to_world    = glh::mat4::Identity();
+        glh::mat4 world_to_object  = parent->local_to_world_.inverse();
+        glh::mat4 screen_to_object = world_to_object * view_to_world * screen_to_view;
+
+        glh::vec4 v(delta[0], delta[1], 0, 0);
+        
+        glh::vec3 nd = glh::decrease_dim<float, 4>(screen_to_object * v);
+
+        glh::Transform t = glh::Transform::position(nd);
+        t.scale_ = glh::vec3(0.f, 0.f, 0.f);
+        parent->transform_.add_to_each_dim(t);
+
+        glh::Transform t2 = glh::Transform();
+        t2.scale_ = glh::vec3(0.f, 0.f, 0.f);
+        float wz = delta[0] < 0.f ? 0.05f : -0.05f;
+        t2.rotation_.z() = wz;
+
+        node->transform_.add_to_each_dim(t2);
+    };
+}
+
+bool init(glh::App* app)
+{
+    using namespace glh;
+    using std::string;
+
+    GraphicsManager* gm = app->graphics_manager();
+
+    ui_context.reset(new glh::UiContext(*gm, *app, graph, string_numerator, scene));
+
+    ui_context->set_movement_mapper_generator(get_pixel_space_movement_mapper);
+
+    //sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment);
+    sp_select_program  = gm->create_program(sp_select, sh_geometry, sh_vertex_obj, sh_fragment_selection_color);
+    sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment_fix_color);
+
+    render_picker->selection_program_ = sp_select_program;
+
+    struct{vec2 dims; vec3 pos; vec4 color_primary; vec4 color_secondary;} quads[] ={
+        {vec2(0.5, 0.5), vec3(-0.5, -0.5, 0.), vec4(COLOR_RED), vec4(COLOR_WHITE) },
+        {vec2(0.5, 0.5), vec3(0.5, 0.5, 0.), vec4(COLOR_GREEN), vec4(COLOR_WHITE)},
+        {vec2(0.5, 0.5), vec3(-0.5, 0.5, 0.), vec4(COLOR_BLUE), vec4(COLOR_WHITE)},
+        {vec2(0.25, 0.25), vec3(0.5, -0.5, 0.), vec4(COLOR_YELLOW),vec4(COLOR_WHITE) }
+    };
+
+    size_t quad_count = static_array_size(quads);
+    for(auto& s: quads){
+        string name = string_numerator("node");
+
+        auto parent = scene.add_node(scene.root());
+
+        auto n = add_quad_to_scene(gm, scene, *sp_colored_program, s.dims, parent);
+        parent->transform_.position_ = s.pos;
+        n->name_ = name;
+        set_material(*n, FIXED_COLOR,    s.color_primary);
+        set_material(*n, PRIMARY_COLOR,  s.color_primary);
+        set_material(*n, SECONDARY_COLOR,s.color_secondary);
+        set_material(*n, COLOR_DELTA, 0.f);
+        add_color_interpolation_to_graph(app, n);
+        add_focus_action(app, n, ui_context->focus_context_, graph, string_numerator);
+    }
+    graph.solve_dependencies();
+
+    init_uniform_data();
+
+    return true;
+}
+#endif
+
 
 
 bool pass_pickable(glh::SceneTree::Node* node){return node->pickable_;}

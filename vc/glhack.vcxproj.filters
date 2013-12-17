@@ -33,6 +33,7 @@
     <ClCompile Include="..\glhack\glh_uicontext.cpp" />
     <ClCompile Include="..\glhack\glh_scene_extensions.cpp" />
     <ClCompile Include="..\glhack\glh_default_assets.cpp" />
+    <ClCompile Include="..\glhack\glh_scene_util.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\glhack\glbase.h" />
@@ -70,5 +71,6 @@
     <ClInclude Include="..\glhack\win32_dirent.h" />
     <ClInclude Include="..\glhack\glh_scene_extensions.h" />
     <ClInclude Include="..\glhack\glh_default_assets.h" />
+    <ClInclude Include="..\glhack\glh_scene_util.h" />
   </ItemGroup>
 </Project>

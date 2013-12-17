@@ -112,7 +112,7 @@ glh::ProgramHandle* sp_colorcoded;
 // App state
 
 glh::RenderPassSettings g_renderpass_settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT,
-                                            glh::vec4(0.76f,0.71f,0.5f,1.0f), 1);
+                                            glh::vec4(0.5f,0.5f,0.5f,1.0f), 1);
 glh::RenderPassSettings g_blend_settings(glh::RenderPassSettings::BlendSettings(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
 bool g_run = true;
@@ -225,6 +225,14 @@ void init_uniform_data(){
     env.set_texture2d("Sampler", glyph_pane->fonttexture_);// todo: then env.set "Sampler" texture into glyph_pane
 }
 
+// TODO: Render background.
+// TODO: Render cursor.
+// TODO: Move cursor with arrow keys
+// TODO: Move cursor by clicking with mouse
+// TODO: Color picker
+// TODO: Repeat
+// TODO: us_ascii mapper to text utility
+
 bool init(glh::App* app)
 {
     glh::GraphicsManager* gm = app->graphics_manager();
@@ -243,6 +251,8 @@ bool init(glh::App* app)
     load_font_image(gm);
 
     init_uniform_data();
+
+    // render backgroudn
 
     return true;
 }
@@ -309,8 +319,8 @@ void mouse_move_callback(int x, int y)
     std::cout << "Mouse:"  << x << " " << y << std::endl;
 }
 
-// 
-char ascii_tolower(char c){
+// TODO to text util or such.
+char us_ascii_tolower(char c){
 
 #define IFN(param, target) case param: return target; break
     switch(c){
@@ -345,7 +355,7 @@ char ascii_tolower(char c){
 #undef IFN
 }
 
-char ascii_toupper(char c){
+char us_ascii_toupper(char c){
 
 #define IFN(param, target) case target: return param; break
     switch(c){
@@ -383,7 +393,7 @@ char ascii_toupper(char c){
 char key_to_char(int key, bool shift_down){
     char c = 0;
     if(key < CHAR_MAX && key > 0) c = static_cast<char>(key);
-    if(c) c = shift_down ? ascii_toupper(c) : ascii_tolower(c);
+    if(c) c = shift_down ? us_ascii_toupper(c) : us_ascii_tolower(c);
     return c;
 }
 

@@ -929,6 +929,12 @@ typename M::mapped_type* try_get_value(M& map, typename const M::key_type& key)
     return result;
 }
 
+template<class KEY, class VAL>
+bool has_pair(const std::map<KEY, VAL>& map, const KEY& key, const VAL& expected){
+
+    auto mapiter = map.find(key);
+    return mapiter != map.end() ? (mapiter->second == expected) : false;
+}
 
 //////////// Container functions //////////////
 

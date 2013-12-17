@@ -18,5 +18,7 @@ void set_material(SceneTree::Node& node, cstring& name, const vec4& var){
 void set_material(SceneTree::Node& node, cstring& name, const float var){
     node.material_.set_scalar(name, var);}
 
+SceneTree::iterator begin_iter(SceneTree::Node* node){return SceneTree::tree_iterator(node);}
+SceneTree::iterator end_iter(SceneTree::Node* node){return SceneTree::tree_iterator(0);}
 
 }

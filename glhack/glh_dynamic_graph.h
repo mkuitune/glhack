@@ -165,7 +165,7 @@ public:
         return id;
     }
 
-    vertex_id instantitate_vertex(const V& v){
+    vertex_id instantiate_vertex(const V& v){
         const vertex_id vpos = has_vertex(v);
         if(vpos == npos) return add_vertex_nocheck(v);
         else             return vpos;
@@ -182,8 +182,8 @@ public:
     }
 
     void add_edge(const V& from, const V& to){
-        vertex_id fromid = instantitate_vertex(from);
-        vertex_id toid   = instantitate_vertex(to);
+        vertex_id fromid = instantiate_vertex(from);
+        vertex_id toid   = instantiate_vertex(to);
         heads_[fromid].insert(toid);
     }
 
@@ -777,6 +777,12 @@ public:
         else{set_output(GLH_PROPERTY_INTERPOLANT, DynamicGraph::Value::Scalar, 0.0f);}
     }
 };
+
+// TODO: Mouse move node
+// TODO: Button node
+// TODO: Gadget node
+// TODO: Define mouse mover x mouse left button -> Gadget graph
+//
 
 #if 0 // TODO figure this out.
 class TransformGadget : public DynamicGraph::DynamicNode{

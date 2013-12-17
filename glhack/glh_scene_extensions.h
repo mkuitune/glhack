@@ -66,6 +66,14 @@ void render_glyph_coordinates_to_mesh(FontContext& context, TextField& t,
     BakedFontHandle handle, vec2 origin, double line_height /* Multiples of font height */,
     DefaultMesh& mesh);
 
+//TODO:
+// - add mesh for row background
+// - embed Glyphpane in specific shape, bind to background node (outside glyphpane)
+// - add a mesh for cursor
+// - add a datum for cursor, an interface for moving it (accept mouse position, accept
+//   cursor key, etc.
+// - 
+
 
 class GlyphPane
 {
@@ -81,6 +89,8 @@ public:
 
         renderable_->bind_program(*font_program_handle);
         renderable_->set_mesh(fontmesh_);
+
+        init_background();
     }
 
     ~GlyphPane(){
@@ -90,6 +100,11 @@ public:
             parent_->remove_child(node_);
             scene_->finalize(node_);
         }
+    }
+
+    void init_background()
+    {
+
     }
 
     void set_font(const std::string& name, float size){
@@ -116,18 +131,24 @@ public:
     }
 
 
-    Texture*            fonttexture_;
-    SceneTree*          scene_;
-    SceneTree::Node*    parent_;
-    SceneTree::Node*    node_;
-    FontManager*        fontmanager_;
-    DefaultMesh*        fontmesh_;
-    GraphicsManager*    gm_;
-    vec2                origin_;
-    BakedFontHandle     font_handle_;
-    double              line_height_;
-    FullRenderable*     renderable_;
-    TextField           text_field_;
+    Texture*         fonttexture_;
+    SceneTree*       scene_;
+    SceneTree::Node* parent_;
+    SceneTree::Node* node_;
+
+    // TODO: Implement background texture and texture painting routines to
+    // implement the highlight and cursor
+    SceneTree::Node* background_mesh; //> The background for highlights.
+    SceneTree::Node* cursor;          //> The 
+
+    FontManager*     fontmanager_;
+    DefaultMesh*     fontmesh_;
+    GraphicsManager* gm_;
+    vec2             origin_;
+    BakedFontHandle  font_handle_;
+    double           line_height_;
+    FullRenderable*  renderable_;
+    TextField        text_field_;
 };
 
 
