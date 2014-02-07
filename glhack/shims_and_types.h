@@ -49,6 +49,8 @@ typedef const std::string cstring;
 
 template<class T>
 bool any_of(const T& val, const T& ref0, const T& ref1){return val == ref0 || val == ref1;}
+template<class T, class V>
+bool any_of(const T& val, const V& ref0, const V& ref1){ return val == ref0 || val == ref1; }
 template<class T>
 bool any_of(const T& val, const T& ref0, const T& ref1, const T& ref2){return val == ref0 || val == ref1 || val == ref2;}
 template<class T>
@@ -96,6 +98,8 @@ struct TextLine
     const char* begin() const {return string.c_str();}
     const char* end() const {return string.c_str() + string.size();}
     int length(){return string.size();}
+    size_t size(){ return string.size(); }
+    void erase_from_back(){ string.erase(string.size() - 1, 1);}
 
     void push_back(const char c){string.push_back(c);}
 
@@ -130,6 +134,11 @@ template<class T>
 void erase(T& container, typename const T::value_type& v)
 {
     container.erase(std::remove(container.begin(), container.end(), v), container.end());
+}
+
+template<class T, class F>
+typename T::iterator find_if(T& container, F predicate){
+    return std::find_if(container.begin(), container.end(), predicate);
 }
 
 /** If container has last element, compare it with the given. */

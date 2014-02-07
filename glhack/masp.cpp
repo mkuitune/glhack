@@ -1673,7 +1673,9 @@ Value eval(const Value& v, Map& env, Masp& masp)
     else if(v.type == SYMBOL)
     {
         glh::ConstOption<Value> result = env.try_get_value(v);
-        if(!result.is_valid()) throw EvaluationException(std::string("eval: Symbol not found. Input:") + *v.value.string);
+        if(!result.is_valid()){
+                throw EvaluationException(std::string("eval: Symbol not found. Input:") + *v.value.string);
+        }
         return *result;
     }
     else if(is_quoted(v))

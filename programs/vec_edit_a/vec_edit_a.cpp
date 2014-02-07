@@ -152,7 +152,7 @@ void init_font_manager(glh::GraphicsManager* gm)
 }
 
 std::shared_ptr<glh::GlyphPane> glyph_pane;
-bool glyph_pane_dirty; // Update only once per two frames
+
 int glyph_pane_update_interval;
 int glyph_pane_update_interval_limit;
 
@@ -175,9 +175,7 @@ void load_font_image(glh::GraphicsManager* gm)
     glyph_pane->text_field_.push_line("Hello, world.");
     glyph_pane->text_field_.push_line("This is another line, then.");
     glyph_pane->update_representation();
-
-    glyph_pane_dirty = true;
-
+	glyph_pane->dirty_ = true;
     SceneTree::Node* root = scene.root();
     glyph_pane->attach(&scene, root);
 }
@@ -276,9 +274,10 @@ bool update(glh::App* app)
     env.set_vec4("Albedo", glh::vec4(0.28f, 0.024f, 0.024f,albedo_alpha));
 
     glyph_pane_update_interval = (glyph_pane_update_interval + 1) % glyph_pane_update_interval_limit;
-    if(glyph_pane_dirty && glyph_pane_update_interval== 0){
+    if(glyph_pane->dirty_ && glyph_pane_update_interval== 0){
         glyph_pane->update_representation();
-    }
+    }// TODO add this to render handler for the glyph pane: Text buffer gets updates,
+    // these updates are forwarded to glyph pane at specific intervals
 
     glyph_pane->node_->material_.set_vec4("Albedo", glh::vec4(1.f, 1.f, 1.f,1.f));
 
@@ -319,120 +318,30 @@ void mouse_move_callback(int x, int y)
     std::cout << "Mouse:"  << x << " " << y << std::endl;
 }
 
-// TODO to text util or such.
-char us_ascii_tolower(char c){
+glh::Modifiers modifiers;
 
-#define IFN(param, target) case param: return target; break
-    switch(c){
-        IFN('~', '`');
-        IFN('!', '1');
-        IFN('@', '2');
-        IFN('#', '3');
-        IFN('$', '4');
-        IFN('%', '5');
-        IFN('^', '6');
-        IFN('&', '7');
-        IFN('*', '8');
-        IFN('(', '9');
-        IFN(')', '0');
-        IFN('_', '-');
-        IFN('+', '=');
-
-        IFN('{', '[');
-        IFN('}', ']');
-        IFN(':', ';');
-        IFN('"', '\'');
-        IFN('|', '\\');
-        IFN('<', ',');
-        IFN('>', '.');
-        IFN('?', '/');
-        default:{
-            if(c > 64 && c < 91){
-                return c + 32;
-            } else return c;
-        }
-    }
-#undef IFN
-}
-
-char us_ascii_toupper(char c){
-
-#define IFN(param, target) case target: return param; break
-    switch(c){
-        IFN('~', '`');
-        IFN('!', '1');
-        IFN('@', '2');
-        IFN('#', '3');
-        IFN('$', '4');
-        IFN('%', '5');
-        IFN('^', '6');
-        IFN('&', '7');
-        IFN('*', '8');
-        IFN('(', '9');
-        IFN(')', '0');
-        IFN('_', '-');
-        IFN('+', '=');
-
-        IFN('{', '[');
-        IFN('}', ']');
-        IFN(':', ';');
-        IFN('"', '\'');
-        IFN('|', '\\');
-        IFN('<', ',');
-        IFN('>', '.');
-        IFN('?', '/');
-        default:{    
-            if(c > 96 && c < 123){
-                return c - 32;
-            } else return c;
-        }
-    }
-#undef IFN
-}
-
-char key_to_char(int key, bool shift_down){
-    char c = 0;
-    if(key < CHAR_MAX && key > 0) c = static_cast<char>(key);
-    if(c) c = shift_down ? us_ascii_toupper(c) : us_ascii_tolower(c);
-    return c;
-}
-
-bool shift_down;
 void key_callback(int key, const glh::Input::ButtonState& s)
 {
     using namespace glh;
-    char c;
-
     // TODO: here, pipe to internal char buffer. Pipe characters onwards
     // to all character "listeners".
 
     if(key == Input::Esc) { g_run = false;}
     if(key == Input::Lshift || key == Input::Rshift){
         if(s == glh::Input::Held)
-            shift_down = true;
-        else shift_down = false;
+            modifiers.shift_ = true;
+		else modifiers.shift_ = false;
     }
     else if(key == Input::Left){ radial_speed -= 0.1f * PIf;}
     else if(key == Input::Right){ radial_speed += 0.1f * PIf;}
-    else if(key == Input::Enter && s == glh::Input::Held){
-        glyph_pane->text_field_.push_line("");
-        glyph_pane_dirty = true;
+    else if(s == Input::Held){
+		glyph_pane->recieve_characters(key, modifiers);
     }
-    else if(key == Input::Space && s == glh::Input::Held){
-        glyph_pane->text_field_.last().push_back(' ');
-        glyph_pane_dirty = true;
-    }
-    else if((c = key_to_char(key, shift_down)) && s == glh::Input::Held) {
-        glyph_pane->text_field_.last().push_back(c);
-        glyph_pane_dirty = true;
-    } 
-
     // TODO: del, backspace, cursor
 }
 
 int main(int arch, char* argv)
 {
-    shift_down = false;
     glyph_pane_update_interval = 0;
     glyph_pane_update_interval_limit = 3;
 

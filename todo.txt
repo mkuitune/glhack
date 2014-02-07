@@ -86,6 +86,38 @@ Done Masp:
 
 Todo glh:
 ---------
+- virtual scene graph for scene construction, spatial scene graph to compute transforms and bounding boxes
+- properties map next to scene graph, properties disconnected from nodes and into properties map, accessible through node id
+- all objects inherit from GlhObject with possiblity to now pass containers of heterogenous objects around simply through GlhObject*
+- all heap objects allocated in single allocator
+- multiple threads with communication using mailboxes:
+- simplify graph semantics using bound objects or such (as simple as possible syntax to declare links, ,like
+   Link("foo", "output").to("bar", "input")
+- mouse drag actions with lambdas. Dragged-onto lambda triggers when object is dragged onto something. Mouse.drag(Mouse::Drag::Onto(), Mouse::Drag::Active())
+    - now "Active" lambda can forward the mouse movement to 
+- the alternative to this is, that whe mouse starts to drag an object, 
+    a new object is created (ObjectMover) that has a join ade in the graph Link("mouse", "output").to("object", "position")
+    - if we have a group of objects selected an object mover is created for every one of them
+    - when drag ends all objectmovers are passed the id onto which the the mouse was on top when the drag stopped
+- selection (a notion that comes to mind): global selection set (only one user, only one context. Selection as a UI feature does not really make sense otherwise. BUT,
+                                   can save selection sets)
+    - mouse operations etc. automatically target the global selection set? 
+    - when e.g. clicking,  with selector tool, erase selection set (unless modifier active, eg. ctrl + but down is not same as plain but down)
+    - mouse roles through different tools: e.g. picker-> mouse picks. Property selector-> gets color / material / id whatever wanted property, does
+        not clear selection buffer. Selector is the default role. Are roles lambdas bound to the mouse entity?
+
+- different scene graphs for 2d scene and 3d scene (2d scene root transform matrix pixel/dpi bound? Thus would map immediately to screen? Sounds good)
+- or, just different roots ("root3d", "root2d")
+- 2d layout, automatic background meshes for 2d element containers, that can be set as parents for e.g text
+- thread architecture(? maybe silly and not needed if can handle task management from external higher level source):
+    - master thread (mt): launches all sub-threads and manages them. No other responsibiliites
+    - OpenGL thread (ot): Executes all opengl commands
+    - io thread: reads input and output. 
+    - graph thread[s]: compute graph operations
+    - assets-thread[s](at):
+        - compose data from internal and external sources to a form that can be passed to ot 
+        - 
+
 - half-edge mesh
 - boolean operations
 - simple mesh rendering (ogl)

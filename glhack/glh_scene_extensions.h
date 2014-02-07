@@ -5,6 +5,7 @@
 
 #include "glh_font.h"
 #include "glh_scenemanagement.h"
+#include "shims_and_types.h"
 #include <vector>
 
 namespace glh{
@@ -60,11 +61,28 @@ public:
     TextLine& last(){
         return *text_fields_.back().get();
     }
+
+    size_t size(){return text_fields_.size();}
+
+    void erase(TextLine& t){
+        auto e = find_if(text_fields_, [&](std::shared_ptr<TextLine>& ptr){return ptr.get() == &t;});
+        if(e != text_fields_.end()) text_fields_.erase(e);
+    }
+
+    bool empty(){ return text_fields_.size() == 0 || text_fields_.size() == 1 && text_fields_[0]->size() == 0; }
 };
 
 void render_glyph_coordinates_to_mesh(FontContext& context, TextField& t,
     BakedFontHandle handle, vec2 origin, double line_height /* Multiples of font height */,
     DefaultMesh& mesh);
+
+/** Encodes the modifiers state for interpreting input streams. */
+struct Modifiers
+{
+    bool shift_;
+    bool ctrl_;
+    Modifiers():shift_(false), ctrl_(false){}
+};
 
 //TODO:
 // - add mesh for row background
@@ -81,7 +99,7 @@ public:
 
     GlyphPane(GraphicsManager* gm, const std::string& program_name, FontManager* fontmanager)
         :gm_(gm), node_(0), line_height_(1.0),fontmanager_(fontmanager),
-        origin_(0.f, 0.f), font_handle_(invalid_font_handle()){
+        origin_(0.f, 0.f), font_handle_(invalid_font_handle()), dirty_(true){
         fontmesh_ = gm_->create_mesh();
         renderable_= gm_->create_renderable();
 
@@ -122,12 +140,16 @@ public:
         scene_ = scene;
     }
 
+	void recieve_characters(int key, Modifiers modifiers);
+
     void update_representation()
     {
         if(handle_valid(font_handle_)){
             render_glyph_coordinates_to_mesh(fontmanager_->context_, text_field_, font_handle_, origin_, line_height_, *fontmesh_);
             renderable_->reset_buffers();
         }
+
+        dirty_ = false;
     }
 
 
@@ -149,6 +171,8 @@ public:
     double           line_height_;
     FullRenderable*  renderable_;
     TextField        text_field_;
+
+    bool             dirty_;
 };
 
 
