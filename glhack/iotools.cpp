@@ -2,6 +2,8 @@
     \author Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)
 */
 #include "iotools.h"
+#include "shims_and_types.h"
+#include <algorithm>
 
 
 #ifdef WIN32
@@ -26,12 +28,6 @@ std::string fix_path_to_posix_path(const std::string& path)
 }
 } // end anonymous namespace
 
-bool file_exists(const char* path)
-{
-    bool result = false;
-
-    return result;
-}
 
 static FilesystemReference::t typeof_entry(dirent *entry){
 
@@ -69,19 +65,17 @@ std::vector<FilesystemReference> list_dir(const char* path)
     return contents;
 }
 
-
-
-bool is_file(const char* path)
-{
+bool directory_exists(std::string dirpath){
+    std::string platform_path = path_to_platform_string(dirpath);
     bool result = false;
+    DIR* dir = opendir(platform_path.c_str());
 
-    return result;
-}
-
-bool is_directory(const char* path)
-{
-     bool result = false;
-
+    if(dir)
+    {
+        /* Directory exists. */
+        closedir(dir);
+        result = true;
+    }
     return result;
 }
 
@@ -150,6 +144,7 @@ char platform_separator(){
 
 std::string path_to_platform_string(const std::string& path)
 {
+//TODO Change conversion and output format to e.g. type SystemPathString or such that it works in all regions.
 #ifdef WIN32
     return fix_path_to_win32_path(path);
 #else

@@ -11,6 +11,7 @@
 #include "glh_typedefs.h"
 #include "shims_and_types.h"
 #include "glh_scene_extensions.h"
+#include "iotools.h"
 #include <cctype>
 #include <vector>
 
@@ -28,6 +29,8 @@ const char* sh_vertex   =
 "}";
 
 #define OBJ2WORLD "ObjectToWorld"
+
+#define CANVASTOCREEN "CanvasToScreen"
 
 const char* sh_vertex_obj   = 
 "#version 150               \n"
@@ -130,44 +133,94 @@ float tprev = 0;
 float angle = 0.f;
 float radial_speed = 0.0f * PIf;
 
-glh::AssetManagerPtr manager;
+namespace glh{
+
+/** Container for the services initializable after GL context exist. */
+class AppServices{
+public:
+
+    App*            app_;
+
+    FontManagerPtr  fontmanager_;
+    AssetManagerPtr manager_;
+
+    SceneTree       scene_;
+
+    SceneTree::Node* scene_ps_;
+    SceneTree::Node* scene_ndc_;
+
+    // TODO: RenderQueue
+
+    void init_font_manager()
+    {
+        GraphicsManager* gm = app_->graphics_manager();
+
+        std::string fontpath = manager_->fontpath();
+
+        if(!directory_exists(fontpath.c_str())){
+            throw GraphicsException(std::string("Font directory not found:") + fontpath);
+        }
+
+        fontmanager_.reset(new FontManager(gm, fontpath));
+    }
+
+    void init(App* app, const char* config_file)
+    {
+        app_ = app;
+
+        manager_ = make_asset_manager(config_file);
+
+        init_font_manager();
+
+        auto root = scene_.root();
+        scene_ps_ = scene_.add_node(root);
+        scene_ps_->name_ = "PS"; // Pixel space
+        scene_ndc_ = scene_.add_node(root);
+        scene_ndc_->name_ = "NDC"; // Normalized device coordinates
+
+    }
+
+    void update(){
+        mat4 screen_to_view = app_orthographic_pixel_projection(app_);
+        // move projections to local entities etc
+        // update render 
+        // scene_ps_->
+    }
+
+    FontManager* fontmanager(){ return fontmanager_.get(); }
+};
+
+}
+
+glh::AppServices services;
 
 glh::RenderEnvironment env;
 
 
 glh::FullRenderable font_renderable;
 
-std::shared_ptr<glh::FontManager> fontmanager;
 
 glh::TextLine text_line;
 
 glh::SceneTree   scene;
 glh::RenderQueue render_queueue;
 
-void init_font_manager(glh::GraphicsManager* gm)
-{
-    using namespace glh;
-    std::string fontpath = manager->fontpath();
-    fontmanager.reset(new glh::FontManager(gm, fontpath));
-}
 
 std::shared_ptr<glh::GlyphPane> glyph_pane;
 
 int glyph_pane_update_interval;
 int glyph_pane_update_interval_limit;
 
-void load_font_image(glh::GraphicsManager* gm)
+void load_font_resources(glh::GraphicsManager* gm)
 {
     using namespace glh;
-
-    init_font_manager(gm);
 
     std::string old_goudy("OFLGoudyStMTT.ttf");
     std::string junction("Junction-webfont.ttf");
 
     float fontsize = 15.0f;
 
-    glyph_pane = std::make_shared<GlyphPane>(gm, font_program_name, fontmanager.get());
+    glyph_pane = std::make_shared<GlyphPane>(gm, font_program_name, services.fontmanager());
 
     glyph_pane->set_font(junction, fontsize);
 
@@ -233,12 +286,17 @@ void init_uniform_data(){
 
 bool init(glh::App* app)
 {
+    const char* config_file = "config.mp";
+
+    services.init(app, config_file);
+
     glh::GraphicsManager* gm = app->graphics_manager();
 
     //fonttexture = gm->create_texture();
 
     gm->create_program(font_program_name, sh_geometry, sh_vertex_obj_tex, sh_fragment_tex_alpha);
 
+   // Add screenquad to service
    // mesh_load_screenquad(*mesh);
     int width = app->config().width;
     int height = app->config().height;
@@ -246,7 +304,7 @@ bool init(glh::App* app)
 
     //mesh_load_screenquad(0.5f, 0.5f, *mesh);
 
-    load_font_image(gm);
+    load_font_resources(gm);
 
     init_uniform_data();
 
@@ -266,7 +324,9 @@ bool update(glh::App* app)
     Eigen::Affine3f transform;
     transform = Eigen::AngleAxis<float>(angle, glh::vec3(0.f, 0.f, 1.f));
 
-    mat4 screen_to_view = app_orthographic_pixel_projection(app);
+    mat4 screen_to_view = app_orthographic_pixel_projection(app); 
+    // TODO: Use this automatically as the root projection in the 2D scenegraph
+    // TODO: Similarly updating projection for the 3D scenegraph
 
     env.set_mat4(OBJ2WORLD, screen_to_view);
 
@@ -323,8 +383,6 @@ glh::Modifiers modifiers;
 void key_callback(int key, const glh::Input::ButtonState& s)
 {
     using namespace glh;
-    // TODO: here, pipe to internal char buffer. Pipe characters onwards
-    // to all character "listeners".
 
     if(key == Input::Esc) { g_run = false;}
     if(key == Input::Lshift || key == Input::Rshift){
@@ -337,7 +395,6 @@ void key_callback(int key, const glh::Input::ButtonState& s)
     else if(s == Input::Held){
 		glyph_pane->recieve_characters(key, modifiers);
     }
-    // TODO: del, backspace, cursor
 }
 
 int main(int arch, char* argv)
@@ -350,11 +407,11 @@ int main(int arch, char* argv)
     config.width = 1024;
     config.height = 640;
 
-    const char* config_file = "config.mp";
 
-    manager = glh::make_asset_manager(config_file);
 
     glh::App app(config);
+
+
 
     GLH_LOG_EXPR("Logger started");
     add_key_callback(app, key_callback);

@@ -5,9 +5,30 @@
 #include "glh_scenemanagement.h"
 #include "glh_typedefs.h"
 #include "glsystem.h"
-
+#include <cstring>
 
 namespace glh {
+
+PathArray string_to_patharray(const std::string& str)
+{
+    PathArray result;
+
+    size_t last = 0;
+    size_t index = str.find("/");
+
+    if(index == std::string::npos){
+        result.push_back(str);
+    }
+    else{
+        while(index != std::string::npos){
+            result.push_back(std::string(str, last, index - last));
+            last = index + 1;
+            index = str.find("/", last);
+        }
+    }
+
+    return result;
+}
 
 void set_material(SceneTree::Node& node, RenderEnvironment& material){
     node.material_ = material;}

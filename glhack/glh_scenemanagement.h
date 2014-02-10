@@ -7,6 +7,7 @@
 #include "glh_names.h"
 #include "shims_and_types.h"
 
+
 namespace glh{
 
 //struct Transform{
@@ -26,7 +27,11 @@ namespace glh{
 //    mat4 matrix(){return generate_transform<float>(position_, rotation_, scale_).matrix();}
 //};
 
+
+typedef std::vector<std::string> PathArray;
 typedef ExplicitTransform<float> Transform;
+
+PathArray string_to_patharray(std::string str);
 
 class SceneTree{
 public:
@@ -42,7 +47,7 @@ public:
         bool        pickable_; // TODO: Preferably, remove from here (UI stuff)
         bool        interaction_lock_; // Lock for when dragged and so on. TODO: Preferably, remove from here (UI stuff)
 
-        RenderEnvironment material_;
+        RenderEnvironment material_; // todo, pointer
 
         Transform transform_; // local to parent transform
 
@@ -105,6 +110,22 @@ public:
             }
 
             return tree_world_bounds_AAB_;
+        }
+
+        Node* get_child(const std::string& name){
+            Node* res = 0;
+            foreach(children_, [&](Node* child){if(child->name_ == name){res = child;}});
+            return res;
+        }
+
+        Node* get_child(const PathArray path){
+            Node* cur = this;
+            PathArray::const_iterator iter = path.begin();
+            while(cur && iter != path.end()){
+                cur = cur->get_child(*iter);
+                iter++;
+            }
+            return cur;
         }
 
         ChildContainer::iterator begin(){return children_.begin();}
@@ -174,6 +195,7 @@ public:
        nodes_.push_back(Node(0));
        root_ = &nodes_.back();
        root_->id_ = id_generator_.new_id();
+       root_->name_ = "root";
        vec4 color = ObjectRoster::color_of_id(root_->id_);
        root_->material_.set_vec4(UICTX_SELECT_NAME, color);
     }
@@ -232,6 +254,10 @@ public:
         auto n = try_get_value(id_to_node_, id);
         if(n) return *n;
         else return 0;
+    }
+
+    Node* get(const PathArray path){
+        return root_->get_child(path);
     }
 
 private:
@@ -309,11 +335,48 @@ public:
     node_ptr_sequence_t renderables_;
 };
 
-// TODO: Do we need this?
+
+/////////////////////// Camera ///////////////////////
+
+class Camera{
+public:
+    SceneTree::Node* node; // word_to_camera
+
+    mat4             view_to_screen; // To NDC/Pixel coordinates
+    mat4             camera_to_view;  // Projection
+
+};
+
+/////////////////////// RenderPass ///////////////////////
+
 class RenderPass{
 public:
     RenderPassSettings settings_;
-    RenderQueue queue_;
+    RenderQueue        queue_;
+    std::string        root_path_;
+    RenderEnvironment  env_;
+
+    Camera* camera_;
+
+    RenderPass(){}
+
+    void update_queue(SceneTree& scene){
+        queue_.clear();
+        auto root = scene.get(string_to_patharray(root_path_));
+        if(root){queue_.add(root);}
+    }
+
+    void camera_parameters_to_env(){
+        // Take 
+        // world_to_camera, camera_to_view and view_to_screen matrices
+        // to env.
+    }
+
+    void render_queue(GraphicsManager* gm){
+        apply(settings_);
+        
+        queue_.render(gm, env_);
+    }
 };
 
 ///////////// UiEvents //////////////

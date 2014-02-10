@@ -27,10 +27,9 @@ struct FilesystemReference{
 
 };
 
-bool file_exists(const char* path);
 std::vector<FilesystemReference> list_dir(const char* path);
-bool is_file(const char* path);
-bool is_directory(const char* path);
+
+bool directory_exists(std::string dir);
 
 std::tuple<std::string, bool>          file_to_string(const char* path);
 std::tuple<std::vector<uint8_t>, bool> file_to_bytes(const char* path);

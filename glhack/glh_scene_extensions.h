@@ -45,6 +45,8 @@ private:
     FontManager& operator=(const FontManager& old);
 };
 
+typedef std::unique_ptr<FontManager> FontManagerPtr;
+
 /** Collection of text fields and their rendering options. */
 class TextField {
 public:
@@ -151,6 +153,13 @@ public:
 
         dirty_ = false;
     }
+
+
+    // TODO add handle mouse click method. Gets x,y in screen coordinates. Invert the local matrix and 
+    // multiply coordinates to get them in the local coordinates for this element. See which row
+    // and colums this hit and place cursor accordingly.
+
+    // TODO Paint option along with copy and paste to clipboard.
 
 
     Texture*         fonttexture_;

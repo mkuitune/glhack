@@ -233,6 +233,7 @@ void add_mouse_wheel_callback(App& app, const UserInput::MouseWheelCallback& cb)
 mat4 app_orthographic_pixel_projection(const App* app);
 
 
+
 ///////////// Misc ///////////////
 
 /** Execute a minimal scene. Test that everything builds and runs etc.*/
