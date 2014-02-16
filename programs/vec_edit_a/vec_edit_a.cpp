@@ -144,7 +144,7 @@ public:
     FontManagerPtr  fontmanager_;
     AssetManagerPtr manager_;
 
-    SceneTree       scene_;
+    std::shared_ptr<SceneAssets>  assets_;
 
     SceneTree::Node* scene_ps_;
     SceneTree::Node* scene_ndc_;
@@ -167,15 +167,23 @@ public:
     void init(App* app, const char* config_file)
     {
         app_ = app;
+        GraphicsManager* gm = app_->graphics_manager();
 
         manager_ = make_asset_manager(config_file);
 
         init_font_manager();
 
-        auto root = scene_.root();
-        scene_ps_ = scene_.add_node(root);
+        // TODO: Create 2d pixel space camera whose projection matrix is read from app
+        // TODO: Create 3d view space camera whose projection matrix is read from app
+        // TODO: Use the 2d camera as the camera for the gui renderpass
+        // TODO: Make this compile after that
+
+        assets_ = SceneAssets::create(app_, gm, fontmanager_.get());
+
+        auto root = assets_->tree_.root();
+        scene_ps_ = assets_->tree_.add_node(root);
         scene_ps_->name_ = "PS"; // Pixel space
-        scene_ndc_ = scene_.add_node(root);
+        scene_ndc_ = assets_->tree_.add_node(root);
         scene_ndc_->name_ = "NDC"; // Normalized device coordinates
 
     }
@@ -388,12 +396,12 @@ void key_callback(int key, const glh::Input::ButtonState& s)
     if(key == Input::Lshift || key == Input::Rshift){
         if(s == glh::Input::Held)
             modifiers.shift_ = true;
-		else modifiers.shift_ = false;
+        else modifiers.shift_ = false;
     }
     else if(key == Input::Left){ radial_speed -= 0.1f * PIf;}
     else if(key == Input::Right){ radial_speed += 0.1f * PIf;}
     else if(s == Input::Held){
-		glyph_pane->recieve_characters(key, modifiers);
+        glyph_pane->recieve_characters(key, modifiers);
     }
 }
 

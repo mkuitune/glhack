@@ -60,8 +60,8 @@ public:
     }
 
     // TODO scene to own context
-    UiContext(GraphicsManager& manager, glh::App& app, DynamicGraph& graph, StringNumerator& string_numerator, SceneTree& scene):
-        manager_(manager),app_(app), graph_(graph),string_numerator_(string_numerator), render_picker_(app), scene_(scene)
+    UiContext(GraphicsManager& manager, glh::App& app, DynamicGraph& graph, SceneTree& scene):
+        manager_(manager),app_(app), graph_(graph), render_picker_(app), scene_(scene)
     {
         init_assets();
 
@@ -87,7 +87,7 @@ public:
     // Techniques - fixed interaction forms.
     void add_technique(Technique::t technique, SceneTree::Node* node){
         if(technique == Technique::ColorInterpolation){
-            Technique::color_interpolation(app_, graph_, string_numerator_, node);
+            Technique::color_interpolation(app_, graph_, app_.string_numerator(), node);
         }
     }
 
@@ -191,12 +191,19 @@ public:
             }
 
             // TODO: Can graph operations be used to replace this?
+            // Answer: No, closure bound to mouse state is just fine. Probably should refactor so that
+            // the position gets fed to the active closurers list (create an active closures list!)
+            // that gets popped when the mouse button is raised (add a closure to mouse button raised
+            // state that will erase the closures?)
 
             {
                 vec2i delta = mouse_current_ - mouse_prev_;
                 vec3 deltaf((float) delta[0], (float) delta[1], 0.f);
                 // TODO: Replace with dynamic graph network attached to each renderable node
                 if(is_left_mouse_button_down()){
+                    // TODO: In stead of storing this node id, perhaps it would be better to store node id
+                    // explicitly in the closure that operates on it, store all active closures in a list
+                    // and just 'execute all active'?
                     for(SceneTree::Node* node: dragged){
                         movement_mappers_[node->id_](deltaf, node);
                         //Transform t(movement_mappers_[node->id_](deltaf, node));
@@ -229,7 +236,6 @@ public:
     GraphicsManager& manager_;
     App&             app_;
     DynamicGraph&    graph_;
-    StringNumerator& string_numerator_;
 
     FocusContext                focus_context_;
     RenderPicker                render_picker_;

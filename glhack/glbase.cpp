@@ -307,6 +307,7 @@ void App::resize(int width, int height)
 }
 
 GraphicsManager* App::graphics_manager(){return manager_.get();}
+StringNumerator& App::string_numerator(){return string_numerator_;}
 
 
 void add_key_callback(App& app, const UserInput::KeyCallback& cb){

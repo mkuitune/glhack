@@ -213,12 +213,15 @@ public:
 
     GraphicsManager* graphics_manager();
 
+    StringNumerator& string_numerator();
+
     /** Signal window resize for app.*/
     void resize(int width, int height);
 private:
     AppConfig                        config_;
     UserInput                        user_input_;
     bool                             running_;
+    StringNumerator                  string_numerator_;
     std::shared_ptr<GraphicsManager> manager_;
 };
 

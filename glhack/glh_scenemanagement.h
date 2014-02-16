@@ -33,9 +33,14 @@ typedef ExplicitTransform<float> Transform;
 
 PathArray string_to_patharray(std::string str);
 
+DeclInterface(SceneObject,
+    virtual const std::string& name() const = 0;
+    virtual EntityType::t      entity_type() const = 0; 
+);
+
 class SceneTree{
 public:
-    class Node{
+    class Node : public SceneObject{
     public:
         typedef std::vector<Node*> ChildContainer;
 
@@ -65,6 +70,9 @@ public:
 
         Node():renderable_(0){
             reset_data();}
+
+        virtual const std::string& name() const override  {return name_;}
+        virtual EntityType::t entity_type() const override  {return EntityType::SceneTreeNode;}
 
         void reset_data(){
             pickable_ = true;
@@ -281,6 +289,9 @@ void set_material(SceneTree::Node& node, cstring& name, const float var);
 
 ///////////// RenderQueue //////////////
 
+// TODO: Render que is a 'renderer functinality implementing' class and thus a lower level object than
+// e.g. render pass. This should probably be somewhere else.
+
 class RenderQueue{
 public:
 
@@ -338,27 +349,45 @@ public:
 
 /////////////////////// Camera ///////////////////////
 
-class Camera{
+class Camera : public SceneObject{
 public:
-    SceneTree::Node* node; // word_to_camera
+
+    enum class Projection{
+        PixelSpaceOrthographic,
+        Orthographic,
+        Perspective
+    };
+
+    Projection projection_;
+
+    SceneTree::Node* node; // world_to_camera
 
     mat4             view_to_screen; // To NDC/Pixel coordinates
-    mat4             camera_to_view;  // Projection
+    mat4             camera_to_view; // Projection
+
+    std::string     name_;
+
+    virtual const std::string& name() const override  {return name_;}
+    virtual EntityType::t entity_type() const override  {return EntityType::Camera;}
 
 };
 
 /////////////////////// RenderPass ///////////////////////
 
-class RenderPass{
+class RenderPass : public SceneObject{
 public:
     RenderPassSettings settings_;
     RenderQueue        queue_;
     std::string        root_path_;
     RenderEnvironment  env_;
+    std::string        name_;
 
     Camera* camera_;
 
     RenderPass(){}
+
+    virtual const std::string& name() const override  {return name_;}
+    virtual EntityType::t entity_type() const override  {return EntityType::RenderPass;}
 
     void update_queue(SceneTree& scene){
         queue_.clear();

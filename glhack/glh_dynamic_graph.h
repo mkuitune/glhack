@@ -256,6 +256,7 @@ std::vector<T> postorder_sort_graph(const AdjacencyListGraph<T>& graph){
     return DfsForestSort<T>(graph)();
 }
 
+// TODO: Probably need own StringNumerator?
 class DynamicGraph{
 public:
 

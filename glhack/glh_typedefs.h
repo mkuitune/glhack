@@ -80,12 +80,21 @@ public:
         ProgramHandle = 5,
         BufferSet     = 6,
         DefaultMesh   = 7,
-        SceneTreeNode = 8,
-        Texture       = 9,
+        Texture       = 8,
+
         Vec4          = 1008,
         Mat4          = 1009,
         Image8        = 1010,
         Image32       = 1011,
+
+        // Scene assets
+        Camera         = 2001,
+        RenderPass     = 2002,
+        TextField      = 2003,
+        SceneTreeNode  = 2004,
+        GlyphPane      = 2005,
+
+
         LAST_TYPE
     };
 

@@ -177,9 +177,9 @@ void add_color_interpolation_to_graph(glh::App* app, glh::SceneTree::Node* node)
     lnk(mix, GLH_PROPERTY_COLOR, nodereciever, FIXED_COLOR);
 }
 
-void add_focus_action(glh::App* app, glh::SceneTree::Node* node, glh::FocusContext& focus_context, glh::DynamicGraph& graph, glh::StringNumerator& string_numerator){
+void add_focus_action(glh::App* app, glh::SceneTree::Node* node, glh::FocusContext& focus_context, glh::DynamicGraph& graph){
     using namespace glh;
-    auto f = DynamicNodeRef::factory_enumerate_names(graph, string_numerator);
+    auto f = DynamicNodeRef::factory_enumerate_names(graph, app->string_numerator());
 
     float decspeed = -2.f;
     float incrspeed = 7.f;
@@ -299,7 +299,7 @@ bool init(glh::App* app)
 
     GraphicsManager* gm = app->graphics_manager();
 
-    ui_context.reset(new glh::UiContext(*gm, *app, graph, string_numerator, scene));
+    ui_context.reset(new glh::UiContext(*gm, *app, graph, scene));
 
     ui_context->set_movement_mapper_generator(get_pixel_space_movement_mapper);
 
@@ -318,7 +318,7 @@ bool init(glh::App* app)
 
     size_t quad_count = static_array_size(quads);
     for(auto& s: quads){
-        string name = string_numerator("node");
+        string name = app->string_numerator()("node");
 
         auto parent = scene.add_node(scene.root());
 
@@ -330,7 +330,7 @@ bool init(glh::App* app)
         set_material(*n, SECONDARY_COLOR,s.color_secondary);
         set_material(*n, COLOR_DELTA, 0.f);
         add_color_interpolation_to_graph(app, n);
-        add_focus_action(app, n, ui_context->focus_context_, graph, string_numerator);
+        add_focus_action(app, n, ui_context->focus_context_, graph);
     }
     graph.solve_dependencies();
 
