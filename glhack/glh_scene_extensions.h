@@ -248,7 +248,6 @@ private:
     }
 public:
 
-
     static std::shared_ptr<SceneAssets> create(App* app, GraphicsManager* gm, FontManager* font_manager){
         std::shared_ptr<SceneAssets> assets_(new SceneAssets);
         assets_->init(app, gm, font_manager);
