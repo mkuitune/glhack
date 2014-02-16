@@ -241,33 +241,6 @@ void load_font_resources(glh::GraphicsManager* gm)
     glyph_pane->attach(&scene, root);
 }
 
-    // TODO
-    //    How to render font pane:
-    //     1) - render all fonts to a single texture
-    //        - texture the target pane with this texture
-    //     2) - render background into stencil and depth
-    //        - for fonts: disable depth and write, use stencil.
-    //     3) - at first can just render all fonts in a last pass.
-    //
-    //    * font typeface from context, rules: first, if not present, select some else font present.
-    //
-    //    Use parent node material to render glyph_pane mesh
-    //
-    //    
-    //
-    //    Attach a dark background mesh to glyph pane
-    //    Make text in glyph pane selectable
-    //    Move font context as part of app or graphics manager so no need to init piece by piece
-    //    Store and generate these 'default material' like the font material in sentral place
-    //    Use even a global singleton to get them or something. Only rendering thread will access
-    //    them and the default assets should be created on init.
-    //    ie. GraphicsManager->default_assets or something.
-    //    Figure out a nice way to handle the mapping. Now the matrix screen_to_view
-    //      is just used to transform the mesh to pixel coordinates. 
-    //    As a first step in centralized assets management impelement a monolithic
-    //      asset owner and initializer class that just load and holds all the expected defaults.
-    //      Later do something more sophisticated.
-
     //
     // Proto:
     // Implement a directory browser

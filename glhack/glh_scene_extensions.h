@@ -151,7 +151,7 @@ public:
     {
         if(handle_valid(font_handle_)){
             render_glyph_coordinates_to_mesh(fontmanager_->context_, text_field_, font_handle_, origin_, line_height_, *fontmesh_);
-            renderable_->reset_buffers();
+            renderable_->resend_data_on_render();
         }
 
         dirty_ = false;

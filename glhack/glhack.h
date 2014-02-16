@@ -99,8 +99,9 @@ public:
     DefaultMesh*      mesh_;
 
     bool meshdata_on_gpu_;
+    bool meshdata_dirty_;
 
-    FullRenderable():program_(0),meshdata_on_gpu_(false), mesh_(0){}
+    FullRenderable():program_(0),meshdata_on_gpu_(false), mesh_(0), meshdata_dirty_(false){}
 
     void bind_program(ProgramHandle& program){
         program_ = &program;
@@ -111,12 +112,17 @@ public:
         if(mesh_){
             glh::assign_by_guessing_names(device_buffers_, *mesh_); // Assign mesh data to buffers
             meshdata_on_gpu_ = true;
+            meshdata_dirty_ = false;
         }
     }
 
     void reset_buffers(){
         device_buffers_.reset();
         meshdata_on_gpu_ = false;
+    }
+
+    void resend_data_on_render(){
+        meshdata_dirty_ = true;
     }
 
     void set_mesh(DefaultMesh* meshptr){

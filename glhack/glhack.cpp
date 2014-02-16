@@ -670,7 +670,7 @@ public:
 
         if(!r.mesh()) throw GraphicsException("FullRenderable: trying to render without bound mesh.");
 
-        if(!r.meshdata_on_gpu_) r.transfer_vertexdata_to_gpu();
+        if(!r.meshdata_on_gpu_ || r.meshdata_dirty_) r.transfer_vertexdata_to_gpu();
                                                                
         auto active = make_active(&program);
         active.bind_vertex_input(r.device_buffers_.buffers_);
