@@ -49,6 +49,7 @@ namespace glh{
 
 /////////////// Types //////////////
 
+
 typedef Eigen::Vector4f vec4;
 typedef Eigen::Vector4i vec4i;
 typedef Eigen::Vector3f vec3;
@@ -61,6 +62,18 @@ typedef Eigen::Quaternion<float>  quaternion;
 typedef Eigen::Quaternion<double> quaterniond;
 
 typedef Eigen::Transform<float, 3, Eigen::Affine> transform3;
+
+struct Color{
+    float r;
+    float g;
+    float b;
+    float a;
+
+    Color():r(0.f),g(0.f), b(0.f),a(0.f){}
+    Color(float rr, float gg, float bb, float aa):r(rr), g(gg), b(bb), a(aa){}
+    Color(const vec4& v):r(v[0]), g(v[1]), b(v[2]), a(v[3]){}
+};
+
 
 template<class T>
 class Math

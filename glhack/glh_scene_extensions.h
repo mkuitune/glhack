@@ -224,7 +224,7 @@ public:
 
     RenderPass* create_render_pass(const std::string& name){
         render_passes_.emplace_back();
-        auto pass = &render_passes_.back();
+        RenderPass* pass = &render_passes_.back();
         pass->name_ = name;
         return pass;
     }

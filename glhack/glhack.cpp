@@ -779,7 +779,7 @@ RenderPassSettings::RenderPassSettings():
     depth_mask_set(false), color_mask_set(false) {
 }
 
-RenderPassSettings::RenderPassSettings(const GLuint clear_mask, const vec4& color, const GLclampd depth)
+RenderPassSettings::RenderPassSettings(const GLuint clear_mask, const Color& color, const GLclampd depth)
 :clear_mask(clear_mask), clear_color(color), clear_depth(depth),
 clear_color_set(true), clear_depth_set(true), blend_set(false), depth_mask_set(false), color_mask_set(false)
 {}
@@ -806,18 +806,18 @@ void RenderPassSettings::set_buffer_clear(Buffer buffer)
 {
     switch(buffer)
     {
-        case Color:   clear_mask |= GL_COLOR_BUFFER_BIT; break;
-        case Depth:   clear_mask |= GL_DEPTH_BUFFER_BIT; break;
-        case Stencil: clear_mask |= GL_STENCIL_BUFFER_BIT; break;
+        case BufferColor:   clear_mask |= GL_COLOR_BUFFER_BIT; break;
+        case BufferDepth:   clear_mask |= GL_DEPTH_BUFFER_BIT; break;
+        case BufferStencil: clear_mask |= GL_STENCIL_BUFFER_BIT; break;
         default: assert(0);
     }
 }
 
 void apply(const RenderPassSettings& pass)
 {
-    const vec4& cc(pass.clear_color); 
+    const Color& cc(pass.clear_color); 
 
-    if(pass.clear_color_set) glClearColor(cc[0], cc[1], cc[2], cc[3]);
+    if(pass.clear_color_set) glClearColor(cc.r, cc.g, cc.b, cc.a);
     if(pass.clear_depth_set) glClearDepth(pass.clear_depth);
     if(pass.clear_mask) glClear(pass.clear_mask);
     if(pass.blend_set) pass.blend.apply();

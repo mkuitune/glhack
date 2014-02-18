@@ -376,11 +376,11 @@ public:
 
 class RenderPass : public SceneObject{
 public:
-    RenderPassSettings settings_;
-    RenderQueue        queue_;
-    std::string        root_path_;
-    RenderEnvironment  env_;
-    std::string        name_;
+    std::list<RenderPassSettings> settings_;
+    RenderQueue                     queue_;
+    std::string                     root_path_;
+    RenderEnvironment               env_;
+    std::string                     name_;
 
     Camera* camera_;
 
@@ -389,20 +389,30 @@ public:
     virtual const std::string& name() const override  {return name_;}
     virtual EntityType::t entity_type() const override  {return EntityType::RenderPass;}
 
+    void add_settings(const RenderPassSettings& settings){
+        settings_.push_back(settings);
+    }
+
+    // TODO figure out if this setting root path is not the right thing to do.
     void update_queue(SceneTree& scene){
         queue_.clear();
         auto root = scene.get(string_to_patharray(root_path_));
         if(root){queue_.add(root);}
     }
 
+    void update_queue(SceneTree& scene, RenderQueue::node_filter_fun_t filter){
+        queue_.clear();
+        queue_.add(scene, filter);
+    }
+    
     void camera_parameters_to_env(){
         // Take 
         // world_to_camera, camera_to_view and view_to_screen matrices
         // to env.
     }
 
-    void render_queue(GraphicsManager* gm){
-        apply(settings_);
+    void render(GraphicsManager* gm){
+        for(auto &s: settings_) apply(s);
         
         queue_.render(gm, env_);
     }
@@ -495,7 +505,7 @@ public:
     std::tuple<Box<int,2>, bool> setup_context(int pointer_x, int pointer_y){
          // set up scene
          RenderPassSettings settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT,
-                                            glh::vec4(0.0f,0.0f,0.0f,1.f), 1);
+                                            glh::Color(0.0f,0.0f,0.0f,1.f), 1);
          // Constrain view box
         const int w = app_.config().width;
         const int h = app_.config().height;

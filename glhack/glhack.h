@@ -10,6 +10,7 @@ Targeted OpenGL version: 3.2. Targeted GLSL version: 1.5.
 #include "glh_mesh.h"
 #include "gltexture.h"
 #include "glh_font.h"
+#include "math_tools.h"
 
 #include <list>
 #include <string>
@@ -224,17 +225,17 @@ public:
         }
     };
 
-    enum Buffer{Color = GL_COLOR_BUFFER_BIT, Depth = GL_DEPTH_BUFFER_BIT, Stencil = GL_STENCIL_BUFFER_BIT};
+    enum Buffer{ BufferColor = GL_COLOR_BUFFER_BIT, BufferDepth = GL_DEPTH_BUFFER_BIT, BufferStencil = GL_STENCIL_BUFFER_BIT };
 
-    GLuint   clear_mask;
-    vec4     clear_color; bool clear_color_set;
+
+    Color clear_color; bool clear_color_set;
     GLclampd clear_depth; bool clear_depth_set;
     BlendSettings blend;  bool blend_set;
     DepthMask depth_mask; bool depth_mask_set;
     ColorMask color_mask; bool color_mask_set;
+    GLuint   clear_mask;
 
-
-    RenderPassSettings(const GLuint clear_mask, const vec4& clear_color, const GLclampd clear_depth);
+    RenderPassSettings(const GLuint clear_mask, const Color& clear_color, const GLclampd clear_depth);
     RenderPassSettings(BlendSettings& blend_settings);
     RenderPassSettings(DepthMask& depth_mask_param);
     RenderPassSettings(ColorMask& color_mask_param);

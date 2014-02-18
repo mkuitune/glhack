@@ -114,13 +114,8 @@ glh::ProgramHandle* sp_colorcoded;
 
 // App state
 
-glh::RenderPassSettings g_renderpass_settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT,
-                                            glh::vec4(0.5f,0.5f,0.5f,1.0f), 1);
-glh::RenderPassSettings g_blend_settings(glh::RenderPassSettings::BlendSettings(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
 bool g_run = true;
-
-std::shared_ptr<glh::DefaultMesh> mesh(new glh::DefaultMesh()); // ram vertex data
 
 // Screen quad shader
 const char* sp_vcolors = "screen";
@@ -135,7 +130,7 @@ float radial_speed = 0.0f * PIf;
 
 namespace glh{
 
-/** Container for the services initializable after GL context exist. */
+/** Container for the services initializable only after GL context exist. */
 class AppServices{
 public:
 
@@ -180,11 +175,8 @@ public:
 
         assets_ = SceneAssets::create(app_, gm, fontmanager_.get());
 
-        auto root = assets_->tree_.root();
-        scene_ps_ = assets_->tree_.add_node(root);
-        scene_ps_->name_ = "PS"; // Pixel space
-        scene_ndc_ = assets_->tree_.add_node(root);
-        scene_ndc_->name_ = "NDC"; // Normalized device coordinates
+
+        // TODO: Add 2D and 3D cameras to scene
 
     }
 
@@ -202,17 +194,9 @@ public:
 
 glh::AppServices services;
 
-glh::RenderEnvironment env;
+glh::RenderQueue* render_queue;
 
-
-glh::FullRenderable font_renderable;
-
-
-glh::TextLine text_line;
-
-glh::SceneTree   scene;
-glh::RenderQueue render_queueue;
-
+glh::RenderPass* render_pass;
 
 std::shared_ptr<glh::GlyphPane> glyph_pane;
 
@@ -237,8 +221,8 @@ void load_font_resources(glh::GraphicsManager* gm)
     glyph_pane->text_field_.push_line("This is another line, then.");
     glyph_pane->update_representation();
 	glyph_pane->dirty_ = true;
-    SceneTree::Node* root = scene.root();
-    glyph_pane->attach(&scene, root);
+    SceneTree::Node* root = services.assets_->tree_.root();
+    glyph_pane->attach(&services.assets_->tree_, root);
 }
 
     //
@@ -250,12 +234,6 @@ void load_font_resources(glh::GraphicsManager* gm)
     // In effect, wrap glyph pane/text consumer into a class
     // Create class to map keyboard events to a nice stream that above can consume.
     // Implement backspace/del.
-
-void init_uniform_data(){
-    env.set_vec4("ObjColor", glh::vec4(0.f, 1.f, 0.f, 1.f));
-    env.set_vec4("Albedo", glh::vec4(0.28f, 0.024f, 0.024f, 1.0));
-    env.set_texture2d("Sampler", glyph_pane->fonttexture_);// todo: then env.set "Sampler" texture into glyph_pane
-}
 
 // TODO: Render background.
 // TODO: Render cursor.
@@ -273,24 +251,25 @@ bool init(glh::App* app)
 
     glh::GraphicsManager* gm = app->graphics_manager();
 
-    //fonttexture = gm->create_texture();
 
     gm->create_program(font_program_name, sh_geometry, sh_vertex_obj_tex, sh_fragment_tex_alpha);
 
-   // Add screenquad to service
-   // mesh_load_screenquad(*mesh);
-    int width = app->config().width;
-    int height = app->config().height;
-    mesh_load_screenquad((float) width, (float) height, *mesh);
-
-    //mesh_load_screenquad(0.5f, 0.5f, *mesh);
-
     load_font_resources(gm);
 
-    init_uniform_data();
+    render_pass = services.assets_->create_render_pass(app->string_numerator()("RenderPass"));
+    render_queue = &render_pass->queue_;
 
-    // render backgroudn
+    render_pass->env_.set_vec4("ObjColor", glh::vec4(0.f, 1.f, 0.f, 1.f));
+    render_pass->env_.set_vec4("Albedo", glh::vec4(0.28f, 0.024f, 0.024f, 1.0));
+    render_pass->env_.set_texture2d("Sampler", glyph_pane->fonttexture_);// todo: then env.set "Sampler" texture into glyph_pane
 
+    glh::RenderPassSettings renderpass_settings(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT,
+        glh::Color(0.5f, 0.5f, 0.5f, 1.0f), 1);
+    glh::RenderPassSettings blend_settings(glh::RenderPassSettings::BlendSettings(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+
+
+    render_pass->add_settings(renderpass_settings);
+    render_pass->add_settings(blend_settings);
     return true;
 }
 
@@ -309,10 +288,10 @@ bool update(glh::App* app)
     // TODO: Use this automatically as the root projection in the 2D scenegraph
     // TODO: Similarly updating projection for the 3D scenegraph
 
-    env.set_mat4(OBJ2WORLD, screen_to_view);
+    render_pass->env_.set_mat4(OBJ2WORLD, screen_to_view);
 
     float albedo_alpha = 1.0f - (t - floor(t));
-    env.set_vec4("Albedo", glh::vec4(0.28f, 0.024f, 0.024f,albedo_alpha));
+    render_pass->env_.set_vec4("Albedo", glh::vec4(0.28f, 0.024f, 0.024f, albedo_alpha));
 
     glyph_pane_update_interval = (glyph_pane_update_interval + 1) % glyph_pane_update_interval_limit;
     if(glyph_pane->dirty_ && glyph_pane_update_interval== 0){
@@ -322,21 +301,17 @@ bool update(glh::App* app)
 
     glyph_pane->node_->material_.set_vec4("Albedo", glh::vec4(1.f, 1.f, 1.f,1.f));
 
-    render_queueue.clear();
-    render_queueue.add(scene, [](SceneTree::Node* n){return true;});
+    render_pass->update_queue(services.assets_->tree_, [](SceneTree::Node* n){return true; });
 
     return g_run;
 }
 
 void render_font(glh::App* app)
 {
+    // TODO FIX renderpass settings, non-obvious
     glh::GraphicsManager* gm = app->graphics_manager();
-    apply(g_renderpass_settings);
-    apply(g_blend_settings);
-    //font_renderable.reset_buffers(); 'light torture'
 
-    //gm->render(*glyph_pane->renderable_, env, env);
-    render_queueue.render(gm, env);
+    render_pass->render(gm);
 }
 
 void resize(glh::App* app, int width, int height)
