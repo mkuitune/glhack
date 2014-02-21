@@ -33,6 +33,12 @@ namespace glh{
 #define GLH_PROPERTY_INTERPOLANT    "GLH_PROPERTY_INTERPOLANT"
 #define GLH_PROPERTY_DELTA          "GLH_PROPERTY_DELTA"
 
+//////////////// Shader parameters. ////////////////
+
+#define OBJ2WORLD     "ObjectToWorld"
+#define WORLD2CAMERA  "WorldToCamera"
+#define CAMERA2SCREEN "CameraToScreen"
+#define WORLD2SCREEN  "WorldToScreen"
 
     //////////////// Color constants. ////////////////
 // Can be used as eg. 

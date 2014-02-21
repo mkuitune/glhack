@@ -10,24 +10,6 @@
 
 namespace glh{
 
-//struct Transform{
-//
-//    vec3       position_;
-//    vec3       scale_;
-//    quaternion rotation_;
-//
-//    Transform(){initialize();}
-//
-//    void initialize(){
-//        position_ = vec3(0.f, 0.f, 0.f);
-//        scale_    = vec3(1.f, 1.f, 1.f);
-//        rotation_ = quaternion(1.f, 0.f, 0.f, 0.f);
-//    }
-//
-//    mat4 matrix(){return generate_transform<float>(position_, rotation_, scale_).matrix();}
-//};
-
-
 typedef std::vector<std::string> PathArray;
 typedef ExplicitTransform<float> Transform;
 
@@ -353,19 +335,54 @@ class Camera : public SceneObject{
 public:
 
     enum class Projection{
-        PixelSpaceOrthographic,
-        Orthographic,
+        PixelSpaceOrthographic, // Maps mesh coordinates to view with default that mesh coordinates are in pixel space.
+        Orthographic,           // Maps mesh coordinates to view with scaling
         Perspective
     };
 
+    mat4 camera_to_view_;   // Projection
+    mat4 view_to_screen_;   // To NDC. 
+    mat4 camera_to_screen_; // compute per frame, ctv * vts
+
     Projection projection_;
 
-    SceneTree::Node* node; // world_to_camera
+    SceneTree::Node* node_;          // world_to_camera / camera_to_world
 
-    mat4             view_to_screen; // To NDC/Pixel coordinates
-    mat4             camera_to_view; // Projection
+    std::string      name_;
 
-    std::string     name_;
+    Camera(SceneTree::Node* node):node_(node){
+        camera_to_view_ = mat4::Identity();
+        view_to_screen_ = mat4::Identity();
+        camera_to_screen_ = mat4::Identity();
+    }
+
+    void set_view_to_screen_transform(const mat4& view_to_screen){
+        view_to_screen_ = view_to_screen;}
+
+    void set_camera_to_view_transform(const mat4& camera_to_view){
+        camera_to_view_ = camera_to_view;
+    }
+
+    const mat4& camera_to_screen(){ return camera_to_screen_; }
+    mat4 world_to_camera(){ return node_->local_to_world_.inverse(); }
+
+    void update(App* app){
+
+        // TODO: Probably link this stuff with RenderTarget
+        if(projection_ == Camera::Projection::PixelSpaceOrthographic){
+            view_to_screen_ = app_orthographic_pixel_projection(app);
+        }
+        else if(projection_ == Camera::Projection::Orthographic)
+        {
+            throw GraphicsException("Camera.update: Projection type not implemented yet!");
+        }
+        else // Perspective
+        {
+            throw GraphicsException("Camera.update: Projection type not implemented yet!");
+        }
+
+        camera_to_screen_ = view_to_screen_ * camera_to_view_;
+    }
 
     virtual const std::string& name() const override  {return name_;}
     virtual EntityType::t entity_type() const override  {return EntityType::Camera;}
@@ -389,6 +406,8 @@ public:
     virtual const std::string& name() const override  {return name_;}
     virtual EntityType::t entity_type() const override  {return EntityType::RenderPass;}
 
+    void set_camera(Camera* camera){ camera_ = camera; }
+
     void add_settings(const RenderPassSettings& settings){
         settings_.push_back(settings);
     }
@@ -406,14 +425,19 @@ public:
     }
     
     void camera_parameters_to_env(){
-        // Take 
-        // world_to_camera, camera_to_view and view_to_screen matrices
-        // to env.
+        env_.set_mat4(WORLD2CAMERA, camera_->world_to_camera());
+        env_.set_mat4(CAMERA2SCREEN, camera_->camera_to_screen());
+        env_.set_mat4(WORLD2SCREEN, camera_->camera_to_screen() * camera_->world_to_camera());
     }
 
     void render(GraphicsManager* gm){
+
+        if(!camera_) throw GraphicsException("RenderPass::render: camera_ not assigned");
+
+        camera_parameters_to_env();
+
         for(auto &s: settings_) apply(s);
-        
+
         queue_.render(gm, env_);
     }
 };

@@ -1,17 +1,9 @@
 /** 
 
-
 */
 
+#include "glh_app_services.h"
 
-#include "glbase.h"
-#include "asset_manager.h"
-#include "glh_generators.h"
-#include "glh_image.h"
-#include "glh_typedefs.h"
-#include "shims_and_types.h"
-#include "glh_scene_extensions.h"
-#include "iotools.h"
 #include <cctype>
 #include <vector>
 
@@ -28,20 +20,16 @@ const char* sh_vertex   =
 "    gl_Position = vec4( VertexPosition, 1.0 );"
 "}";
 
-#define OBJ2WORLD "ObjectToWorld"
-
-#define CANVASTOCREEN "CanvasToScreen"
-
 const char* sh_vertex_obj   = 
 "#version 150               \n"
-"uniform mat4 ObjectToWorld;"
+"uniform mat4 ObjectToScreen;"
 "in vec3      VertexPosition;    "
 "in vec3      VertexColor;       "
 "out vec3 Color;            "
 "void main()                "
 "{                          "
 "    Color = VertexColor;   "
-"    gl_Position = ObjectToWorld * vec4( VertexPosition, 1.0 );"
+"    gl_Position = ObjectToScreen * vec4( VertexPosition, 1.0 );"
 "}";
 
 const char* sh_vertex_obj_pos   = 
@@ -55,7 +43,7 @@ const char* sh_vertex_obj_pos   =
 
 const char* sh_vertex_obj_tex   = 
 "#version 150               \n"
-"uniform mat4 ObjectToWorld;"
+"uniform mat4 WorldToScreen;"
 "in vec3      VertexPosition;    "
 "in vec3      TexCoord;"
 "out vec3 v_color;            "
@@ -63,7 +51,7 @@ const char* sh_vertex_obj_tex   =
 "void main()                "
 "{                          "
 "    v_texcoord = TexCoord.xy;"
-"    gl_Position = ObjectToWorld * vec4( VertexPosition, 1.0 );"
+"    gl_Position = WorldToScreen * vec4( VertexPosition, 1.0 );"
 "}";
 
 
@@ -114,7 +102,6 @@ glh::ProgramHandle* sp_colorcoded;
 
 // App state
 
-
 bool g_run = true;
 
 // Screen quad shader
@@ -128,80 +115,13 @@ float tprev = 0;
 float angle = 0.f;
 float radial_speed = 0.0f * PIf;
 
-namespace glh{
-
-/** Container for the services initializable only after GL context exist. */
-class AppServices{
-public:
-
-    App*            app_;
-
-    FontManagerPtr  fontmanager_;
-    AssetManagerPtr manager_;
-
-    std::shared_ptr<SceneAssets>  assets_;
-
-    SceneTree::Node* scene_ps_;
-    SceneTree::Node* scene_ndc_;
-
-    // TODO: RenderQueue
-
-    void init_font_manager()
-    {
-        GraphicsManager* gm = app_->graphics_manager();
-
-        std::string fontpath = manager_->fontpath();
-
-        if(!directory_exists(fontpath.c_str())){
-            throw GraphicsException(std::string("Font directory not found:") + fontpath);
-        }
-
-        fontmanager_.reset(new FontManager(gm, fontpath));
-    }
-
-    void init(App* app, const char* config_file)
-    {
-        app_ = app;
-        GraphicsManager* gm = app_->graphics_manager();
-
-        manager_ = make_asset_manager(config_file);
-
-        init_font_manager();
-
-        // TODO: Create 2d pixel space camera whose projection matrix is read from app
-        // TODO: Create 3d view space camera whose projection matrix is read from app
-        // TODO: Use the 2d camera as the camera for the gui renderpass
-        // TODO: Make this compile after that
-
-        assets_ = SceneAssets::create(app_, gm, fontmanager_.get());
-
-
-        // TODO: Add 2D and 3D cameras to scene
-
-    }
-
-    void update(){
-        mat4 screen_to_view = app_orthographic_pixel_projection(app_);
-        // move projections to local entities etc
-        // update render 
-        // scene_ps_->
-    }
-
-    FontManager* fontmanager(){ return fontmanager_.get(); }
-};
-
-}
-
-glh::AppServices services;
-
+glh::AppServices  services;
 glh::RenderQueue* render_queue;
+glh::RenderPass*  render_pass;
 
-glh::RenderPass* render_pass;
+glh::Camera*      camera;
 
-std::shared_ptr<glh::GlyphPane> glyph_pane;
-
-int glyph_pane_update_interval;
-int glyph_pane_update_interval_limit;
+glh::GlyphPane* glyph_pane;
 
 void load_font_resources(glh::GraphicsManager* gm)
 {
@@ -212,7 +132,7 @@ void load_font_resources(glh::GraphicsManager* gm)
 
     float fontsize = 15.0f;
 
-    glyph_pane = std::make_shared<GlyphPane>(gm, font_program_name, services.fontmanager());
+    glyph_pane = services.assets().create_glyph_pane(font_program_name);  // TODO: font program should be automatically handled by scene assets I think
 
     glyph_pane->set_font(junction, fontsize);
 
@@ -220,28 +140,12 @@ void load_font_resources(glh::GraphicsManager* gm)
     glyph_pane->text_field_.push_line("Hello, world.");
     glyph_pane->text_field_.push_line("This is another line, then.");
     glyph_pane->update_representation();
-	glyph_pane->dirty_ = true;
+    glyph_pane->dirty_ = true;
     SceneTree::Node* root = services.assets_->tree_.root();
     glyph_pane->attach(&services.assets_->tree_, root);
+
+    // TODO: View layouter that aligns glyph_pane
 }
-
-    //
-    // Proto:
-    // Implement a directory browser
-    //
-    // Do two text fields. Select with mouse which one to feed text to.
-    // Do a 'field is active' visualization
-    // In effect, wrap glyph pane/text consumer into a class
-    // Create class to map keyboard events to a nice stream that above can consume.
-    // Implement backspace/del.
-
-// TODO: Render background.
-// TODO: Render cursor.
-// TODO: Move cursor with arrow keys
-// TODO: Move cursor by clicking with mouse
-// TODO: Color picker
-// TODO: Repeat
-// TODO: us_ascii mapper to text utility
 
 bool init(glh::App* app)
 {
@@ -251,7 +155,6 @@ bool init(glh::App* app)
 
     glh::GraphicsManager* gm = app->graphics_manager();
 
-
     gm->create_program(font_program_name, sh_geometry, sh_vertex_obj_tex, sh_fragment_tex_alpha);
 
     load_font_resources(gm);
@@ -259,45 +162,42 @@ bool init(glh::App* app)
     render_pass = services.assets_->create_render_pass(app->string_numerator()("RenderPass"));
     render_queue = &render_pass->queue_;
 
+    // TODO: Default mat
     render_pass->env_.set_vec4("ObjColor", glh::vec4(0.f, 1.f, 0.f, 1.f));
     render_pass->env_.set_vec4("Albedo", glh::vec4(0.28f, 0.024f, 0.024f, 1.0));
     render_pass->env_.set_texture2d("Sampler", glyph_pane->fonttexture_);// todo: then env.set "Sampler" texture into glyph_pane
 
-    glh::RenderPassSettings renderpass_settings(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT,
-        glh::Color(0.5f, 0.5f, 0.5f, 1.0f), 1);
-    glh::RenderPassSettings blend_settings(glh::RenderPassSettings::BlendSettings(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
+    render_pass->add_settings(glh::RenderPassSettings(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT,
+        glh::Color(0.5f, 0.5f, 0.5f, 1.0f), 1));
+    render_pass->add_settings(glh::RenderPassSettings(glh::RenderPassSettings::BlendSettings(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)));
 
+    camera = services.assets_->create_camera(glh::Camera::Projection::PixelSpaceOrthographic);
 
-    render_pass->add_settings(renderpass_settings);
-    render_pass->add_settings(blend_settings);
+    render_pass->set_camera(camera);
+
     return true;
 }
 
-
-bool update(glh::App* app)
-{
-    using namespace glh;
-
+void rotating_transform(glh::App* app){
     float t = (float) app->time();
     angle += (t - tprev) * radial_speed;
     tprev = t;
     Eigen::Affine3f transform;
     transform = Eigen::AngleAxis<float>(angle, glh::vec3(0.f, 0.f, 1.f));
+}
+
+bool update(glh::App* app)
+{
+    using namespace glh;
+
+    services.update();
+
+    rotating_transform(app);
 
     mat4 screen_to_view = app_orthographic_pixel_projection(app); 
-    // TODO: Use this automatically as the root projection in the 2D scenegraph
-    // TODO: Similarly updating projection for the 3D scenegraph
 
-    render_pass->env_.set_mat4(OBJ2WORLD, screen_to_view);
-
-    float albedo_alpha = 1.0f - (t - floor(t));
+    float albedo_alpha = 1.0f;
     render_pass->env_.set_vec4("Albedo", glh::vec4(0.28f, 0.024f, 0.024f, albedo_alpha));
-
-    glyph_pane_update_interval = (glyph_pane_update_interval + 1) % glyph_pane_update_interval_limit;
-    if(glyph_pane->dirty_ && glyph_pane_update_interval== 0){
-        glyph_pane->update_representation();
-    }// TODO add this to render handler for the glyph pane: Text buffer gets updates,
-    // these updates are forwarded to glyph pane at specific intervals
 
     glyph_pane->node_->material_.set_vec4("Albedo", glh::vec4(1.f, 1.f, 1.f,1.f));
 
@@ -317,10 +217,6 @@ void render_font(glh::App* app)
 void resize(glh::App* app, int width, int height)
 {
     std::cout << "Resize:" << width << " " << height << std::endl;
-}
-
-void print_mouse_position()
-{
 }
 
 int g_mouse_x;
@@ -355,27 +251,17 @@ void key_callback(int key, const glh::Input::ButtonState& s)
 
 int main(int arch, char* argv)
 {
-    glyph_pane_update_interval = 0;
-    glyph_pane_update_interval_limit = 3;
-
     glh::AppConfig config = glh::app_config_default(init, update, render_font, resize);
 
     config.width = 1024;
     config.height = 640;
 
-
-
     glh::App app(config);
-
-
 
     GLH_LOG_EXPR("Logger started");
     add_key_callback(app, key_callback);
     add_mouse_move_callback(app, mouse_move_callback);
     glh::default_main(app);
-
-    // TODO resource manager
-    glyph_pane.reset();
-
+    services.finalize();
     return 0;
 }

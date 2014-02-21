@@ -149,7 +149,7 @@ public:
 
     void update_representation()
     {
-        if(handle_valid(font_handle_)){
+        if(dirty_ && handle_valid(font_handle_)){
             render_glyph_coordinates_to_mesh(fontmanager_->context_, text_field_, font_handle_, origin_, line_height_, *fontmesh_);
             renderable_->resend_data_on_render();
         }
@@ -208,17 +208,20 @@ public:
     // Contains references to the lower level constructs so it can refer queries onwards, such as
     // "scenes/tree1/node3" would return a pointer with the object type (SceneTreeNode) 
 
-    GlyphPane* create_glyph_pane(const std::string& name, const std::string& program_name){
+    GlyphPane* create_glyph_pane(const std::string& program_name){
         glyph_panes_.emplace_back(gm_, program_name, font_manager_);
         GlyphPane* pane = &glyph_panes_.back();
-        pane->name_ = name;
+        pane->name_ = app_->string_numerator()("GlyphPane");
         return pane;
     }
 
-     Camera* create_camera(const std::string& name){
-         cameras_.emplace_back();
-         auto camera = &cameras_.back();
-         camera->name_ = name;
+    Camera* create_camera(Camera::Projection projection_type){
+         SceneTree::Node* node = tree_.add_node(tree_.root());
+         cameras_.emplace_back(node);
+         Camera* camera = &cameras_.back();
+         camera->name_ = app_->string_numerator()("Camera");
+         camera->node_ = node;
+         camera->projection_ = projection_type;
          return camera;
     }
 
@@ -227,6 +230,29 @@ public:
         RenderPass* pass = &render_passes_.back();
         pass->name_ = name;
         return pass;
+    }
+
+    // Manages per-frame updates. Basically should be implementable as a DynamicGraph graph (just assigns values to keys). But is not right now.
+    void update(){
+
+        tree_.update();
+
+        for(auto& c : cameras_){
+            if(c.projection_ == Camera::Projection::PixelSpaceOrthographic){
+                c.view_to_screen_ = app_orthographic_pixel_projection(app_);
+                c.update(app_);
+            } else if(c.projection_ == Camera::Projection::Orthographic)
+            {
+                throw GraphicsException("Camera.update: Projection type not implemented yet!");
+            } else // Perspective
+            {
+                throw GraphicsException("Camera.update: Projection type not implemented yet!");
+            }
+        }
+
+        for(auto& g : glyph_panes_){
+            g.update_representation();
+        }
     }
 
 private:
