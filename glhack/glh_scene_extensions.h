@@ -52,6 +52,8 @@ class TextField {
 public:
     std::vector<std::shared_ptr<TextLine>> text_fields_;
 
+    std::vector<std::tuple<vec2, vec2>> glyph_coords_;
+
     float line_height_; /* Multiples of font size. */
 
     TextLine& push_line(const std::string& string){
@@ -78,6 +80,9 @@ void render_glyph_coordinates_to_mesh(FontContext& context, TextField& t,
     BakedFontHandle handle, vec2 origin, double line_height /* Multiples of font height */,
     DefaultMesh& mesh);
 
+void render_glyph_coordinates_to_mesh(FontContext& context, const std::string& row,
+    BakedFontHandle handle, vec2 origin, DefaultMesh& mesh);
+
 /** Encodes the modifiers state for interpreting input streams. */
 struct Modifiers
 {
@@ -102,15 +107,21 @@ public:
     GlyphPane(GraphicsManager* gm, const std::string& program_name, FontManager* fontmanager)
         :gm_(gm), node_(0), line_height_(1.0),fontmanager_(fontmanager),
         origin_(0.f, 0.f), font_handle_(invalid_font_handle()), dirty_(true){
+
         fontmesh_ = gm_->create_mesh();
         renderable_= gm_->create_renderable();
+
+        cursor_mesh_ = gm->create_mesh();
+        cursor_renderable_ = gm_->create_renderable();
 
         auto font_program_handle = gm->program(program_name);
 
         renderable_->bind_program(*font_program_handle);
         renderable_->set_mesh(fontmesh_);
 
-        init_background();
+        cursor_renderable_->bind_program(*font_program_handle);
+        cursor_renderable_->set_mesh(cursor_mesh_);
+
     }
 
     ~GlyphPane(){
@@ -124,7 +135,25 @@ public:
 
     void init_background()
     {
+        // Init cursor
+        if(handle_valid(font_handle_)){
+            render_glyph_coordinates_to_mesh(fontmanager_->context_, "|", font_handle_, origin_,  *cursor_mesh_);
+            cursor_renderable_->resend_data_on_render();
+        }
 
+        vec3 cursor_pos(0.f, 0.f, 0.f);
+
+        if(!text_field_.glyph_coords_.empty()){
+            std::tuple<vec2, vec2>& last = text_field_.glyph_coords_.back();
+            cursor_pos[0] = std::get<0>(last)[0];
+            cursor_pos[1] = std::get<0>(last)[1];
+        } else{
+            cursor_pos[0] = origin_[0];
+            cursor_pos[1] = origin_[1];
+        }
+
+        cursor_node_->transform_.position_[0] = cursor_pos[0];
+        cursor_node_->transform_.position_[1] = cursor_pos[1];
     }
 
     virtual const std::string& name() const override  {return name_;}
@@ -143,6 +172,10 @@ public:
         node_ = scene->add_node(parent, renderable_);
         parent_ = parent;
         scene_ = scene;
+        cursor_node_ = scene->add_node(parent, cursor_renderable_);
+
+
+        init_background();
     }
 
     void recieve_characters(int key, Modifiers modifiers);
@@ -172,15 +205,17 @@ public:
 
     // TODO: Implement background texture and texture painting routines to
     // implement the highlight and cursor
-    SceneTree::Node* background_mesh; //> The background for highlights.
-    SceneTree::Node* cursor;          //> The 
+    SceneTree::Node* background_mesh_node_; //> The background for highlights.
+    SceneTree::Node* cursor_node_;          //> The cursor node
 
     FontManager*     fontmanager_;
     DefaultMesh*     fontmesh_;
+    DefaultMesh*     cursor_mesh_;
+    FullRenderable*  cursor_renderable_;
     GraphicsManager* gm_;
-    vec2             origin_;
+    vec2             origin_; // TODO do not use this, use node origin, in stead. Layout might be a different thing.
     BakedFontHandle  font_handle_;
-    double           line_height_;
+    double           line_height_; // Multiple of font height
     FullRenderable*  renderable_;
     TextField        text_field_;
 
@@ -195,9 +230,9 @@ public:
 
     SceneTree tree_; // TODO: Split SceneTree from SceneAssets?
 
-    std::list<GlyphPane>  glyph_panes_;
-    std::list<Camera>     cameras_;
-    std::list<RenderPass> render_passes_;
+    std::list<GlyphPane>                                glyph_panes_;
+    std::list<Camera, Eigen::aligned_allocator<Camera>> cameras_;
+    std::list<RenderPass>                               render_passes_;
 
     GraphicsManager* gm_;
     FontManager*     font_manager_;
@@ -236,6 +271,7 @@ public:
     void update(){
 
         tree_.update();
+        tree_.apply_to_render_env();
 
         for(auto& c : cameras_){
             if(c.projection_ == Camera::Projection::PixelSpaceOrthographic){

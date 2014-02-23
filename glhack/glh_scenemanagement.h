@@ -34,7 +34,7 @@ public:
         bool        pickable_; // TODO: Preferably, remove from here (UI stuff)
         bool        interaction_lock_; // Lock for when dragged and so on. TODO: Preferably, remove from here (UI stuff)
 
-        RenderEnvironment material_; // todo, pointer
+        RenderEnvironment material_; // todo, pointer or head to root env map.Use PesistentMap?
 
         Transform transform_; // local to parent transform
 
@@ -225,7 +225,7 @@ public:
         root_->update_bounds();
     }
 
-    void apply_to_renderables(){
+    void apply_to_render_env(){
         for(auto& n: nodes_){
                 n.material_.set_mat4(GLH_LOCAL_TO_WORLD, n.local_to_world_);}}
 
@@ -425,9 +425,9 @@ public:
     }
     
     void camera_parameters_to_env(){
-        env_.set_mat4(WORLD2CAMERA, camera_->world_to_camera());
-        env_.set_mat4(CAMERA2SCREEN, camera_->camera_to_screen());
-        env_.set_mat4(WORLD2SCREEN, camera_->camera_to_screen() * camera_->world_to_camera());
+        env_.set_mat4(GLH_WORLD_TO_CAMERA, camera_->world_to_camera());
+        env_.set_mat4(GLH_CAMERA_TO_SCREEN, camera_->camera_to_screen());
+        env_.set_mat4(GLH_WORLD_TO_SCREEN, camera_->camera_to_screen() * camera_->world_to_camera());
     }
 
     void render(GraphicsManager* gm){

@@ -369,7 +369,7 @@ bool update(glh::App* app)
     env.set_vec4("Albedo", glh::vec4(0.28f, 0.024f, 0.024f, 1.0));
 
     scene.update();
-    scene.apply_to_renderables();
+    scene.apply_to_render_env();
 
     render_queueue.clear();
     render_queueue.add(scene, pass_interaction_unlocked);

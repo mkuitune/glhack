@@ -12,9 +12,6 @@ namespace glh{
 
 #define UICTX_SELECT_NAME "SelectionColor"
 
-#define GLH_LOCAL_TO_WORLD  "LocalToWorld"
-
-
 #define GLH_CHANNEL_ROTATION        "GLH_CHANNEL_ROTATION"
 #define GLH_CHANNEL_POSITION        "GLH_CHANNEL_POSITION"
 #define GLH_CHANNEL_SCALE           "GLH_CHANNEL_SCALE"
@@ -35,10 +32,10 @@ namespace glh{
 
 //////////////// Shader parameters. ////////////////
 
-#define OBJ2WORLD     "ObjectToWorld"
-#define WORLD2CAMERA  "WorldToCamera"
-#define CAMERA2SCREEN "CameraToScreen"
-#define WORLD2SCREEN  "WorldToScreen"
+#define GLH_LOCAL_TO_WORLD   "LocalToWorld"
+#define GLH_WORLD_TO_CAMERA  "WorldToCamera"
+#define GLH_CAMERA_TO_SCREEN "CameraToScreen"
+#define GLH_WORLD_TO_SCREEN  "WorldToScreen"
 
     //////////////// Color constants. ////////////////
 // Can be used as eg. 

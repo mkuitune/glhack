@@ -34,15 +34,16 @@ const char* sh_vertex_obj   =
 
 const char* sh_vertex_obj_pos   = 
 "#version 150               \n"
-"uniform mat4 ObjectToWorld;"
+"uniform mat4 LocalToWorld;"
 "in vec3      VertexPosition;    "
 "void main()                "
 "{                          "
-"    gl_Position = ObjectToWorld * vec4( VertexPosition, 1.0 );"
+"    gl_Position = LocalToWorld * vec4( VertexPosition, 1.0 );"
 "}";
 
-const char* sh_vertex_obj_tex   = 
+const char* sh_vertex_obj_tex =
 "#version 150               \n"
+"uniform mat4 LocalToWorld;"
 "uniform mat4 WorldToScreen;"
 "in vec3      VertexPosition;    "
 "in vec3      TexCoord;"
@@ -51,7 +52,7 @@ const char* sh_vertex_obj_tex   =
 "void main()                "
 "{                          "
 "    v_texcoord = TexCoord.xy;"
-"    gl_Position = WorldToScreen * vec4( VertexPosition, 1.0 );"
+"    gl_Position = WorldToScreen * LocalToWorld * vec4( VertexPosition, 1.0 );"
 "}";
 
 

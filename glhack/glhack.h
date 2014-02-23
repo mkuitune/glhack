@@ -92,7 +92,6 @@ public:
 
 //////////// Renderable settings //////////////
 
-// TODO: Need to wrap in interface?
 class FullRenderable {
 public:
     ProgramHandle*    program_;

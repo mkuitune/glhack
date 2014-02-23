@@ -50,17 +50,24 @@ namespace glh{
         vec2 origin,
         double line_height /* Multiples of font height */,
         DefaultMesh& mesh){
-
+            t.glyph_coords_.clear();
             float line_number = 0.f;
             float spacing = (float)(line_height * handle.second);
-            std::vector<std::tuple<vec2, vec2>> glyph_coords;
             for(auto&line : t.text_fields_){
                 context.write_pixel_coords_for_string(line->string, 
-                    handle, origin[0], origin[1] + line_number * spacing, glyph_coords);
+                    handle, origin[0], origin[1] + line_number * spacing, t.glyph_coords_);
                 line_number += 1.0f;
             }
 
-            transfer_position_data_to_mesh(glyph_coords, &mesh);
+            transfer_position_data_to_mesh(t.glyph_coords_, &mesh);
+    }
+
+    void render_glyph_coordinates_to_mesh(FontContext& context, const std::string& row,
+        BakedFontHandle handle, vec2 origin, DefaultMesh& mesh)
+    {
+        std::vector<std::tuple<vec2, vec2>> glyph_coords;
+        context.write_pixel_coords_for_string(row, handle, origin[0], origin[1], glyph_coords);
+        transfer_position_data_to_mesh(glyph_coords, &mesh);
     }
 
     // TODO to text util or such.
