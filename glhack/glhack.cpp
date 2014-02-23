@@ -6,6 +6,7 @@
 #include "glbase.h"
 
 #include "glh_regex.h"
+#include "glh_names.h"
 
 #include <stack>
 #include <list>
@@ -677,6 +678,8 @@ public:
         
         program_params_from_env(active, env);
         program_params_from_env(active, material);
+
+        active.bind_uniform(GLH_LOCAL_TO_WORLD, material.get_mat4(GLH_LOCAL_TO_WORLD));
 
         active.draw();
     }

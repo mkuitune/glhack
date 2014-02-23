@@ -104,10 +104,11 @@ class GlyphPane : public SceneObject
 {
 public:
 
-    GlyphPane(GraphicsManager* gm, const std::string& program_name, FontManager* fontmanager)
+    GlyphPane(GraphicsManager* gm, const std::string& program_name, FontManager* fontmanager, const std::string& pane_name)
         :gm_(gm), node_(0), line_height_(1.0),fontmanager_(fontmanager),
-        origin_(0.f, 0.f), font_handle_(invalid_font_handle()), dirty_(true){
+        font_handle_(invalid_font_handle()), dirty_(true){
 
+        default_origin_ = vec2(0.f, 0.f);
         fontmesh_ = gm_->create_mesh();
         renderable_= gm_->create_renderable();
 
@@ -122,6 +123,7 @@ public:
         cursor_renderable_->bind_program(*font_program_handle);
         cursor_renderable_->set_mesh(cursor_mesh_);
 
+        name_ = pane_name;
     }
 
     ~GlyphPane(){
@@ -133,28 +135,40 @@ public:
         }
     }
 
-    void init_background()
+    void update_cursor_pos()
     {
-        // Init cursor
-        if(handle_valid(font_handle_)){
-            render_glyph_coordinates_to_mesh(fontmanager_->context_, "|", font_handle_, origin_,  *cursor_mesh_);
-            cursor_renderable_->resend_data_on_render();
-        }
-
         vec3 cursor_pos(0.f, 0.f, 0.f);
 
         if(!text_field_.glyph_coords_.empty()){
-            std::tuple<vec2, vec2>& last = text_field_.glyph_coords_.back();
+            std::tuple<vec2, vec2>& last = text_field_.glyph_coords_[text_field_.glyph_coords_.size() - 2];
+
+            float cursor_y = line_height_ * font_handle_.second * (text_field_.text_fields_.size() - 1);
+
             cursor_pos[0] = std::get<0>(last)[0];
-            cursor_pos[1] = std::get<0>(last)[1];
-        } else{
-            cursor_pos[0] = origin_[0];
-            cursor_pos[1] = origin_[1];
+            //cursor_pos[1] = std::get<0>(last)[1];
+            cursor_pos[1] = cursor_y;
+        }
+        else{
+            cursor_pos[0] = default_origin_[0];
+            cursor_pos[1] = default_origin_[1];
         }
 
-        cursor_node_->transform_.position_[0] = cursor_pos[0];
-        cursor_node_->transform_.position_[1] = cursor_pos[1];
+        cursor_node_->transform_.position_ = cursor_pos;
     }
+
+    void init_cursor()
+    {
+        // Init cursor
+        if(handle_valid(font_handle_)){
+            render_glyph_coordinates_to_mesh(fontmanager_->context_, "|", font_handle_, default_origin_, *cursor_mesh_);
+            //render_glyph_coordinates_to_mesh(fontmanager_->context_, "THIS IS A LONG DEBUG STRING", font_handle_, default_origin_, *cursor_mesh_);
+            cursor_renderable_->resend_data_on_render();
+        }
+
+        update_cursor_pos();
+    }
+
+    SceneTree::Node* root(){ return pane_root_; }
 
     virtual const std::string& name() const override  {return name_;}
     virtual EntityType::t entity_type() const override  {return EntityType::GlyphPane;}
@@ -166,16 +180,24 @@ public:
         // fontimage_ = context.get_font_map(font_handle_);
         //write_image_png(*fontimage, "font.png");
         fonttexture_ = fontmanager_->get_font_texture(font_handle_);
+
+        init_cursor();
     }
 
     void attach(SceneTree* scene, SceneTree::Node* parent){
-        node_ = scene->add_node(parent, renderable_);
+        pane_root_ = scene->add_node(parent);
+        pane_root_->name_ = name_ + std::string("/Root");
+
+        node_ = scene->add_node(pane_root_, renderable_);
+        node_->name_ = name_ + std::string("/Glyph");
+
         parent_ = parent;
         scene_ = scene;
-        cursor_node_ = scene->add_node(parent, cursor_renderable_);
 
+        cursor_node_ = scene->add_node(pane_root_, cursor_renderable_);
+        cursor_node_->name_ = name_ + std::string("/Cursor");
 
-        init_background();
+        //init_background();
     }
 
     void recieve_characters(int key, Modifiers modifiers);
@@ -183,8 +205,11 @@ public:
     void update_representation()
     {
         if(dirty_ && handle_valid(font_handle_)){
-            render_glyph_coordinates_to_mesh(fontmanager_->context_, text_field_, font_handle_, origin_, line_height_, *fontmesh_);
+            vec2 default_origin(0.f, 0.f);
+            render_glyph_coordinates_to_mesh(fontmanager_->context_, text_field_, font_handle_, default_origin, line_height_, *fontmesh_);
             renderable_->resend_data_on_render();
+
+            update_cursor_pos();
         }
 
         dirty_ = false;
@@ -200,20 +225,23 @@ public:
 
     Texture*         fonttexture_;
     SceneTree*       scene_;
-    SceneTree::Node* parent_;
-    SceneTree::Node* node_;
 
     // TODO: Implement background texture and texture painting routines to
     // implement the highlight and cursor
     SceneTree::Node* background_mesh_node_; //> The background for highlights.
     SceneTree::Node* cursor_node_;          //> The cursor node
+    SceneTree::Node* parent_;
+    SceneTree::Node* pane_root_;
+    SceneTree::Node* node_;
+
+
+    vec2             default_origin_; // TODO do we need this when layout finished
 
     FontManager*     fontmanager_;
     DefaultMesh*     fontmesh_;
     DefaultMesh*     cursor_mesh_;
     FullRenderable*  cursor_renderable_;
     GraphicsManager* gm_;
-    vec2             origin_; // TODO do not use this, use node origin, in stead. Layout might be a different thing.
     BakedFontHandle  font_handle_;
     double           line_height_; // Multiple of font height
     FullRenderable*  renderable_;
@@ -244,9 +272,11 @@ public:
     // "scenes/tree1/node3" would return a pointer with the object type (SceneTreeNode) 
 
     GlyphPane* create_glyph_pane(const std::string& program_name){
-        glyph_panes_.emplace_back(gm_, program_name, font_manager_);
+        glyph_panes_.emplace_back(gm_, program_name, font_manager_, app_->string_numerator()("GlyphPane"));
         GlyphPane* pane = &glyph_panes_.back();
-        pane->name_ = app_->string_numerator()("GlyphPane");
+        SceneTree::Node* root = tree_.root();
+        pane->attach(&tree_, root);
+
         return pane;
     }
 

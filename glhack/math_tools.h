@@ -241,7 +241,8 @@ Eigen::Matrix<T, N-1, 1> decrease_dim(const Eigen::Matrix<T, N, 1>& v){
 template<class T>
 Eigen::Transform<T,3, Eigen::Affine> generate_transform(Eigen::Matrix<T, 3, 1>& loc, Eigen::Quaternion<T>& rot, Eigen::Matrix<T, 3, 1>& scale)
 {
-    Eigen::Transform<T,3, Eigen::Affine> t = Eigen::Translation<T,3>(loc) * rot * Eigen::Scaling(scale);
+    Eigen::Translation<T, 3> translation(loc);
+    Eigen::Transform<T, 3, Eigen::Affine> t = translation * rot * Eigen::Scaling(scale);
     return t;
 }
 

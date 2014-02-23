@@ -47,12 +47,15 @@ const char* sh_vertex_obj_tex =
 "uniform mat4 WorldToScreen;"
 "in vec3      VertexPosition;    "
 "in vec3      TexCoord;"
-"out vec3 v_color;            "
 "out vec2 v_texcoord;"
 "void main()                "
 "{                          "
 "    v_texcoord = TexCoord.xy;"
+"    /* mat4 override = LocalToWorld;*/"
+"    /* override[3][0] = 500.f;*/"
+"    /* override[3][1] = 500.f;*/"
 "    gl_Position = WorldToScreen * LocalToWorld * vec4( VertexPosition, 1.0 );"
+"    /*gl_Position = WorldToScreen * override * vec4( VertexPosition, 1.0 );*/"
 "}";
 
 
@@ -134,16 +137,15 @@ void load_font_resources(glh::GraphicsManager* gm)
     float fontsize = 15.0f;
 
     glyph_pane = services.assets().create_glyph_pane(font_program_name);  // TODO: font program should be automatically handled by scene assets I think
+    vec3 glyph_pane_loc(500.f, 500.f, 0.f); // TODO to glyph pane loc node
+    glyph_pane->root()->transform_.position_ = glyph_pane_loc;
 
     glyph_pane->set_font(junction, fontsize);
 
-    glyph_pane->origin_ = vec2(100.f, 100.f);
     glyph_pane->text_field_.push_line("Hello, world.");
     glyph_pane->text_field_.push_line("This is another line, then.");
     glyph_pane->update_representation();
     glyph_pane->dirty_ = true;
-    SceneTree::Node* root = services.assets_->tree_.root();
-    glyph_pane->attach(&services.assets_->tree_, root);
 
     // TODO: View layouter that aligns glyph_pane
 }
