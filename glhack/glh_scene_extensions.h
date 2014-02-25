@@ -5,6 +5,7 @@
 
 #include "glh_font.h"
 #include "glh_scenemanagement.h"
+#include "glh_scene_util.h"
 #include "shims_and_types.h"
 #include <vector>
 
@@ -104,9 +105,11 @@ class GlyphPane : public SceneObject
 {
 public:
 
-    GlyphPane(GraphicsManager* gm, const std::string& program_name, FontManager* fontmanager, const std::string& pane_name)
+    GlyphPane(GraphicsManager* gm, const std::string& program_name, const std::string& background_program_name, FontManager* fontmanager, const std::string& pane_name)
         :gm_(gm), node_(0), line_height_(1.0),fontmanager_(fontmanager),
         font_handle_(invalid_font_handle()), dirty_(true){
+
+        text_field_bounds_ = Box2f(vec2(100.f, 100.f), vec2(400.f, 500.f));
 
         default_origin_ = vec2(0.f, 0.f);
         fontmesh_ = gm_->create_mesh();
@@ -114,6 +117,13 @@ public:
 
         cursor_mesh_ = gm->create_mesh();
         cursor_renderable_ = gm_->create_renderable();
+
+        auto background_program_handle = gm->program(background_program_name);
+        background_renderable_ = gm_->create_renderable();
+        background_renderable_->bind_program(*background_program_handle);
+        background_mesh_ = gm->create_mesh();
+        load_screenquad(text_field_bounds_.size(), *background_mesh_);
+        background_renderable_->set_mesh(background_mesh_);
 
         auto font_program_handle = gm->program(program_name);
 
@@ -185,18 +195,23 @@ public:
     }
 
     void attach(SceneTree* scene, SceneTree::Node* parent){
+        parent_ = parent;
+        scene_ = scene;
+
         pane_root_ = scene->add_node(parent);
         pane_root_->name_ = name_ + std::string("/Root");
 
-        node_ = scene->add_node(pane_root_, renderable_);
-        node_->name_ = name_ + std::string("/Glyph");
+        background_mesh_node_ = scene->add_node(pane_root_, background_renderable_);
+        background_mesh_node_->name_ = name_ + std::string("/Background");
 
-        parent_ = parent;
-        scene_ = scene;
+        vec2 backround_half = 0.5f * text_field_bounds_.size();
+        background_mesh_node_->transform_.position_ = vec3(backround_half[0], backround_half[1], 0.f);
 
         cursor_node_ = scene->add_node(pane_root_, cursor_renderable_);
         cursor_node_->name_ = name_ + std::string("/Cursor");
 
+        node_ = scene->add_node(pane_root_, renderable_);
+        node_->name_ = name_ + std::string("/Glyph");
         //init_background();
     }
 
@@ -237,14 +252,21 @@ public:
 
     vec2             default_origin_; // TODO do we need this when layout finished
 
+    Box2f            text_field_bounds_;
+
     FontManager*     fontmanager_;
     DefaultMesh*     fontmesh_;
     DefaultMesh*     cursor_mesh_;
+    DefaultMesh*     background_mesh_;
+
     FullRenderable*  cursor_renderable_;
+    FullRenderable*  renderable_;
+    FullRenderable*  background_renderable_;
+
     GraphicsManager* gm_;
     BakedFontHandle  font_handle_;
     double           line_height_; // Multiple of font height
-    FullRenderable*  renderable_;
+
     TextField        text_field_;
 
     std::string      name_;
@@ -271,8 +293,8 @@ public:
     // Contains references to the lower level constructs so it can refer queries onwards, such as
     // "scenes/tree1/node3" would return a pointer with the object type (SceneTreeNode) 
 
-    GlyphPane* create_glyph_pane(const std::string& program_name){
-        glyph_panes_.emplace_back(gm_, program_name, font_manager_, app_->string_numerator()("GlyphPane"));
+    GlyphPane* create_glyph_pane(const std::string& program_name, const std::string& background_program_name){
+        glyph_panes_.emplace_back(gm_, program_name, background_program_name, font_manager_, app_->string_numerator()("GlyphPane"));
         GlyphPane* pane = &glyph_panes_.back();
         SceneTree::Node* root = tree_.root();
         pane->attach(&tree_, root);
@@ -290,10 +312,10 @@ public:
          return camera;
     }
 
-    RenderPass* create_render_pass(const std::string& name){
+    RenderPass* create_render_pass(){
         render_passes_.emplace_back();
         RenderPass* pass = &render_passes_.back();
-        pass->name_ = name;
+        pass->name_ = app_->string_numerator()("RenderPass");
         return pass;
     }
 

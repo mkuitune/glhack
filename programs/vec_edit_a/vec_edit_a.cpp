@@ -9,37 +9,53 @@
 
 //////////////// Program stuff ////////////////
 
-const char* sh_vertex   = 
-"#version 150               \n"
-"in vec3 VertexPosition;    "
-"in vec3 VertexColor;       "
-"out vec3 Color;            "
-"void main()                "
-"{                          "
-"    Color = VertexColor;   "
-"    gl_Position = vec4( VertexPosition, 1.0 );"
-"}";
+//const char* sh_vertex   = 
+//"#version 150               \n"
+//"in vec3 VertexPosition;    "
+//"in vec3 VertexColor;       "
+//"out vec3 Color;            "
+//"void main()                "
+//"{                          "
+//"    Color = VertexColor;   "
+//"    gl_Position = vec4( VertexPosition, 1.0 );"
+//"}";
+//
+//const char* sh_vertex_obj   = 
+//"#version 150               \n"
+//"uniform mat4 ObjectToScreen;"
+//"in vec3      VertexPosition;    "
+//"in vec3      VertexColor;       "
+//"out vec3 Color;            "
+//"void main()                "
+//"{                          "
+//"    Color = VertexColor;   "
+//"    gl_Position = ObjectToScreen * vec4( VertexPosition, 1.0 );"
+//"}";
 
-const char* sh_vertex_obj   = 
-"#version 150               \n"
-"uniform mat4 ObjectToScreen;"
-"in vec3      VertexPosition;    "
-"in vec3      VertexColor;       "
-"out vec3 Color;            "
-"void main()                "
-"{                          "
-"    Color = VertexColor;   "
-"    gl_Position = ObjectToScreen * vec4( VertexPosition, 1.0 );"
-"}";
 
-const char* sh_vertex_obj_pos   = 
+const char* sh_vertex_obj =
 "#version 150               \n"
 "uniform mat4 LocalToWorld;"
-"in vec3      VertexPosition;    "
+"uniform mat4 WorldToScreen;"
+"in vec3      VertexPosition;"
+"in vec3      VertexColor;   "
+"out vec3     v_color;       "
 "void main()                "
 "{                          "
-"    gl_Position = LocalToWorld * vec4( VertexPosition, 1.0 );"
+"    v_color = VertexColor;"
+"    gl_Position = WorldToScreen * LocalToWorld * vec4( VertexPosition, 1.0 );"
 "}";
+
+const char* sh_fragment_vertex_color =
+"#version 150                  \n"
+"uniform vec4 ColorAlbedo;"
+"in vec3 v_color;               "
+"out vec4 FragColor;           "
+"void main() {                 "
+"    FragColor = ColorAlbedo;   "
+"}";
+
+// Font material
 
 const char* sh_vertex_obj_tex =
 "#version 150               \n"
@@ -59,41 +75,14 @@ const char* sh_vertex_obj_tex =
 "}";
 
 
-const char* sh_fragment = 
-"#version 150                  \n"
-"in vec3 Color;                "
-"out vec4 FragColor;           "
-"void main() {                 "
-"    FragColor = vec4(Color, 1.0); "
-"}";
-
-const char* sh_fragment_fix_color = 
-"#version 150                  \n"
-"uniform vec4 ObjColor;        "
-"out vec4 FragColor;           "
-"void main() {                 "
-"    FragColor = ObjColor; "
-"}";
-
-const char* sh_fragment_tex = 
-"#version 150                  \n"
-"uniform sampler2D Sampler;    "
-"in vec2 v_texcoord;           "
-"out vec4 FragColor;           "
-"void main() {                 "
-"    vec4 texColor = texture( Sampler, v_texcoord );"
-"    FragColor = texColor;"
-//"    FragColor = vec4(Color, 1.0); "
-"}";
-
 const char* sh_fragment_tex_alpha = 
 "#version 150                  \n"
 "uniform sampler2D Sampler;    "
-"uniform vec4      Albedo;    "
+"uniform vec4      ColorAlbedo;    "
 "in vec2 v_texcoord;           "
 "out vec4 FragColor;           "
 "void main() {                 "
-"    vec4 texColor = vec4(Albedo.rgb, Albedo.a * texture( Sampler, v_texcoord ).r);"
+"    vec4 texColor = vec4(ColorAlbedo.rgb, ColorAlbedo.a * texture( Sampler, v_texcoord ).r);"
 "    FragColor = texColor;"
 //"    FragColor = vec4(Color, 1.0); "
 "}";
@@ -109,11 +98,8 @@ glh::ProgramHandle* sp_colorcoded;
 bool g_run = true;
 
 // Screen quad shader
-const char* sp_vcolors = "screen";
-const char* sp_obj     = "screen_obj";
-const char* sp_obj_tex = "screen_obj_tex";
 const char* font_program_name = "screen_obj_font";
-const char* sp_obj_colored = "screen_obj_colored";
+const char* object_colored_program_name = "screen_obj_colored";
 
 float tprev = 0;
 float angle = 0.f;
@@ -136,7 +122,7 @@ void load_font_resources(glh::GraphicsManager* gm)
 
     float fontsize = 15.0f;
 
-    glyph_pane = services.assets().create_glyph_pane(font_program_name);  // TODO: font program should be automatically handled by scene assets I think
+    glyph_pane = services.assets().create_glyph_pane(font_program_name, object_colored_program_name);  // TODO: font program should be automatically handled by scene assets I think
     vec3 glyph_pane_loc(500.f, 500.f, 0.f); // TODO to glyph pane loc node
     glyph_pane->root()->transform_.position_ = glyph_pane_loc;
 
@@ -146,6 +132,9 @@ void load_font_resources(glh::GraphicsManager* gm)
     glyph_pane->text_field_.push_line("This is another line, then.");
     glyph_pane->update_representation();
     glyph_pane->dirty_ = true;
+
+    glyph_pane->cursor_node_->material_.set_vec4(GLH_COLOR_ALBEDO, glh::vec4(0.f, 0.f, 0.f, 1.f));
+    glyph_pane->background_mesh_node_->material_.set_vec4(GLH_COLOR_ALBEDO, glh::vec4(0.5f, 0.51f, 0.51f, 1.f));
 
     // TODO: View layouter that aligns glyph_pane
 }
@@ -159,16 +148,16 @@ bool init(glh::App* app)
     glh::GraphicsManager* gm = app->graphics_manager();
 
     gm->create_program(font_program_name, sh_geometry, sh_vertex_obj_tex, sh_fragment_tex_alpha);
+    gm->create_program(object_colored_program_name, sh_geometry, sh_vertex_obj, sh_fragment_vertex_color);
 
     load_font_resources(gm);
 
-    render_pass = services.assets_->create_render_pass(app->string_numerator()("RenderPass"));
+    render_pass = services.assets_->create_render_pass();
     render_queue = &render_pass->queue_;
 
     // TODO: Default mat
-    render_pass->env_.set_vec4("ObjColor", glh::vec4(0.f, 1.f, 0.f, 1.f));
-    render_pass->env_.set_vec4("Albedo", glh::vec4(0.28f, 0.024f, 0.024f, 1.0));
-    render_pass->env_.set_texture2d("Sampler", glyph_pane->fonttexture_);// todo: then env.set "Sampler" texture into glyph_pane
+    render_pass->env_.set_vec4(GLH_COLOR_ALBEDO, glh::vec4(0.28f, 0.024f, 0.024f, 1.0));
+    render_pass->env_.set_texture2d("Sampler", glyph_pane->fonttexture_);// todo: then env.set "Sampler" texture into glyph_pane TODO move this into GlyphPane
 
     render_pass->add_settings(glh::RenderPassSettings(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT,
         glh::Color(0.5f, 0.5f, 0.5f, 1.0f), 1));
@@ -200,9 +189,9 @@ bool update(glh::App* app)
     mat4 screen_to_view = app_orthographic_pixel_projection(app); 
 
     float albedo_alpha = 1.0f;
-    render_pass->env_.set_vec4("Albedo", glh::vec4(0.28f, 0.024f, 0.024f, albedo_alpha));
+    render_pass->env_.set_vec4(GLH_COLOR_ALBEDO, glh::vec4(0.28f, 0.024f, 0.024f, albedo_alpha));
 
-    glyph_pane->node_->material_.set_vec4("Albedo", glh::vec4(1.f, 1.f, 1.f,1.f));
+    glyph_pane->node_->material_.set_vec4(GLH_COLOR_ALBEDO, glh::vec4(1.f, 1.f, 1.f, 1.f));
 
     render_pass->update_queue(services.assets_->tree_, [](SceneTree::Node* n){return true; });
 

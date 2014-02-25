@@ -37,7 +37,10 @@ namespace glh{
 #define GLH_CAMERA_TO_SCREEN "CameraToScreen"
 #define GLH_WORLD_TO_SCREEN  "WorldToScreen"
 
-    //////////////// Color constants. ////////////////
+#define GLH_COLOR_ALBEDO     "ColorAlbedo"
+
+
+//////////////// Color constants. ////////////////
 // Can be used as eg. 
 //    float red[] = {COLOR_RED};
 //    or

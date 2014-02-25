@@ -313,7 +313,8 @@ struct Box
     }
 };
 
-typedef Box<int, 2> Box2i;
+typedef Box<int, 2>   Box2i;
+typedef Box<float, 2> Box2f;
 typedef Box<float, 3> Box3f;
 
 template<class T>
