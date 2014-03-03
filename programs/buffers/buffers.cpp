@@ -2,16 +2,7 @@
     Test buffer management and selection.
 */
 
-#include "glbase.h"
-#include "asset_manager.h"
-#include "glh_generators.h"
-#include "glh_image.h"
-#include "glh_typedefs.h"
-#include "glh_font.h"
-#include "shims_and_types.h"
-#include "math_tools.h"
-#include "glh_uicontext.h"
-#include "glh_scene_util.h"
+#include "glh_app_services.h"
 
 //////////////// Program stuff ////////////////
 
@@ -118,10 +109,9 @@ glh::RenderPassSettings g_renderpass_settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFE
 
 bool g_run = true;
 
+
 glh::AssetManagerPtr manager;
 glh::RenderEnvironment env;
-
-std::shared_ptr<glh::FontContext> fontcontext;
 
 glh::ObjectRoster::IdGenerator idgen;
 
@@ -129,25 +119,24 @@ int obj_id = glh::ObjectRoster::max_id / 2;
 
 glh::RenderPickerPtr render_picker;
 
-glh::SceneTree                     scene;
 glh::RenderQueue                   selectable_queue;
 glh::RenderQueue                   render_queueue;
 glh::RenderQueue                   top_queue;
 
-glh::DynamicSystem      dynamics;
-glh::StringNumerator    string_numerator;
 
-std::unique_ptr<glh::UiContext> ui_context;
+
+glh::AppServices  services;
+
 
 #define COLOR_DELTA "ColorDelta"
 #define PRIMARY_COLOR "PrimaryColor"
 #define SECONDARY_COLOR "SecondaryColor"
 
-glh::DynamicGraph graph;
 
-void add_color_interpolation_to_graph(glh::App* app, glh::SceneTree::Node* node){
+
+void add_color_interpolation_to_graph(glh::App* app, glh::DynamicGraph& graph, glh::SceneTree::Node* node){
     using namespace glh;
-    auto f = DynamicNodeRef::factory_enumerate_names(graph, string_numerator);
+    auto f = DynamicNodeRef::factory_enumerate_names(graph, app->string_numerator());
 
     auto sys      = DynamicNodeRef::factory(graph)(new SystemInput(app));
     auto ramp     = f(new ScalarRamp());
@@ -204,20 +193,6 @@ void init_uniform_data(){
 using glh::vec2i;
 using glh::vec2;
 
-#if 0
-glh::SceneTree::Node* add_quad_to_scene(glh::GraphicsManager* gm, glh::ProgramHandle& program, glh::vec2 dims){
-
-    glh::DefaultMesh* mesh = gm->create_mesh();
-    load_screenquad(dims, *mesh);
-
-    auto renderable = gm->create_renderable();
-
-    renderable->bind_program(program);
-    renderable->set_mesh(mesh);
-
-    auto root = scene.root();
-    return scene.add_node(root, renderable);
-}
 
 bool init(glh::App* app)
 {
@@ -226,82 +201,8 @@ bool init(glh::App* app)
 
     GraphicsManager* gm = app->graphics_manager();
 
-    ui_context.reset(new glh::UiContext(*gm, *app, graph, string_numerator, scene));
-
-    //sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment);
-    sp_select_program  = gm->create_program(sp_select, sh_geometry, sh_vertex_obj, sh_fragment_selection_color);
-    sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment_fix_color);
-
-    render_picker->selection_program_ = sp_select_program;
-
-    struct{vec2 dims; vec3 pos; vec4 color_primary; vec4 color_secondary;} quads[] ={
-        {vec2(0.5, 0.5), vec3(-0.5, -0.5, 0.), vec4(COLOR_RED), vec4(COLOR_WHITE) },
-        {vec2(0.5, 0.5), vec3(0.5, 0.5, 0.), vec4(COLOR_GREEN), vec4(COLOR_WHITE)},
-        {vec2(0.5, 0.5), vec3(-0.5, 0.5, 0.), vec4(COLOR_BLUE), vec4(COLOR_WHITE)},
-        {vec2(0.25, 0.25), vec3(0.5, -0.5, 0.), vec4(COLOR_YELLOW),vec4(COLOR_WHITE) }
-    };
-
-    size_t quad_count = static_array_size(quads);
-    for(auto& s: quads){
-        string name = string_numerator("node");
-
-        auto n = add_quad_to_scene(gm, *sp_colored_program, s.dims);
-        n->transform_.position_ = s.pos;
-        n->name_ = name;
-        set_material(*n, FIXED_COLOR,    s.color_primary);
-        set_material(*n, PRIMARY_COLOR,  s.color_primary);
-        set_material(*n, SECONDARY_COLOR,s.color_secondary);
-        set_material(*n, COLOR_DELTA, 0.f);
-        add_color_interpolation_to_graph(app, n);
-        add_focus_action(app, n, ui_context->focus_context_, graph, string_numerator);
-    }
-    graph.solve_dependencies();
-
-    init_uniform_data();
-
-    return true;
-}
-#else
-
-//TODO: Move into application code. Init 
-static glh::MovementMapper get_pixel_space_movement_mapper(glh::App* app, glh::SceneTree* scene, glh::SceneTree::Node* node)
-{
-    return [=](glh::vec3 delta, glh::SceneTree::Node* node){
-
-        auto parent = scene->get(node->parent_id_);
-
-        glh::mat4 screen_to_view   = glh::app_orthographic_pixel_projection(app);
-        glh::mat4 view_to_world    = glh::mat4::Identity();
-        glh::mat4 world_to_object  = parent->local_to_world_.inverse();
-        glh::mat4 screen_to_object = world_to_object * view_to_world * screen_to_view;
-
-        glh::vec4 v(delta[0], delta[1], 0, 0);
-        
-        glh::vec3 nd = glh::decrease_dim<float, 4>(screen_to_object * v);
-
-        glh::Transform t = glh::Transform::position(nd);
-        t.scale_ = glh::vec3(0.f, 0.f, 0.f);
-        parent->transform_.add_to_each_dim(t);
-
-        glh::Transform t2 = glh::Transform();
-        t2.scale_ = glh::vec3(0.f, 0.f, 0.f);
-        float wz = delta[0] < 0.f ? 0.05f : -0.05f;
-        t2.rotation_.z() = wz;
-
-        node->transform_.add_to_each_dim(t2);
-    };
-}
-
-bool init(glh::App* app)
-{
-    using namespace glh;
-    using std::string;
-
-    GraphicsManager* gm = app->graphics_manager();
-
-    ui_context.reset(new glh::UiContext(*gm, *app, graph, scene));
-
-    ui_context->set_movement_mapper_generator(get_pixel_space_movement_mapper);
+    const char* config_file = "config.mp";
+    services.init(app, config_file);
 
     //sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment);
     sp_select_program  = gm->create_program(sp_select, sh_geometry, sh_vertex_obj, sh_fragment_selection_color);
@@ -320,27 +221,24 @@ bool init(glh::App* app)
     for(auto& s: quads){
         string name = app->string_numerator()("node");
 
-        auto parent = scene.add_node(scene.root());
+        auto parent = services.assets().scene().add_node(services.assets().scene().root());
 
-        auto n = add_quad_to_scene(gm, scene, *sp_colored_program, s.dims, parent);
+        auto n = add_quad_to_scene(gm, services.assets().scene(), *sp_colored_program, s.dims, parent);
         parent->transform_.position_ = s.pos;
         n->name_ = name;
         set_material(*n, FIXED_COLOR,    s.color_primary);
         set_material(*n, PRIMARY_COLOR,  s.color_primary);
         set_material(*n, SECONDARY_COLOR,s.color_secondary);
         set_material(*n, COLOR_DELTA, 0.f);
-        add_color_interpolation_to_graph(app, n);
-        add_focus_action(app, n, ui_context->focus_context_, graph);
+        add_color_interpolation_to_graph(app, services.graph(), n);
+        add_focus_action(app, n, services.ui_context().focus_context_, services.graph());
     }
-    graph.solve_dependencies();
+    services.graph().solve_dependencies();
 
     init_uniform_data();
 
     return true;
 }
-#endif
-
-
 
 bool pass_pickable(glh::SceneTree::Node* node){return node->pickable_;}
 bool pass_unpickable(glh::SceneTree::Node* node){return !node->pickable_;}
@@ -355,9 +253,7 @@ bool update(glh::App* app)
 
     float t = (float) app->time();
 
-    dynamics.update(t);
-
-    graph.execute();
+    services.graph().execute();
 
     Eigen::Affine3f transform;
     transform = Eigen::AngleAxis<float>(0.f, glh::vec3(0.f, 0.f, 1.f));
@@ -368,18 +264,18 @@ bool update(glh::App* app)
 
     env.set_vec4("Albedo", glh::vec4(0.28f, 0.024f, 0.024f, 1.0));
 
-    scene.update();
-    scene.apply_to_render_env();
+    services.assets().scene().update();
+    services.assets().scene().apply_to_render_env();
 
     render_queueue.clear();
-    render_queueue.add(scene, pass_interaction_unlocked);
+    render_queueue.add(services.assets().scene(), pass_interaction_unlocked);
 
     selectable_queue.clear();
-    selectable_queue.add(scene, pass_pickable_and_unlocked);
+    selectable_queue.add(services.assets().scene(), pass_pickable_and_unlocked);
     render_picker->attach_render_queue(&selectable_queue);
 
     top_queue.clear();
-    top_queue.add(scene, pass_interaction_locked);
+    top_queue.add(services.assets().scene(), pass_interaction_locked);
     
     return g_run;
 }
@@ -387,9 +283,9 @@ bool update(glh::App* app)
 void do_selection_pass(glh::App* app){
     using namespace glh;
 
-    glh::FocusContext::Focus focus = ui_context->focus_context_.start_event_handling();
+    glh::FocusContext::Focus focus = services.ui_context().focus_context_.start_event_handling();
 
-    vec2i mouse = ui_context->mouse_current_;
+    vec2i mouse = services.ui_context().mouse_current_;
 
     auto picked = render_picker->render_selectables(env, mouse[0], mouse[1]);
     
@@ -415,7 +311,7 @@ Eigen::aligned_allocator<std::pair<glh::UiEntity*, glh::vec4>>> prev_color;
 
 void render(glh::App* app){
 
-    ui_context->update();
+    services.ui_context().update();
 
     do_selection_pass(app);
     do_render_pass(app);

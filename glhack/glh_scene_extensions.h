@@ -106,7 +106,7 @@ class GlyphPane : public SceneObject
 public:
 
     GlyphPane(GraphicsManager* gm, const std::string& program_name, const std::string& background_program_name, FontManager* fontmanager, const std::string& pane_name)
-        :gm_(gm), node_(0), line_height_(1.0),fontmanager_(fontmanager),
+        :gm_(gm), glyph_node_(0), line_height_(1.0), fontmanager_(fontmanager),
         font_handle_(invalid_font_handle()), dirty_(true){
 
         text_field_bounds_ = Box2f(vec2(100.f, 100.f), vec2(400.f, 500.f));
@@ -139,9 +139,9 @@ public:
     ~GlyphPane(){
         gm_->release_mesh(fontmesh_);
         gm_->release_renderable(renderable_);
-        if(node_ && parent_ && scene_){
-            parent_->remove_child(node_);
-            scene_->finalize(node_);
+        if(glyph_node_ && parent_ && scene_){
+            parent_->remove_child(glyph_node_);
+            scene_->finalize(glyph_node_);
         }
     }
 
@@ -152,7 +152,7 @@ public:
         if(!text_field_.glyph_coords_.empty()){
             std::tuple<vec2, vec2>& last = text_field_.glyph_coords_[text_field_.glyph_coords_.size() - 2];
 
-            float cursor_y = line_height_ * font_handle_.second * (text_field_.text_fields_.size() - 1);
+            float cursor_y = (float) (line_height_ * font_handle_.second * (text_field_.text_fields_.size() - 1));
 
             cursor_pos[0] = std::get<0>(last)[0];
             //cursor_pos[1] = std::get<0>(last)[1];
@@ -210,8 +210,8 @@ public:
         cursor_node_ = scene->add_node(pane_root_, cursor_renderable_);
         cursor_node_->name_ = name_ + std::string("/Cursor");
 
-        node_ = scene->add_node(pane_root_, renderable_);
-        node_->name_ = name_ + std::string("/Glyph");
+        glyph_node_ = scene->add_node(pane_root_, renderable_);
+        glyph_node_->name_ = name_ + std::string("/Glyph");
         //init_background();
     }
 
@@ -247,7 +247,7 @@ public:
     SceneTree::Node* cursor_node_;          //> The cursor node
     SceneTree::Node* parent_;
     SceneTree::Node* pane_root_;
-    SceneTree::Node* node_;
+    SceneTree::Node* glyph_node_;
 
 
     vec2             default_origin_; // TODO do we need this when layout finished
@@ -342,6 +342,9 @@ public:
             g.update_representation();
         }
     }
+
+    SceneTree& scene(){ return tree_; }
+
 
 private:
     SceneAssets(){}

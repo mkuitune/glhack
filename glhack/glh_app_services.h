@@ -12,7 +12,7 @@
 #include "shims_and_types.h"
 #include "glh_scene_extensions.h"
 #include "iotools.h"
-
+#include "glh_uicontext.h"
 
 namespace glh{
 
@@ -25,40 +25,18 @@ public:
     FontManagerPtr  fontmanager_;
     AssetManagerPtr manager_;
 
-    std::shared_ptr<SceneAssets>  assets_;
+    DynamicGraph graph_;
+
+    std::shared_ptr<SceneAssets>    assets_;
+
+    std::shared_ptr<UiContext> ui_context_;
 
     // TODO: RenderQueue
+private:
+    void init_font_manager();
 
-    void init_font_manager()
-    {
-        GraphicsManager* gm = app_->graphics_manager();
-
-        std::string fontpath = manager_->fontpath();
-
-        if(!directory_exists(fontpath.c_str())){
-            throw GraphicsException(std::string("Font directory not found:") + fontpath);
-        }
-
-        fontmanager_.reset(new FontManager(gm, fontpath));
-    }
-
-    SceneAssets& assets(){ return *assets_; }
-
-    void init(App* app, const char* config_file)
-    {
-        app_ = app;
-        GraphicsManager* gm = app_->graphics_manager();
-
-        manager_ = make_asset_manager(config_file);
-
-        init_font_manager();
-
-        // TODO: Use the 2d camera as the camera for the gui renderpass
-
-        assets_ = SceneAssets::create(app_, gm, fontmanager_.get());
-
-        if(!assets_.get()){ throw GraphicsException("AppServices: Could not init assets_"); }
-    }
+public:
+    void init(App* app, const char* config_file);
 
     void update(){
         assets_->update();
@@ -71,6 +49,12 @@ public:
     }
 
     FontManager* fontmanager(){ return fontmanager_.get(); }
+
+    DynamicGraph& graph(){ return graph_; }
+    UiContext&    ui_context(){ return *ui_context_; }
+    SceneAssets& assets(){ return *assets_; }
+
+
 };
 
 }

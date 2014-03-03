@@ -170,12 +170,13 @@ bool init(glh::App* app)
     return true;
 }
 
-void rotating_transform(glh::App* app){
+Eigen::Affine3f rotating_transform(glh::App* app){
     float t = (float) app->time();
     angle += (t - tprev) * radial_speed;
     tprev = t;
     Eigen::Affine3f transform;
     transform = Eigen::AngleAxis<float>(angle, glh::vec3(0.f, 0.f, 1.f));
+    return transform;
 }
 
 bool update(glh::App* app)
@@ -191,7 +192,15 @@ bool update(glh::App* app)
     float albedo_alpha = 1.0f;
     render_pass->env_.set_vec4(GLH_COLOR_ALBEDO, glh::vec4(0.28f, 0.024f, 0.024f, albedo_alpha));
 
-    glyph_pane->node_->material_.set_vec4(GLH_COLOR_ALBEDO, glh::vec4(1.f, 1.f, 1.f, 1.f));
+    glyph_pane->glyph_node_->material_.set_vec4(GLH_COLOR_ALBEDO, glh::vec4(1.f, 1.f, 1.f, 1.f));
+
+    float cursor_albedo = abs(sin(5.f * app->time()));
+    glyph_pane->cursor_node_->material_.set_vec4(GLH_COLOR_ALBEDO, glh::vec4(0.f, 0.f, 0.f, cursor_albedo));
+
+    //Math<float>::quaternion_t rot(1.f, 0.f, 0.f, 0.f);
+    //rot.z() = 0.01f;
+    //glyph_pane->pane_root_->transform_.rotation_ = rot * glyph_pane->pane_root_->transform_.rotation_;
+    //glyph_pane->pane_root_->transform_.rotation_.normalize();
 
     render_pass->update_queue(services.assets_->tree_, [](SceneTree::Node* n){return true; });
 

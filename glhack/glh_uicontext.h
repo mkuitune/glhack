@@ -166,6 +166,9 @@ public:
             events_.pop();
             //GLH_LOG_EXPR("Event");
 
+            // TODO: Refactor so that these parameters are not in nodes but in map separate from nodes
+            //       Try to use closures in the map instead of explicit reference to node pointers.
+
             if(is_left_mouse_button_activated(e)){
                 for(SceneTree::Node* node: focus_context_.currently_focused_){
                     dragged.push_back(node);
