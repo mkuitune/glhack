@@ -6,58 +6,9 @@
 
 //////////////// Program stuff ////////////////
 
-const char* sh_vertex   = 
-"#version 150               \n"
-"in vec3 VertexPosition;    "
-"in vec3 VertexColor;       "
-"out vec3 Color;            "
-"void main()                "
-"{                          "
-"    Color = VertexColor;   "
-"    gl_Position = vec4( VertexPosition, 1.0 );"
-"}";
-
-const char* sh_vertex_obj_pos   = 
-"#version 150               \n"
-"uniform mat4 LocalToWorld;"
-"in vec3      VertexPosition;    "
-"void main()                "
-"{                          "
-"    gl_Position = LocalToWorld * vec4( VertexPosition, 1.0 );"
-"}";
-
-const char* sh_vertex_obj_tex   = 
-"#version 150               \n"
-"uniform mat4 LocalToWorld;"
-"in vec3      VertexPosition;    "
-"in vec3      TexCoord;"
-"out vec3 v_color;            "
-"out vec2 v_texcoord;"
-"void main()                "
-"{                          "
-"    v_texcoord = TexCoord.xy;"
-"    gl_Position = LocalToWorld * vec4( VertexPosition, 1.0 );"
-"}";
-
-const char* sh_fragment = 
-"#version 150                  \n"
-"in vec3 Color;                "
-"out vec4 FragColor;           "
-"void main() {                 "
-"    FragColor = vec4(Color, 1.0); "
-"}";
-
-const char* sh_fragment_tex = 
-"#version 150                  \n"
-"uniform sampler2D Sampler;    "
-"in vec2 v_texcoord;           "
-"out vec4 FragColor;           "
-"void main() {                 "
-"    vec4 texColor = texture( Sampler, v_texcoord );"
-"    FragColor = texColor;"
-//"    FragColor = vec4(Color, 1.0); "
-"}";
-
+// TAKE CAMERA INTO USE
+// FILTER BASED ON SCENEGRAPH ROOT OR CREATE A SPECIFIC COLLECTION FOR PICKABLE AND INTERACTION LOCKED
+//  so NOT EXPLICIT PARAMETERS rather MOVE TO AND BETWEEN specific collecionts
 
 const char* sh_vertex_obj   = 
 "#version 150               \n"
@@ -71,14 +22,12 @@ const char* sh_vertex_obj   =
 "    gl_Position = LocalToWorld * vec4( VertexPosition, 1.0 );"
 "}";
 
-#define FIXED_COLOR "FixedColor"
-
 const char* sh_fragment_fix_color = 
 "#version 150                  \n"
-"uniform vec4 FixedColor;"
+"uniform vec4 ColorAlbedo;"
 "out vec4 FragColor;           "
 "void main() {                 "
-"    FragColor = FixedColor;   "
+"    FragColor = ColorAlbedo;   "
 "}";
 
 const char* sh_fragment_selection_color = 
@@ -97,44 +46,32 @@ const char* sp_select  = "sp_selecting";
 glh::ProgramHandle* sp_colored_program;
 glh::ProgramHandle* sp_select_program;
 
-glh::Texture* texture;
-
 // App state
 
 glh::RenderPassSettings g_renderpass_settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT,
                                             glh::vec4(0.0f,0.0f,0.0f,1.f), 1);
-//glh::RenderPassSettings g_color_mask_settings(glh::RenderPassSettings::ColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE));
-//glh::RenderPassSettings g_blend_settings(glh::RenderPassSettings::BlendSettings(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
-//glh::RenderPassSettings g_blend_settings(glh::RenderPassSettings::BlendSettings(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA));
 
 bool g_run = true;
 
+glh::RenderEnvironment env;                           // TODO get rid of
 
-glh::AssetManagerPtr manager;
-glh::RenderEnvironment env;
-
-glh::ObjectRoster::IdGenerator idgen;
 
 int obj_id = glh::ObjectRoster::max_id / 2;
 
-glh::RenderPickerPtr render_picker;
+glh::RenderPickerPtr render_picker;                   // TODO to assets etc
 
-glh::RenderQueue                   selectable_queue;
+glh::RenderQueue                   selectable_queue;  
 glh::RenderQueue                   render_queueue;
 glh::RenderQueue                   top_queue;
 
-
+// TODO Do not use RenderQueues directly, use render passes
 
 glh::AppServices  services;
 
 
-#define COLOR_DELTA "ColorDelta"
-#define PRIMARY_COLOR "PrimaryColor"
-#define SECONDARY_COLOR "SecondaryColor"
 
-
-
-void add_color_interpolation_to_graph(glh::App* app, glh::DynamicGraph& graph, glh::SceneTree::Node* node){
+// TODO to 'techniques' file?
+void add_color_interpolation_to_graph(glh::App* app, glh::DynamicGraph& graph, glh::SceneTree::Node* node, std::string target_var_Name){
     using namespace glh;
     auto f = DynamicNodeRef::factory_enumerate_names(graph, app->string_numerator());
 
@@ -144,9 +81,9 @@ void add_color_interpolation_to_graph(glh::App* app, glh::DynamicGraph& graph, g
     auto offset   = f(new ScalarOffset());
     auto mix      = f(new MixNode());
 
-    std::list<std::string> vars = list(std::string(COLOR_DELTA), 
-                                       std::string(PRIMARY_COLOR),
-                                       std::string(SECONDARY_COLOR));
+    std::list<std::string> vars = list(std::string(GLH_COLOR_DELTA), 
+                                       std::string(GLH_PRIMARY_COLOR),
+                                       std::string(GLH_SECONDARY_COLOR));
 
     auto nodesource = f(new NodeSource(node, vars));
     auto nodereciever = f(new NodeReciever(node));
@@ -154,18 +91,19 @@ void add_color_interpolation_to_graph(glh::App* app, glh::DynamicGraph& graph, g
     auto lnk = DynamicNodeRef::linker(graph);
 
     lnk(sys, GLH_PROPERTY_TIME_DELTA, offset, GLH_PROPERTY_INTERPOLANT);
-    lnk(nodesource, COLOR_DELTA, offset, GLH_PROPERTY_SCALE);
+    lnk(nodesource, GLH_COLOR_DELTA, offset, GLH_PROPERTY_SCALE);
 
     lnk(offset, GLH_PROPERTY_INTERPOLANT, dynvalue, GLH_PROPERTY_DELTA);
     lnk(dynvalue, GLH_PROPERTY_INTERPOLANT,  ramp, GLH_PROPERTY_INTERPOLANT);
 
     lnk(ramp, GLH_PROPERTY_INTERPOLANT, mix, GLH_PROPERTY_INTERPOLANT);
-    lnk(nodesource, PRIMARY_COLOR, mix, GLH_PROPERTY_1);
-    lnk(nodesource, SECONDARY_COLOR, mix, GLH_PROPERTY_2);
+    lnk(nodesource, GLH_PRIMARY_COLOR, mix, GLH_PROPERTY_1);
+    lnk(nodesource, GLH_SECONDARY_COLOR, mix, GLH_PROPERTY_2);
 
-    lnk(mix, GLH_PROPERTY_COLOR, nodereciever, FIXED_COLOR);
+    lnk(mix, GLH_PROPERTY_COLOR, nodereciever, target_var_Name);
 }
 
+// TODO to 'techniques' file?
 void add_focus_action(glh::App* app, glh::SceneTree::Node* node, glh::FocusContext& focus_context, glh::DynamicGraph& graph){
     using namespace glh;
     auto f = DynamicNodeRef::factory_enumerate_names(graph, app->string_numerator());
@@ -180,14 +118,7 @@ void add_focus_action(glh::App* app, glh::SceneTree::Node* node, glh::FocusConte
     auto lnk = DynamicNodeRef::linker(graph);
 
     lnk(focus, GLH_PROPERTY_INTERPOLANT, mix, GLH_PROPERTY_INTERPOLANT);
-    lnk(mix, GLH_PROPERTY_INTERPOLANT, noderes, COLOR_DELTA);
-}
-
-void init_uniform_data(){
-    //env.set_vec4("ObjColor", glh::vec4(0.f, 1.f, 0.f, 0.2f));
-    glh::vec4 obj_color_sel = glh::ObjectRoster::color_of_id(obj_id);
-    env.set_vec4(UICTX_SELECT_NAME,     obj_color_sel);
-    env.set_vec4(FIXED_COLOR, glh::vec4(0.28f, 0.024f, 0.024f, 1.0));
+    lnk(mix, GLH_PROPERTY_INTERPOLANT, noderes, GLH_COLOR_DELTA);
 }
 
 using glh::vec2i;
@@ -204,7 +135,6 @@ bool init(glh::App* app)
     const char* config_file = "config.mp";
     services.init(app, config_file);
 
-    //sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment);
     sp_select_program  = gm->create_program(sp_select, sh_geometry, sh_vertex_obj, sh_fragment_selection_color);
     sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment_fix_color);
 
@@ -226,16 +156,14 @@ bool init(glh::App* app)
         auto n = add_quad_to_scene(gm, services.assets().scene(), *sp_colored_program, s.dims, parent);
         parent->transform_.position_ = s.pos;
         n->name_ = name;
-        set_material(*n, FIXED_COLOR,    s.color_primary);
-        set_material(*n, PRIMARY_COLOR,  s.color_primary);
-        set_material(*n, SECONDARY_COLOR,s.color_secondary);
-        set_material(*n, COLOR_DELTA, 0.f);
-        add_color_interpolation_to_graph(app, services.graph(), n);
+        set_material(*n, GLH_COLOR_ALBEDO, s.color_primary);
+        set_material(*n, GLH_PRIMARY_COLOR,  s.color_primary);
+        set_material(*n, GLH_SECONDARY_COLOR,s.color_secondary);
+        set_material(*n, GLH_COLOR_DELTA, 0.f);
+        add_color_interpolation_to_graph(app, services.graph(), n, GLH_COLOR_ALBEDO);
         add_focus_action(app, n, services.ui_context().focus_context_, services.graph());
     }
     services.graph().solve_dependencies();
-
-    init_uniform_data();
 
     return true;
 }
@@ -255,18 +183,9 @@ bool update(glh::App* app)
 
     services.graph().execute();
 
-    Eigen::Affine3f transform;
-    transform = Eigen::AngleAxis<float>(0.f, glh::vec3(0.f, 0.f, 1.f));
-
-    mat4 screen_to_view = app_orthographic_pixel_projection(app);
-
-    env.set_mat4(GLH_LOCAL_TO_WORLD, transform.matrix());
-
-    env.set_vec4("Albedo", glh::vec4(0.28f, 0.024f, 0.024f, 1.0));
-
     services.assets().scene().update();
     services.assets().scene().apply_to_render_env();
-
+    
     render_queueue.clear();
     render_queueue.add(services.assets().scene(), pass_interaction_unlocked);
 
@@ -284,10 +203,10 @@ void do_selection_pass(glh::App* app){
     using namespace glh;
 
     glh::FocusContext::Focus focus = services.ui_context().focus_context_.start_event_handling();
-
     vec2i mouse = services.ui_context().mouse_current_;
 
-    auto picked = render_picker->render_selectables(env, mouse[0], mouse[1]);
+    auto picked = render_picker->render_selectables(env, mouse[0], mouse[1]); // Render picker to ui_context?
+                                                                              // Lift 'do selection pass' to some technique file?
     
     for(auto p: picked){
         focus.on_focus(p);
@@ -331,13 +250,8 @@ void key_callback(int key, const glh::Input::ButtonState& s)
 int main(int arch, char* argv)
 {
     glh::AppConfig config = glh::app_config_default(init, update, render, resize);
-    //glh::AppConfig config = glh::app_config_default(init, update, render_with_selection_pass, resize);
     config.width = 1024;
     config.height = 640;
-
-    const char* config_file = "config.mp";
-
-    manager = glh::make_asset_manager(config_file);
 
     glh::App app(config);
 

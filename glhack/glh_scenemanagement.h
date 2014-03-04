@@ -266,8 +266,10 @@ SceneTree::iterator end_iter(SceneTree::Node* node);
 ///////////// Utility functions for scene elements /////////////
 
 void set_material(SceneTree::Node& node, RenderEnvironment& material);
+void append_material(SceneTree::Node& node, RenderEnvironment& material);
 void set_material(SceneTree::Node& node, cstring& name, const vec4& var);
 void set_material(SceneTree::Node& node, cstring& name, const float var);
+
 
 ///////////// RenderQueue //////////////
 

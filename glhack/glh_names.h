@@ -30,6 +30,10 @@ namespace glh{
 #define GLH_PROPERTY_INTERPOLANT    "GLH_PROPERTY_INTERPOLANT"
 #define GLH_PROPERTY_DELTA          "GLH_PROPERTY_DELTA"
 
+#define GLH_COLOR_DELTA             "GLH_COLOR_DELTA"
+#define GLH_PRIMARY_COLOR           "GLH_PRIMARY_COLOR"
+#define GLH_SECONDARY_COLOR         "GLH_SECONDARY_COLOR"
+
 //////////////// Shader parameters. ////////////////
 
 #define GLH_LOCAL_TO_WORLD   "LocalToWorld"

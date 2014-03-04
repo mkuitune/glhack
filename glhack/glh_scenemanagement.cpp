@@ -33,6 +33,9 @@ PathArray string_to_patharray(const std::string& str)
 void set_material(SceneTree::Node& node, RenderEnvironment& material){
     node.material_ = material;}
 
+void append_material(SceneTree::Node& node, RenderEnvironment& material){
+    node.material_.append(material);}
+
 void set_material(SceneTree::Node& node, cstring& name, const vec4& var){
     node.material_.set_vec4(name, var);}
 

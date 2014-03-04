@@ -79,6 +79,13 @@ public:
         texture2d_.erase(name);
     }
 
+    void append(const RenderEnvironment& r){
+        scalar_.insert(r.scalar_.begin(), r.scalar_.end());
+        texture2d_.insert(r.texture2d_.begin(), r.texture2d_.end());
+        mat4_.insert(r.mat4_.begin(), r.mat4_.end());
+        vec4_.insert(r.vec4_.begin(), r.vec4_.end());
+    }
+
     float&   get_scalar(cstring name);
     vec4&    get_vec4(cstring name);
     mat4&    get_mat4(cstring name);
