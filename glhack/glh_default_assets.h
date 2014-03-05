@@ -4,19 +4,10 @@
 */
 #pragma once
 
+#include "glhack.h"
+
 namespace glh{
 
-//#include "glh_scene_extensions.h"
-
-class DefaultAssets
-{
-public:
-
-    int i;
-};
-
-DefaultAssets* get_default_assets();
-
-void finalize_default_assets();
+void load_default_programs_glsl150(GraphicsManager* gm);
 
 }

@@ -10,43 +10,6 @@
 // FILTER BASED ON SCENEGRAPH ROOT OR CREATE A SPECIFIC COLLECTION FOR PICKABLE AND INTERACTION LOCKED
 //  so NOT EXPLICIT PARAMETERS rather MOVE TO AND BETWEEN specific collecionts
 
-const char* sh_vertex_obj   = 
-"#version 150               \n"
-"uniform mat4 LocalToWorld;" // TODO add world to screen
-"in vec3      VertexPosition;    "
-"in vec3      VertexColor;       "
-"out vec3 Color;            "
-"void main()                "
-"{                          "
-"    Color = VertexColor;   "
-"    gl_Position = LocalToWorld * vec4( VertexPosition, 1.0 );"
-"}";
-
-const char* sh_fragment_fix_color = 
-"#version 150                  \n"
-"uniform vec4 ColorAlbedo;"
-"out vec4 FragColor;           "
-"void main() {                 "
-"    FragColor = ColorAlbedo;   "
-"}";
-
-const char* sh_fragment_selection_color = 
-"#version 150                  \n"
-"uniform vec4 " UICTX_SELECT_NAME ";"
-"out vec4 FragColor;           "
-"void main() {                 "
-"    FragColor = " UICTX_SELECT_NAME "; "
-"}";
-
-
-const char* sh_geometry = "";
-const char* sp_obj     = "sp_colored";
-const char* sp_select  = "sp_selecting";
-
-glh::ProgramHandle* sp_colored_program;
-glh::ProgramHandle* sp_select_program;
-
-// App state
 
 glh::RenderPassSettings g_renderpass_settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT,
                                             glh::vec4(0.0f,0.0f,0.0f,1.f), 1);
@@ -56,15 +19,15 @@ bool g_run = true;
 glh::RenderEnvironment env;                           // TODO get rid of
 
 
-int obj_id = glh::ObjectRoster::max_id / 2;
-
 glh::RenderPickerPtr render_picker;                   // TODO to assets etc
 
-glh::RenderQueue                   selectable_queue;  
-glh::RenderQueue                   render_queueue;
-glh::RenderQueue                   top_queue;
+glh::RenderQueue                   selectable_queue;  // TODO Do not use RenderQueues directly, use render passes
+glh::RenderQueue                   render_queueue; // TODO Do not use RenderQueues directly, use render passes
+glh::RenderQueue                   top_queue; // TODO Do not use RenderQueues directly, use render passes
 
-// TODO Do not use RenderQueues directly, use render passes
+glh::RenderPass*  selection_pass;
+glh::RenderPass*  render_pass;
+glh::RenderPass*  top_pass;
 
 glh::AppServices  services;
 
@@ -135,10 +98,8 @@ bool init(glh::App* app)
     const char* config_file = "config.mp";
     services.init(app, config_file);
 
-    sp_select_program  = gm->create_program(sp_select, sh_geometry, sh_vertex_obj, sh_fragment_selection_color);
-    sp_colored_program = gm->create_program(sp_obj, sh_geometry, sh_vertex_obj, sh_fragment_fix_color);
-
-    render_picker->selection_program_ = sp_select_program;
+    auto sp_colored_program = gm->program(GLH_CONSTANT_ALBEDO_PROGRAM);
+    render_picker->selection_program_ = gm->program(GLH_COLOR_PICKER_PROGRAM);
 
     struct{vec2 dims; vec3 pos; vec4 color_primary; vec4 color_secondary;} quads[] ={
         {vec2(0.5, 0.5), vec3(-0.5, -0.5, 0.), vec4(COLOR_RED), vec4(COLOR_WHITE) },
@@ -221,8 +182,8 @@ void do_render_pass(glh::App* app){
     GraphicsManager* gm = app->graphics_manager();
 
     apply(g_renderpass_settings);
-    render_queueue.render(gm, *sp_colored_program, env);
-    top_queue.render(gm, *sp_colored_program, env);
+    render_queueue.render(gm, *gm->program(GLH_CONSTANT_ALBEDO_PROGRAM), env);
+    top_queue.render(gm, *gm->program(GLH_CONSTANT_ALBEDO_PROGRAM), env);
 }
 
 std::map<glh::SceneTree::Node*, glh::vec4, std::less<glh::SceneTree::Node*>,

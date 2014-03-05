@@ -4,6 +4,7 @@
 #pragma once
 
 #include "glh_app_services.h"
+#include "glh_default_assets.h"
 
 namespace glh{
 
@@ -62,11 +63,16 @@ void AppServices::init(App* app, const char* config_file)
 
     if(!assets_.get()){ throw GraphicsException("AppServices: Could not init assets_"); }
 
+    load_default_programs_glsl150(gm);
+
     ui_context_.reset(new glh::UiContext(*gm, *app, graph_, assets_->scene()));
 
     if(!ui_context_.get()){ throw GraphicsException("AppServices: Could not init ui_context_"); }
 
     ui_context_->set_movement_mapper_generator(get_pixel_space_movement_mapper);
+
+    render_picker_ = std::make_shared<glh::RenderPicker>(*app);
+    if(!render_picker_.get()){ throw GraphicsException("AppServices: Could not init render_picker_"); }
 }
 
 }

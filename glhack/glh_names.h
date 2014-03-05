@@ -34,6 +34,11 @@ namespace glh{
 #define GLH_PRIMARY_COLOR           "GLH_PRIMARY_COLOR"
 #define GLH_SECONDARY_COLOR         "GLH_SECONDARY_COLOR"
 
+//////////////// Program names. ////////////////
+
+#define GLH_COLOR_PICKER_PROGRAM "GLHColorPickerProgram"
+#define GLH_CONSTANT_ALBEDO_PROGRAM "GLHConstantAlbedoProgram"
+
 //////////////// Shader parameters. ////////////////
 
 #define GLH_LOCAL_TO_WORLD   "LocalToWorld"

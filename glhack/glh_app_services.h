@@ -31,6 +31,8 @@ public:
 
     std::shared_ptr<UiContext> ui_context_;
 
+    glh::RenderPickerPtr render_picker_;
+
     // TODO: RenderQueue
 private:
     void init_font_manager();
