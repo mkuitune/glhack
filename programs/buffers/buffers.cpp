@@ -22,8 +22,8 @@ glh::RenderEnvironment env;                           // TODO get rid of
 glh::RenderPickerPtr render_picker;                   // TODO to assets etc
 
 glh::RenderQueue                   selectable_queue;  // TODO Do not use RenderQueues directly, use render passes
-glh::RenderQueue                   render_queueue; // TODO Do not use RenderQueues directly, use render passes
-glh::RenderQueue                   top_queue; // TODO Do not use RenderQueues directly, use render passes
+
+glh::Camera*      camera;
 
 glh::RenderPass*  selection_pass;
 glh::RenderPass*  render_pass;
@@ -126,6 +126,16 @@ bool init(glh::App* app)
     }
     services.graph().solve_dependencies();
 
+    camera = services.assets().create_camera(glh::Camera::Projection::Orthographic);
+
+    selection_pass = services.assets().create_render_pass("SelectionPass"); //TODO to picker assets !!!
+    render_pass = services.assets().create_render_pass("RenderPass");
+    top_pass = services.assets().create_render_pass("TopPass");
+
+    render_pass->set_camera(camera);
+    top_pass->set_camera(camera);
+
+
     return true;
 }
 
@@ -146,20 +156,20 @@ bool update(glh::App* app)
 
     services.assets().scene().update();
     services.assets().scene().apply_to_render_env();
-    
-    render_queueue.clear();
-    render_queueue.add(services.assets().scene(), pass_interaction_unlocked);
+
+    render_pass->update_queue(services.assets().scene(), pass_interaction_unlocked);
 
     selectable_queue.clear();
     selectable_queue.add(services.assets().scene(), pass_pickable_and_unlocked);
-    render_picker->attach_render_queue(&selectable_queue);
+    render_picker->attach_render_queue(&selectable_queue); // TODO render picker as it's own asset next to e.g. glyph pane
 
-    top_queue.clear();
-    top_queue.add(services.assets().scene(), pass_interaction_locked);
-    
+    top_pass->update_queue(services.assets().scene(), pass_interaction_locked);
+
+
     return g_run;
 }
 
+// TODO to it's own utility function with render picker
 void do_selection_pass(glh::App* app){
     using namespace glh;
 
@@ -182,8 +192,8 @@ void do_render_pass(glh::App* app){
     GraphicsManager* gm = app->graphics_manager();
 
     apply(g_renderpass_settings);
-    render_queueue.render(gm, *gm->program(GLH_CONSTANT_ALBEDO_PROGRAM), env);
-    top_queue.render(gm, *gm->program(GLH_CONSTANT_ALBEDO_PROGRAM), env);
+    render_pass->render(gm);
+    top_pass->render(gm);
 }
 
 std::map<glh::SceneTree::Node*, glh::vec4, std::less<glh::SceneTree::Node*>,
@@ -194,8 +204,8 @@ void render(glh::App* app){
     services.ui_context().update();
 
     do_selection_pass(app);
-    do_render_pass(app);
 
+    do_render_pass(app);
 }
 
 void resize(glh::App* app, int width, int height){

@@ -319,6 +319,13 @@ public:
         return pass;
     }
 
+    RenderPass* create_render_pass(const std::string& name){
+        render_passes_.emplace_back();
+        RenderPass* pass = &render_passes_.back();
+        pass->name_ = app_->string_numerator()("name");
+        return pass;
+    }
+
     // Manages per-frame updates. Basically should be implementable as a DynamicGraph graph (just assigns values to keys). But is not right now.
     void update(){
 
@@ -326,16 +333,7 @@ public:
         tree_.apply_to_render_env();
 
         for(auto& c : cameras_){
-            if(c.projection_ == Camera::Projection::PixelSpaceOrthographic){
-                c.view_to_screen_ = app_orthographic_pixel_projection(app_);
-                c.update(app_);
-            } else if(c.projection_ == Camera::Projection::Orthographic)
-            {
-                throw GraphicsException("Camera.update: Projection type not implemented yet!");
-            } else // Perspective
-            {
-                throw GraphicsException("Camera.update: Projection type not implemented yet!");
-            }
+            c.update(app_);
         }
 
         for(auto& g : glyph_panes_){

@@ -342,9 +342,10 @@ public:
         Perspective
     };
 
-    mat4 camera_to_view_;   // Projection
+    mat4 world_to_camera_view_;   // Affine transform based on node
     mat4 view_to_screen_;   // To NDC. 
-    mat4 camera_to_screen_; // compute per frame, ctv * vts
+
+    mat4 world_to_screen_; // compute per frame, view_to_screen_ * world_to_camera_view_
 
     Projection projection_;
 
@@ -352,23 +353,34 @@ public:
 
     std::string      name_;
 
+    float render_volume_depth_;
+    float aabb_scale_; // Orthographic projection scale 
+    // TODO: Add reference to render passes
+
     Camera(SceneTree::Node* node):node_(node){
-        camera_to_view_ = mat4::Identity();
+        world_to_camera_view_ = mat4::Identity();
         view_to_screen_ = mat4::Identity();
-        camera_to_screen_ = mat4::Identity();
+        world_to_screen_ = mat4::Identity();
+        render_volume_depth_ = 1024.f; // TODO needs probably configs and interfaces
+        aabb_scale_ = 1.0f;
     }
 
     void set_view_to_screen_transform(const mat4& view_to_screen){
         view_to_screen_ = view_to_screen;}
 
-    void set_camera_to_view_transform(const mat4& camera_to_view){
-        camera_to_view_ = camera_to_view;
+    void set_world_to_camera_view_transform(const mat4& camera_to_view){
+        world_to_camera_view_ = camera_to_view;
     }
 
-    const mat4& camera_to_screen(){ return camera_to_screen_; }
+    const mat4& camera_to_screen(){ return world_to_screen_; }
+
     mat4 world_to_camera(){ return node_->local_to_world_.inverse(); }
 
     void update(App* app){
+
+        if(node_){
+            world_to_camera_view_ = world_to_camera();
+        }
 
         // TODO: Probably link this stuff with RenderTarget
         if(projection_ == Camera::Projection::PixelSpaceOrthographic){
@@ -376,14 +388,36 @@ public:
         }
         else if(projection_ == Camera::Projection::Orthographic)
         {
-            throw GraphicsException("Camera.update: Projection type not implemented yet!");
+            float l, b, n,
+                  r, t, f;
+            float width = (float) app->config().width;
+            float height = (float) app->config().height;
+
+            float w_scaled = aabb_scale_ * width / height;
+            float h_scaled = aabb_scale_;
+
+            l = -w_scaled / 2.f;   r = w_scaled / 2.f;
+            b = -h_scaled / 2.f;  t = h_scaled / 2.f;
+            n = 0;
+            f = render_volume_depth_;
+            view_to_screen_ = mat4::Identity();
+            view_to_screen_ << 2.f / (r - l), 0.f, 0.f, -((l + r) / (r - l)),
+                               0.f, 2.f / (t - b), 0.f, -((t + b) / (t - b)),
+                               0.f, 0.f, 2.f / (f - n), -((f + n) / (f - n)),
+                               0.f, 0.f, 0.f, 1.f;
+
+            // TODO Ortographic projection computation to utility function
+            // TODO Bind to a render buffer! Or, view port dimensions!!!
+            //throw GraphicsException("Camera.update: Projection type not implemented yet!");
+
         }
         else // Perspective
         {
             throw GraphicsException("Camera.update: Projection type not implemented yet!");
         }
 
-        camera_to_screen_ = view_to_screen_ * camera_to_view_;
+        // TODO make computation of world_to_camera_view_ from node explicit!
+        world_to_screen_ = view_to_screen_ * world_to_camera_view_;
     }
 
     virtual const std::string& name() const override  {return name_;}
@@ -442,6 +476,7 @@ public:
 
         queue_.render(gm, env_);
     }
+
 };
 
 ///////////// UiEvents //////////////
