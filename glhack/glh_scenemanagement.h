@@ -617,7 +617,7 @@ public:
          glDisable(GL_SCISSOR_TEST);
     }
 
-    PickedContext render_selectables(RenderEnvironment& env, int pointer_x, int pointer_y){
+    PickedContext render_selectables(int pointer_x, int pointer_y){
         GraphicsManager* gm = app_.graphics_manager();
         Box<int,2> read_bounds;
         bool bounds_ok;
@@ -628,7 +628,8 @@ public:
 
         if(bounds_ok){
             for(auto node: (*render_queue_)){
-                if(node->pickable_) UiEntity::render(node, *gm, *selection_program_, env);}
+                if(node->pickable_) UiEntity::render(node, *gm, *selection_program_, env_);
+            }
 
             //Once all the items are rendered do picking
             selected_id_ = do_picking(read_bounds);
@@ -649,6 +650,8 @@ public:
 
         return PickedContext(*this);
     }
+
+    RenderEnvironment env_; // TODO: Try to remove, not really needed
 
     RenderQueue*                    render_queue_;
     std::map<int, SceneTree::Node*> id_to_entity_;

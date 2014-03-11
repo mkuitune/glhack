@@ -16,9 +16,6 @@ glh::RenderPassSettings g_renderpass_settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFE
 
 bool g_run = true;
 
-glh::RenderEnvironment env;                           // TODO get rid of
-
-
 glh::RenderPickerPtr render_picker;                   // TODO to assets etc
 
 glh::RenderQueue                   selectable_queue;  // TODO Do not use RenderQueues directly, use render passes
@@ -164,6 +161,8 @@ bool update(glh::App* app)
     render_picker->attach_render_queue(&selectable_queue); // TODO render picker as it's own asset next to e.g. glyph pane
 
     top_pass->update_queue(services.assets().scene(), pass_interaction_locked);
+    // TODO: Rather than these node switch based filters try to make the render picker move the node between collections or something
+    //       - get rid of the explicit parameter in the node.
 
 
     return g_run;
@@ -176,7 +175,7 @@ void do_selection_pass(glh::App* app){
     glh::FocusContext::Focus focus = services.ui_context().focus_context_.start_event_handling();
     vec2i mouse = services.ui_context().mouse_current_;
 
-    auto picked = render_picker->render_selectables(env, mouse[0], mouse[1]); // Render picker to ui_context?
+    auto picked = render_picker->render_selectables(mouse[0], mouse[1]); // Render picker to ui_context?
                                                                               // Lift 'do selection pass' to some technique file?
     
     for(auto p: picked){
