@@ -45,8 +45,6 @@ public:
                                         StringNumerator& string_numerator, SceneTree::Node* node);
     };
 
-
-
         //TODO: Into a graph node  ?
     static MovementMapper get_default_mapper(App* app, SceneTree* scene,SceneTree::Node* node)
     {

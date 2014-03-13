@@ -72,7 +72,15 @@ void AppServices::init(App* app, const char* config_file)
     ui_context_->set_movement_mapper_generator(get_pixel_space_movement_mapper);
 
     render_picker_ = std::make_shared<glh::RenderPicker>(*app);
-    if(!render_picker_.get()){ throw GraphicsException("AppServices: Could not init render_picker_"); }
+    if(!render_picker_.get()){ throw GraphicsException("AppServices: Could not init render_picker_");}
+
+    render_picker_->selection_program_ = gm->program(GLH_COLOR_PICKER_PROGRAM);
+
+
+    render_picker_pass_ = assets_->create_render_pass("RenderPickerPass");
+
+    picker_service_.init(render_picker_.get(), render_picker_pass_, &ui_context().focus_context_);
+
 }
 
 }

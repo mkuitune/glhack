@@ -13,7 +13,7 @@ namespace glh{
 typedef std::vector<std::string> PathArray;
 typedef ExplicitTransform<float> Transform;
 
-PathArray string_to_patharray(std::string str);
+PathArray string_to_patharray(const std::string& str);
 
 DeclInterface(SceneObject,
     virtual const std::string& name() const = 0;
@@ -271,6 +271,18 @@ void set_material(SceneTree::Node& node, cstring& name, const vec4& var);
 void set_material(SceneTree::Node& node, cstring& name, const float var);
 
 
+//
+// Scene filters
+//
+
+bool pass_all(SceneTree::Node* node);
+bool pass_pickable(SceneTree::Node* node);
+bool pass_unpickable(SceneTree::Node* node);
+bool pass_interaction_unlocked(SceneTree::Node* node);
+bool pass_interaction_locked(SceneTree::Node* node);
+bool pass_pickable_and_unlocked(SceneTree::Node* node);
+
+
 ///////////// RenderQueue //////////////
 
 // TODO: Render que is a 'renderer functinality implementing' class and thus a lower level object than
@@ -435,9 +447,11 @@ public:
     RenderEnvironment               env_;
     std::string                     name_;
 
+    RenderQueue::node_filter_fun_t active_filter_;
+
     Camera* camera_;
 
-    RenderPass(){}
+    RenderPass():active_filter_(pass_all){}
 
     virtual const std::string& name() const override  {return name_;}
     virtual EntityType::t entity_type() const override  {return EntityType::RenderPass;}
@@ -455,9 +469,11 @@ public:
         if(root){queue_.add(root);}
     }
 
-    void update_queue(SceneTree& scene, RenderQueue::node_filter_fun_t filter){
+    void set_queue_filter(RenderQueue::node_filter_fun_t fun){ active_filter_ = fun; }
+
+    void update_queue_filtered(SceneTree& scene){
         queue_.clear();
-        queue_.add(scene, filter);
+        queue_.add(scene, active_filter_);
     }
     
     void camera_parameters_to_env(){
@@ -477,48 +493,18 @@ public:
         queue_.render(gm, env_);
     }
 
-};
+    void render(GraphicsManager* gm, ProgramHandle& program){
 
-///////////// UiEvents //////////////
+        if(!camera_) throw GraphicsException("RenderPass::render: camera_ not assigned");
 
-// Tree of widgets, operation wise. Not a spatial tree, but context tree?
-// 
+        camera_parameters_to_env();
 
-//class UiElement{
-//public:
-//    virtual void focus_gained() = 0;
-//    virtual void focus_lost() = 0;
-//    
-//    virtual void button_activate() = 0;
-//    virtual void button_deactivate() = 0;
-//};
+        for(auto &s : settings_) apply(s);
 
-class UiEntity{
-public:
-    // TODO: Do not store selection color in node material?
-    static void render(SceneTree::Node* node, GraphicsManager& gm, ProgramHandle& selection_program, RenderEnvironment& env){
-        FullRenderable* r = node->renderable();
-        if(r){
-            gm.render(*r, selection_program, node->material_, env);
-        }
+        queue_.render(gm, program, env_);
     }
+
 };
-
-typedef std::shared_ptr<UiEntity> UiEntityPtr; 
-
-
-/** User interface state. 
-
-Usage (refactor):
-0. Scene rendering: scene graph is flattened to render queue (per frame?)
-1. Each UiEntity is assigned a FullRenderable entity (or just a color - a texture
-should be renderable in selection pass)
-2. If a UiEntity is assigned a FullRenderable and it is attached to a RenderPicker,
-The FullRenderable environment is given a selection color (overriding any properties there, if any)
-3. When rendering selection scene, the same mechanism is used as per visible scene. The only
-difference is that the program for the FullRenderables is overloaded with the selection rendering
-program.
-*/
 
 class RenderPicker{
 public:
@@ -548,21 +534,22 @@ public:
         id_to_entity_.erase(id);
     }
 
-     void attach_render_queue(RenderQueue* queue){
-         render_queue_ = queue;
-         for(auto r:(*render_queue_)) add_node(r);
+    void clear_ids(){
+        id_to_entity_.clear();
     }
 
-     void detach_queue(){
-         render_queue_ = 0;
-         for(auto r:(*render_queue_)) detach_node(r);
+    void attach_render_pass(RenderPass* pass){
+         render_pass_ = pass;
     }
 
-    // TODO: To support multiple pointer handling, either
-    // a) calculate bounding box for all pointers and render the entire box
-    // b) render scene multiple times with scissors set around each pointer
-    // We probably need some sane test load for profiling before making the change
-    // and figure out which technique we want to use based on the findings.
+     void update_ids(){
+         if(render_pass_){
+             for(SceneTree::Node* n : render_pass_->queue_.renderables_){
+                 add_node(n);
+             }
+         }
+     }
+
     std::tuple<Box<int,2>, bool> setup_context(int pointer_x, int pointer_y){
          // set up scene
          RenderPassSettings settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT,
@@ -627,9 +614,8 @@ public:
         std::tie(read_bounds, bounds_ok) = setup_context(pointer_x, pointer_y);
 
         if(bounds_ok){
-            for(auto node: (*render_queue_)){
-                if(node->pickable_) UiEntity::render(node, *gm, *selection_program_, env_);
-            }
+
+            render_pass_->render(gm, *selection_program_);
 
             //Once all the items are rendered do picking
             selected_id_ = do_picking(read_bounds);
@@ -651,9 +637,8 @@ public:
         return PickedContext(*this);
     }
 
-    RenderEnvironment env_; // TODO: Try to remove, not really needed
+    RenderPass* render_pass_;
 
-    RenderQueue*                    render_queue_;
     std::map<int, SceneTree::Node*> id_to_entity_;
 
     ObjectRoster::IdGenerator idgen_;
@@ -714,6 +699,41 @@ public:
     entity_container_t focus_lost_;
 
     bool event_handling_done_ ;
+};
+
+class RenderPickerService{
+public:
+    RenderPicker* picker_;
+    RenderPass*   picker_pass_;
+    FocusContext* focus_context_;
+
+    void init(RenderPicker* picker, RenderPass* picker_pass, FocusContext* focus_context){
+        picker_ = picker;
+        focus_context_ = focus_context;
+        picker_pass_ = picker_pass;
+
+        picker_pass_->set_queue_filter(glh::pass_pickable);
+
+        picker->render_pass_ = picker_pass_;
+    }
+
+    void update(SceneTree& scene){
+        picker_pass_->update_queue_filtered(scene);
+        picker_->update_ids();
+    }
+
+
+    void do_selection_pass(int x, int y){
+        glh::FocusContext::Focus focus = focus_context_->start_event_handling();
+
+        auto picked = picker_->render_selectables(x, y);
+
+        for(auto p : picked){
+            focus.on_focus(p);
+        }
+        focus.update_event_state();
+    }
+
 };
 
 // TODO remove below

@@ -4,33 +4,20 @@
 
 #include "glh_app_services.h"
 
-//////////////// Program stuff ////////////////
-
-// TAKE CAMERA INTO USE
-// FILTER BASED ON SCENEGRAPH ROOT OR CREATE A SPECIFIC COLLECTION FOR PICKABLE AND INTERACTION LOCKED
-//  so NOT EXPLICIT PARAMETERS rather MOVE TO AND BETWEEN specific collecionts
-
-
 glh::RenderPassSettings g_renderpass_settings(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT,
                                             glh::vec4(0.0f,0.0f,0.0f,1.f), 1);
 
 bool g_run = true;
 
-glh::RenderPickerPtr render_picker;                   // TODO to assets etc
-
-glh::RenderQueue                   selectable_queue;  // TODO Do not use RenderQueues directly, use render passes
-
 glh::Camera*      camera;
 
-glh::RenderPass*  selection_pass;
 glh::RenderPass*  render_pass;
 glh::RenderPass*  top_pass;
 
 glh::AppServices  services;
 
+glh::RenderPickerService* picker_service;
 
-
-// TODO to 'techniques' file?
 void add_color_interpolation_to_graph(glh::App* app, glh::DynamicGraph& graph, glh::SceneTree::Node* node, std::string target_var_Name){
     using namespace glh;
     auto f = DynamicNodeRef::factory_enumerate_names(graph, app->string_numerator());
@@ -63,7 +50,6 @@ void add_color_interpolation_to_graph(glh::App* app, glh::DynamicGraph& graph, g
     lnk(mix, GLH_PROPERTY_COLOR, nodereciever, target_var_Name);
 }
 
-// TODO to 'techniques' file?
 void add_focus_action(glh::App* app, glh::SceneTree::Node* node, glh::FocusContext& focus_context, glh::DynamicGraph& graph){
     using namespace glh;
     auto f = DynamicNodeRef::factory_enumerate_names(graph, app->string_numerator());
@@ -84,7 +70,6 @@ void add_focus_action(glh::App* app, glh::SceneTree::Node* node, glh::FocusConte
 using glh::vec2i;
 using glh::vec2;
 
-
 bool init(glh::App* app)
 {
     using namespace glh;
@@ -96,7 +81,6 @@ bool init(glh::App* app)
     services.init(app, config_file);
 
     auto sp_colored_program = gm->program(GLH_CONSTANT_ALBEDO_PROGRAM);
-    render_picker->selection_program_ = gm->program(GLH_COLOR_PICKER_PROGRAM);
 
     struct{vec2 dims; vec3 pos; vec4 color_primary; vec4 color_secondary;} quads[] ={
         {vec2(0.5, 0.5), vec3(-0.5, -0.5, 0.), vec4(COLOR_RED), vec4(COLOR_WHITE) },
@@ -125,23 +109,17 @@ bool init(glh::App* app)
 
     camera = services.assets().create_camera(glh::Camera::Projection::Orthographic);
 
-    selection_pass = services.assets().create_render_pass("SelectionPass"); //TODO to picker assets !!!
     render_pass = services.assets().create_render_pass("RenderPass");
     top_pass = services.assets().create_render_pass("TopPass");
+
+    picker_service = &services.picker_service_;
+    picker_service->picker_pass_->set_camera(camera);
 
     render_pass->set_camera(camera);
     top_pass->set_camera(camera);
 
-
     return true;
 }
-
-bool pass_pickable(glh::SceneTree::Node* node){return node->pickable_;}
-bool pass_unpickable(glh::SceneTree::Node* node){return !node->pickable_;}
-bool pass_interaction_unlocked(glh::SceneTree::Node* node){return !node->interaction_lock_;}
-bool pass_interaction_locked(glh::SceneTree::Node* node){return node->interaction_lock_;}
-
-bool pass_pickable_and_unlocked(glh::SceneTree::Node* node){return pass_pickable(node) && pass_interaction_unlocked(node);}
 
 bool update(glh::App* app)
 {
@@ -154,16 +132,13 @@ bool update(glh::App* app)
     services.assets().scene().update();
     services.assets().scene().apply_to_render_env();
 
-    render_pass->update_queue(services.assets().scene(), pass_interaction_unlocked);
+    render_pass->set_queue_filter(glh::pass_interaction_unlocked);
+    render_pass->update_queue_filtered(services.assets().scene());
 
-    selectable_queue.clear();
-    selectable_queue.add(services.assets().scene(), pass_pickable_and_unlocked);
-    render_picker->attach_render_queue(&selectable_queue); // TODO render picker as it's own asset next to e.g. glyph pane
+    top_pass->set_queue_filter(pass_interaction_locked);
+    top_pass->update_queue_filtered(services.assets().scene());
 
-    top_pass->update_queue(services.assets().scene(), pass_interaction_locked);
-    // TODO: Rather than these node switch based filters try to make the render picker move the node between collections or something
-    //       - get rid of the explicit parameter in the node.
-
+    picker_service->update(services.assets().scene());
 
     return g_run;
 }
@@ -172,17 +147,8 @@ bool update(glh::App* app)
 void do_selection_pass(glh::App* app){
     using namespace glh;
 
-    glh::FocusContext::Focus focus = services.ui_context().focus_context_.start_event_handling();
     vec2i mouse = services.ui_context().mouse_current_;
-
-    auto picked = render_picker->render_selectables(mouse[0], mouse[1]); // Render picker to ui_context?
-                                                                              // Lift 'do selection pass' to some technique file?
-    
-    for(auto p: picked){
-        focus.on_focus(p);
-    }
-    focus.update_event_state();
-
+    picker_service->do_selection_pass(mouse[0], mouse[1]);
 }
 
 void do_render_pass(glh::App* app){
@@ -194,9 +160,6 @@ void do_render_pass(glh::App* app){
     render_pass->render(gm);
     top_pass->render(gm);
 }
-
-std::map<glh::SceneTree::Node*, glh::vec4, std::less<glh::SceneTree::Node*>,
-Eigen::aligned_allocator<std::pair<glh::UiEntity*, glh::vec4>>> prev_color;
 
 void render(glh::App* app){
 
@@ -224,8 +187,6 @@ int main(int arch, char* argv)
     config.height = 640;
 
     glh::App app(config);
-
-    render_picker = std::make_shared<glh::RenderPicker>(app);
 
     GLH_LOG_EXPR("Logger started");
     add_key_callback(app, key_callback);

@@ -31,7 +31,10 @@ public:
 
     std::shared_ptr<UiContext> ui_context_;
 
-    glh::RenderPickerPtr render_picker_;
+    RenderPass*     render_picker_pass_;
+    RenderPickerPtr render_picker_;
+
+    RenderPickerService picker_service_;
 
     // TODO: RenderQueue
 private:
@@ -54,8 +57,8 @@ public:
 
     DynamicGraph& graph(){ return graph_; }
     UiContext&    ui_context(){ return *ui_context_; }
-    SceneAssets& assets(){ return *assets_; }
-
+    SceneAssets&  assets(){ return *assets_; }
+    RenderPicker& render_picker(){ return *render_picker_.get(); }
 
 };
 

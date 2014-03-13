@@ -202,7 +202,8 @@ bool update(glh::App* app)
     //glyph_pane->pane_root_->transform_.rotation_ = rot * glyph_pane->pane_root_->transform_.rotation_;
     //glyph_pane->pane_root_->transform_.rotation_.normalize();
 
-    render_pass->update_queue(services.assets_->tree_, [](SceneTree::Node* n){return true; });
+    render_pass->set_queue_filter(glh::pass_all);
+    render_pass->update_queue_filtered(services.assets_->tree_);
 
     return g_run;
 }
