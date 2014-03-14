@@ -51,6 +51,18 @@ void assign_by_guessing_names(BufferSet& bufs, DefaultMesh& mesh);
 
 class RenderEnvironment{
 public:
+
+    struct ParamMap{
+        RenderEnvironment& env_;
+        const std::string& name_;
+        ParamMap(RenderEnvironment& env, const std::string& name):env_(env), name_(name){}
+
+        void operator=(float f){ env_.set_scalar(name_, f); }
+        void operator=(Texture* t){ env_.set_texture2d(name_, t); }
+        void operator=(const mat4& mat){ env_.set_mat4(name_, mat); }
+        void operator=(const vec4& vec){ env_.set_vec4(name_, vec); }
+    };
+
     std::map<std::string, float>    scalar_;
     std::map<std::string, Texture*> texture2d_;
     std::map<std::string, mat4, std::less<std::string>, Eigen::aligned_allocator<std::pair<std::string, mat4> >> mat4_;
@@ -95,6 +107,8 @@ public:
     void set_vec4(cstring name, const vec4& vec){vec4_[name] = vec;}
     void set_mat4(cstring name, const mat4& mat){mat4_[name] = mat;}
     void set_texture2d(cstring name, Texture* tex){texture2d_[name] = tex;}
+
+    ParamMap operator[](const std::string& str){ return ParamMap(*this, str); }
 };
 
 //////////// Renderable settings //////////////

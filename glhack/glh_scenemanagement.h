@@ -404,9 +404,12 @@ public:
                   r, t, f;
             float width = (float) app->config().width;
             float height = (float) app->config().height;
+            
+            bool wlarger = width > height;
 
-            float w_scaled = aabb_scale_ * width / height;
-            float h_scaled = aabb_scale_;
+            float w_scaled = wlarger ? aabb_scale_ * width / height : aabb_scale_;
+            float h_scaled = wlarger ? aabb_scale_ : aabb_scale_ * height / width;
+
 
             l = -w_scaled / 2.f;   r = w_scaled / 2.f;
             b = -h_scaled / 2.f;  t = h_scaled / 2.f;

@@ -12,13 +12,14 @@ namespace {
     const char* sh_vertex_obj =
         "#version 150               \n"
         "uniform mat4 LocalToWorld;" // TODO add world to screen
+        "uniform mat4 WorldToScreen;"
         "in vec3      VertexPosition;    "
         "in vec3      VertexColor;       "
         "out vec3 Color;            "
         "void main()                "
         "{                          "
         "    Color = VertexColor;   "
-        "    gl_Position = LocalToWorld * vec4( VertexPosition, 1.0 );"
+        "    gl_Position = WorldToScreen * LocalToWorld * vec4( VertexPosition, 1.0 );"
         "}";
 
     const char* sh_fragment_fix_color =

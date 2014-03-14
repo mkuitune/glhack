@@ -90,7 +90,7 @@ bool init(glh::App* app)
     };
 
     size_t quad_count = static_array_size(quads);
-    for(auto& s: quads){
+    for(auto& s : quads){
         string name = app->string_numerator()("node");
 
         auto parent = services.assets().scene().add_node(services.assets().scene().root());
@@ -98,10 +98,12 @@ bool init(glh::App* app)
         auto n = add_quad_to_scene(gm, services.assets().scene(), *sp_colored_program, s.dims, parent);
         parent->transform_.position_ = s.pos;
         n->name_ = name;
-        set_material(*n, GLH_COLOR_ALBEDO, s.color_primary);
-        set_material(*n, GLH_PRIMARY_COLOR,  s.color_primary);
-        set_material(*n, GLH_SECONDARY_COLOR,s.color_secondary);
-        set_material(*n, GLH_COLOR_DELTA, 0.f);
+
+        n->material_[GLH_COLOR_ALBEDO] = s.color_primary;
+        n->material_[GLH_PRIMARY_COLOR] = s.color_primary;
+        n->material_[GLH_SECONDARY_COLOR] = s.color_secondary;
+        n->material_[GLH_COLOR_DELTA] = 0.f;
+
         add_color_interpolation_to_graph(app, services.graph(), n, GLH_COLOR_ALBEDO);
         add_focus_action(app, n, services.ui_context().focus_context_, services.graph());
     }
@@ -127,10 +129,12 @@ bool update(glh::App* app)
 
     float t = (float) app->time();
 
-    services.graph().execute();
+    services.update();
 
-    services.assets().scene().update();
-    services.assets().scene().apply_to_render_env();
+    //services.graph().execute();
+
+    //services.assets().scene().update();
+    //services.assets().scene().apply_to_render_env();
 
     render_pass->set_queue_filter(glh::pass_interaction_unlocked);
     render_pass->update_queue_filtered(services.assets().scene());

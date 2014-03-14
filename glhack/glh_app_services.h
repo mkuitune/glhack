@@ -25,7 +25,7 @@ public:
     FontManagerPtr  fontmanager_;
     AssetManagerPtr manager_;
 
-    DynamicGraph graph_;
+    DynamicGraph graph_; // TODO figure out if this belongs here, to assets or do we need another abstraction layer above both yet.
 
     std::shared_ptr<SceneAssets>    assets_;
 
@@ -44,6 +44,7 @@ public:
     void init(App* app, const char* config_file);
 
     void update(){
+        graph_.execute();
         assets_->update();
     }
 

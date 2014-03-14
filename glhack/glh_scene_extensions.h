@@ -322,7 +322,7 @@ public:
     RenderPass* create_render_pass(const std::string& name){
         render_passes_.emplace_back();
         RenderPass* pass = &render_passes_.back();
-        pass->name_ = app_->string_numerator()("name");
+        pass->name_ = app_->string_numerator()(name);
         return pass;
     }
 
