@@ -160,6 +160,8 @@ typedef std::shared_ptr<FullRenderable> FullRenderablePtr;
 
 //////////// Graphics context /////////////
 
+// TODO rename to RenderAssetsManager ?
+
 /** GraphicsManager handles opengl assets and instances of adapter classes that
  *  require a global state to function (that e.g. require an initialized GL context,
  *  need to synchronize resource usage and so on.)

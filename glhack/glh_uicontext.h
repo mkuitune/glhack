@@ -10,29 +10,29 @@
 
 namespace glh{
 
-/** Class that stored modifiers to particular transform channels. */
-//template<class T>
-//struct TransformModifier{
-//
-//    enum User{Position = 0, Scale = 1, Rotation = 2};
-//    char active_;
-//    ExplicitTransform<T> transform_;
-//
-//    TransformModifier():active_[0]{}
-//
-//    void apply(ExplicitTransform<T> transform_){
-//
-//    }
-//
-//};
+    typedef std::function<void(vec3, SceneTree::Node*)> MovementMapper; //> Maps a delta vector in normalized device coordinates to node interaction
+    typedef std::function<MovementMapper(App*, const mat4&, SceneTree*, SceneTree::Node*)> MovementMapperGen;
 
-typedef std::function<void(vec3, SceneTree::Node*)> MovementMapper; //> Maps a delta vector in normalized device coordinates to node interaction
-typedef std::function<MovementMapper(App*, SceneTree*,SceneTree::Node*)> MovementMapperGen;
+struct SelectionWorld{
+    typedef std::vector<SceneTree::Node*> selection_list_t;
 
-/**Returns a Workplane that maps the pointer device movement to change in the target coordinates. E.g. mouse on the
-   screen to the scene graph. Accepts in a source to target coordinate system mapping matrix and the workplane for the mapping (workplane in
-   target coordinate system)*/
-//typedef std::function<Workplane(mat4, Plane)> WorkplaneGenerator;
+    RenderPass       render_pass_;
+    selection_list_t selected_list_;
+    FocusContext     focus_context_;
+    std::string      name_;
+
+    SelectionWorld(const std::string& name):name_(name){
+        render_pass_.set_queue_filter(glh::pass_pickable);
+        render_pass_.name_ = name_ + "/RenderPass";
+    }
+
+    RenderPass& items(){ return render_pass_; }
+
+    void update(SceneTree& scene){
+        render_pass_.update_queue_filtered(scene);
+        //picker_->update_ids();
+    }
+};
 
 /** Class that draws together several existing lower level system to create a UI context. */
 class UiContext{
@@ -40,13 +40,13 @@ public:
 
     // TODO: Probably want to lift techniques away from here at some point.
     struct Technique{
-        enum t{ColorInterpolation};
+        enum t{ ColorInterpolation };
         static void color_interpolation(App& app, DynamicGraph& graph,
-                                        StringNumerator& string_numerator, SceneTree::Node* node);
+            StringNumerator& string_numerator, SceneTree::Node* node);
     };
 
-        //TODO: Into a graph node  ?
-    static MovementMapper get_default_mapper(App* app, SceneTree* scene,SceneTree::Node* node)
+    //TODO: Into a graph node  ?
+    static MovementMapper get_default_mapper(App* app, const mat4& mat, SceneTree* scene, SceneTree::Node* node)
     {
         app;
         scene;
@@ -59,28 +59,19 @@ public:
 
     // TODO scene to own context
     UiContext(GraphicsManager& manager, glh::App& app, DynamicGraph& graph, SceneTree& scene):
-        manager_(manager),app_(app), graph_(graph), render_picker_(app), scene_(scene)
+        manager_(manager), app_(app), graph_(graph), render_picker_(app), scene_(scene)
     {
         init_assets();
 
-        mouse_current_ = glh::vec2i(0,0);
-        mouse_prev_ = glh::vec2i(0,0);
+        mouse_current_ = glh::vec2i(0, 0);
+        mouse_prev_ = glh::vec2i(0, 0);
 
         mapper_gen_ = get_default_mapper;
     }
 
-    void set_movement_mapper_generator(MovementMapperGen mapper){mapper_gen_ = mapper;}
+    void set_movement_mapper_generator(MovementMapperGen mapper){ mapper_gen_ = mapper; }
 
     void init_assets();
-
-    // TODO: Add add_render_queue or such routine
-    //void add_node(SceneTree::Node* n){
-    //    add(ui_entities_, n);
-    //    render_picker_.add(&ui_entities_.back());
-
-    //    // TODO: Remove technique forcing
-    //    add_technique(Technique::ColorInterpolation, n);
-    //}
 
     // Techniques - fixed interaction forms.
     void add_technique(Technique::t technique, SceneTree::Node* node){
@@ -107,8 +98,8 @@ public:
         Event(const t& event):event_(event), button_(Input::any_button(Input::Custom, 0)){
         }
 
-        bool is(const t& event) const {return event_ == event;}
-        bool is(const Event& event)const {return event_ == event.event_ && button_ == event.button_;}
+        bool is(const t& event) const { return event_ == event; }
+        bool is(const Event& event)const { return event_ == event.event_ && button_ == event.button_; }
     };
 
     void mouse_move(int x, int y){
@@ -138,26 +129,24 @@ public:
         else                 events_.push(Event(Event::ButtonDeactivated, button));
     }
 
-
-    // TODO: Add events!
-    // - when draggins stops to element, the element gets the color of the dragged
-    // - when an item is selected, assign a new random color to it by pressing r
-    // - add new dynamic action when dragged - scale the node a little bit smaller when dragging - scale back when released
-
     static int brk()
     {
-         return 11;
+        return 11;
     }
 
-    bool is_left_mouse_button_activated(const Event& e){return e.is(Event(Event::ButtonActivated, Input::any_button(Input::Mouse, Input::MouseButton::LeftButton)));}
-    bool is_left_mouse_button_deactivated(const Event& e){return e.is(Event(Event::ButtonDeactivated, Input::any_button(Input::Mouse, Input::MouseButton::LeftButton)));}
+    bool is_left_mouse_button_activated(const Event& e){ return e.is(Event(Event::ButtonActivated, Input::any_button(Input::Mouse, Input::MouseButton::LeftButton))); }
+    bool is_left_mouse_button_deactivated(const Event& e){ return e.is(Event(Event::ButtonDeactivated, Input::any_button(Input::Mouse, Input::MouseButton::LeftButton))); }
 
     bool is_left_mouse_button_down(){
         return has_pair(buttons_, Input::any_button(Input::Mouse, Input::MouseButton::LeftButton), Input::Held);
     }
 
-    // Must call only after selection context has been filled
+    // Must call only after selection context has been filled TODO: need concept of UI layers - a layer wich stores the camera transform used to render it and which ids belong to it
     void update(){
+
+        // Pick passes
+        pick_passes();
+
         // Handle events
         while(!events_.empty()){
             Event e = events_.top();
@@ -168,11 +157,15 @@ public:
             //       Try to use closures in the map instead of explicit reference to node pointers.
 
             if(is_left_mouse_button_activated(e)){
-                for(SceneTree::Node* node: focus_context_.currently_focused_){
-                    dragged.push_back(node);
-                    node->interaction_lock_ = true;
-                    movement_mappers_[node->id_] = mapper_gen_(&app_, &scene_, node);
-                    //GLH_LOG_EXPR("added to dragged:" << node->id_ );
+                for(auto& sw:selection_worlds_){
+                    for(SceneTree::Node* node : sw.focus_context_.currently_focused_){
+                        Camera* active_camera = sw.render_pass_.camera_;
+                        if(!active_camera) throw GraphicsException("UiContext::update selection world active camera not set");
+                        dragged.push_back(node);
+                        node->interaction_lock_ = true;
+                        movement_mappers_[node->id_] = mapper_gen_(&app_, active_camera->world_to_screen_.inverse(), &scene_, node);
+                        //GLH_LOG_EXPR("added to dragged:" << node->id_ );
+                    }
                 }
             }
 
@@ -181,14 +174,14 @@ public:
                 // If a dragging stops on a node, figure out
                 // a) is there a rule to handle this specific dragged on-to situation
                 // b) apply the rule.
-                for(auto node:dragged){ 
+                for(auto node : dragged){
                     node->interaction_lock_ = false;
                     movement_mappers_.erase(node->id_);
                     //GLH_LOG_EXPR("clean from dragged:" << node->id_ );
                 }
 
                 dragged.clear();
-               
+
             }
 
             // TODO: Can graph operations be used to replace this?
@@ -200,25 +193,45 @@ public:
             {
                 vec2i delta = mouse_current_ - mouse_prev_;
                 vec3 deltaf((float) delta[0], (float) delta[1], 0.f);
-                // TODO: Replace with dynamic graph network attached to each renderable node
                 if(is_left_mouse_button_down()){
-                    // TODO: In stead of storing this node id, perhaps it would be better to store node id
-                    // explicitly in the closure that operates on it, store all active closures in a list
-                    // and just 'execute all active'?
-                    for(SceneTree::Node* node: dragged){
+                    for(SceneTree::Node* node : dragged){
                         movement_mappers_[node->id_](deltaf, node);
-                        //Transform t(movement_mappers_[node->id_](deltaf, node));
-                        //node->transform_.add_to_each_dim(t);
-                        //GLH_LOG_EXPR("move:" << node->id_ );
                     }
                 }
             }
         }
     }
 
-//
-// Member variables
-//
+    SelectionWorld* add_selection_world(const std::string& name, Camera* pass_camera){
+        selection_worlds_.emplace_back(name);
+        selection_worlds_.back().render_pass_.camera_ = pass_camera;
+        return &selection_worlds_.back();
+    }
+
+    void pick_passes(){
+
+        int picker_x = mouse_current_[0];
+        int picker_y = mouse_current_[1];
+
+        for(auto& w : selection_worlds_){
+            render_picker_.render_pass_ = &w.render_pass_;
+            render_picker_.update_ids();
+
+            glh::FocusContext::Focus focus = w.focus_context_.start_event_handling();
+
+            auto picked = render_picker_.render_selectables(picker_x, picker_y);
+
+            for(auto p : picked){
+                focus.on_focus(p);
+            }
+
+            focus.update_event_state();
+        }
+    }
+
+    //
+    // Member variables
+    //
     MovementMapperGen mapper_gen_;
 
     std::map<Input::AnyButton, Input::ButtonState> buttons_;
@@ -233,20 +246,18 @@ public:
     std::stack<Event>             events_;
     std::vector<SceneTree::Node*> dragged;
 
-    SceneTree& scene_;
+    SceneTree&       scene_;
     GraphicsManager& manager_;
     App&             app_;
     DynamicGraph&    graph_;
 
-    FocusContext                focus_context_;
+    //FocusContext                focus_context_;
     RenderPicker                render_picker_;
-    std::list<SceneTree::Node*> ui_entities_;
-
-    std::set<SceneTree::Node*> focused;
 
     // Resource handles
     glh::ProgramHandle* sp_select_program_;
 
+    std::vector<SelectionWorld> selection_worlds_;
 };
 
 } // namespace glh

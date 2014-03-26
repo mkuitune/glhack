@@ -3,6 +3,9 @@
 */
 #pragma once
 
+// Disable Eigen's alignment and vectorization, leave it to compiler
+#define EIGEN_DONT_ALIGN 
+
 #include <Eigen/Dense>
 
 #include "tinymt32.h"
@@ -18,7 +21,6 @@
 #include<limits>
 
 #define PIf 3.141592846f
-
 
 /////////////// Hash functions //////////////
 

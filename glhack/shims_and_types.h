@@ -1,6 +1,4 @@
 /** \file shims_and_types.h Declarations not linked directly to OpenGL.
-    Dependencies:
-    Eigen
 
     \author Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)
 */

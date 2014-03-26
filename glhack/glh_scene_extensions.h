@@ -281,7 +281,7 @@ public:
     SceneTree tree_; // TODO: Split SceneTree from SceneAssets?
 
     std::list<GlyphPane>                                glyph_panes_;
-    std::list<Camera, Eigen::aligned_allocator<Camera>> cameras_;
+    std::list<Camera> cameras_;
     std::list<RenderPass>                               render_passes_;
 
     GraphicsManager* gm_;

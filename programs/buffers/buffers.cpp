@@ -13,10 +13,10 @@ glh::Camera*      camera;
 
 glh::RenderPass*  render_pass;
 glh::RenderPass*  top_pass;
+glh::RenderPass*  pick3dpass;
 
 glh::AppServices  services;
 
-glh::RenderPickerService* picker_service;
 
 void add_color_interpolation_to_graph(glh::App* app, glh::DynamicGraph& graph, glh::SceneTree::Node* node, std::string target_var_Name){
     using namespace glh;
@@ -105,8 +105,9 @@ bool init(glh::App* app)
         n->material_[GLH_COLOR_DELTA] = 0.f;
 
         add_color_interpolation_to_graph(app, services.graph(), n, GLH_COLOR_ALBEDO);
-        add_focus_action(app, n, services.ui_context().focus_context_, services.graph());
+        add_focus_action(app, n, services.selection_world_3d_->focus_context_, services.graph());
     }
+
     services.graph().solve_dependencies();
 
     camera = services.assets().create_camera(glh::Camera::Projection::Orthographic);
@@ -114,8 +115,8 @@ bool init(glh::App* app)
     render_pass = services.assets().create_render_pass("RenderPass");
     top_pass = services.assets().create_render_pass("TopPass");
 
-    picker_service = &services.picker_service_;
-    picker_service->picker_pass_->set_camera(camera);
+    pick3dpass = services.selection_pass_3d_default_;
+    pick3dpass->set_camera(camera);
 
     render_pass->set_camera(camera);
     top_pass->set_camera(camera);
@@ -131,28 +132,15 @@ bool update(glh::App* app)
 
     services.update();
 
-    //services.graph().execute();
-
-    //services.assets().scene().update();
-    //services.assets().scene().apply_to_render_env();
-
     render_pass->set_queue_filter(glh::pass_interaction_unlocked);
     render_pass->update_queue_filtered(services.assets().scene());
 
     top_pass->set_queue_filter(pass_interaction_locked);
     top_pass->update_queue_filtered(services.assets().scene());
 
-    picker_service->update(services.assets().scene());
+    pick3dpass->update_queue_filtered(services.assets().scene()); // Set selection pass camera and context
 
     return g_run;
-}
-
-// TODO to it's own utility function with render picker
-void do_selection_pass(glh::App* app){
-    using namespace glh;
-
-    vec2i mouse = services.ui_context().mouse_current_;
-    picker_service->do_selection_pass(mouse[0], mouse[1]);
 }
 
 void do_render_pass(glh::App* app){
@@ -168,8 +156,6 @@ void do_render_pass(glh::App* app){
 void render(glh::App* app){
 
     services.ui_context().update();
-
-    do_selection_pass(app);
 
     do_render_pass(app);
 }

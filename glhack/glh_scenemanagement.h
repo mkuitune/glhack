@@ -454,7 +454,7 @@ public:
 
     Camera* camera_;
 
-    RenderPass():active_filter_(pass_all){}
+    RenderPass():active_filter_(pass_all), camera_(0){}
 
     virtual const std::string& name() const override  {return name_;}
     virtual EntityType::t entity_type() const override  {return EntityType::RenderPass;}
@@ -480,6 +480,7 @@ public:
     }
     
     void camera_parameters_to_env(){
+        if(!camera_) throw GraphicsException("RenderPass::camera_parameters_to_env camera_ not set.");
         env_.set_mat4(GLH_WORLD_TO_CAMERA, camera_->world_to_camera());
         env_.set_mat4(GLH_CAMERA_TO_SCREEN, camera_->camera_to_screen());
         env_.set_mat4(GLH_WORLD_TO_SCREEN, camera_->camera_to_screen() * camera_->world_to_camera());
@@ -704,40 +705,42 @@ public:
     bool event_handling_done_ ;
 };
 
-class RenderPickerService{
-public:
-    RenderPicker* picker_;
-    RenderPass*   picker_pass_;
-    FocusContext* focus_context_;
-
-    void init(RenderPicker* picker, RenderPass* picker_pass, FocusContext* focus_context){
-        picker_ = picker;
-        focus_context_ = focus_context;
-        picker_pass_ = picker_pass;
-
-        picker_pass_->set_queue_filter(glh::pass_pickable);
-
-        picker->render_pass_ = picker_pass_;
-    }
-
-    void update(SceneTree& scene){
-        picker_pass_->update_queue_filtered(scene);
-        picker_->update_ids();
-    }
 
 
-    void do_selection_pass(int x, int y){
-        glh::FocusContext::Focus focus = focus_context_->start_event_handling();
-
-        auto picked = picker_->render_selectables(x, y);
-
-        for(auto p : picked){
-            focus.on_focus(p);
-        }
-        focus.update_event_state();
-    }
-
-};
+//class RenderPickerService{
+//public:
+//    RenderPicker* picker_;
+//    RenderPass*   picker_pass_;
+//    FocusContext* focus_context_;
+//
+//    void init(RenderPicker* picker, RenderPass* picker_pass, FocusContext* focus_context){
+//        picker_ = picker;
+//        focus_context_ = focus_context;
+//        picker_pass_ = picker_pass;
+//
+//        picker_pass_->set_queue_filter(glh::pass_pickable);
+//
+//        picker->render_pass_ = picker_pass_;
+//    }
+//
+//    void update(SceneTree& scene){
+//        picker_pass_->update_queue_filtered(scene);
+//        picker_->update_ids();
+//    }
+//
+//
+//    void do_selection_pass(int x, int y){
+//        glh::FocusContext::Focus focus = focus_context_->start_event_handling();
+//
+//        auto picked = picker_->render_selectables(x, y);
+//
+//        for(auto p : picked){
+//            focus.on_focus(p);
+//        }
+//        focus.update_event_state();
+//    }
+//
+//};
 
 // TODO remove below
 //class TransformGadget{

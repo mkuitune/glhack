@@ -31,10 +31,16 @@ public:
 
     std::shared_ptr<UiContext> ui_context_;
 
-    RenderPass*     render_picker_pass_;
-    RenderPickerPtr render_picker_;
+    Camera*         default_camera;
 
-    RenderPickerService picker_service_;
+    RenderPass*     selection_pass_2d_default_;
+    RenderPass*     selection_pass_3d_default_;
+    SelectionWorld* selection_world_2d_;
+    SelectionWorld* selection_world_3d_;
+
+    //RenderPass*     render_picker_pass_;
+    //RenderPickerPtr render_picker_;
+
 
     // TODO: RenderQueue
 private:
@@ -42,6 +48,11 @@ private:
 
 public:
     void init(App* app, const char* config_file);
+
+    //void update(Camera* active_camera){
+    //    graph_.execute();
+    //    assets_->update();
+    //}
 
     void update(){
         graph_.execute();
@@ -59,7 +70,7 @@ public:
     DynamicGraph& graph(){ return graph_; }
     UiContext&    ui_context(){ return *ui_context_; }
     SceneAssets&  assets(){ return *assets_; }
-    RenderPicker& render_picker(){ return *render_picker_.get(); }
+    //RenderPicker& render_picker(){ return *render_picker_.get(); }
 
 };
 
