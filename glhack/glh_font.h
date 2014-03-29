@@ -7,9 +7,50 @@
 #include "math_tools.h"
 #include<map>
 #include<vector>
+#include<array>
 
 namespace glh{
 
+struct GlyphCoords{
+    typedef std::array<std::tuple<vec2, vec2>, 4> glyph_quad_t;
+    typedef std::vector<std::tuple<vec2, vec2>>   row_coords_t;
+    typedef std::vector<row_coords_t>             row_coords_container_t;
+
+    row_coords_container_t coords_;
+
+    size_t size(){ return coords_.size(); }
+
+    void clear(){ coords_.clear(); }
+
+    bool empty(){ return coords_.empty() || (coords_.size() == 1 && coords_[0].empty()); }
+
+    row_coords_t& last(){ return coords_.back(); }
+
+    int row_len(int row_index){
+        if(in_range_inclusive(row_index, 0, ((int) size()) - 1)){
+            return coords_[row_index].size();
+        }
+        else return 0;
+    }
+
+    // TODO remove temp method to port existing code to new struct
+    std::tuple<vec2, vec2> last_pos(){
+        return coords_.back()[coords_.back().size() - 2]; }
+
+    std::tuple<vec2, vec2> pos(int j, int i){
+
+
+        return coords_[i][j * 4 - 2];
+    }
+
+    row_coords_t* push_row(){
+        coords_.emplace_back();
+        return &coords_.back();
+    }
+
+    //int height(){ return (int) coords_.size();}
+
+};
 
 typedef std::pair<std::string, double> BakedFontHandle;
 
@@ -60,7 +101,7 @@ public:
     std::tuple<float, float> write_pixel_coords_for_string(const std::string& string,
                                                            const BakedFontHandle& handle,
                                                            const float x, const float y,
-                                                           std::vector<std::tuple<vec2, vec2>>& coords);
+                                                           GlyphCoords::row_coords_t& coords);
 
 private:
 

@@ -597,7 +597,7 @@ struct RandomRange<float>
 
 ////////////////// Mappings /////////////////////
 
-/** Given value within [begin, end], map it's position to range [0,1] */
+/** Given value within [begin, end], map it's position to range [0,1]. TODO:Make numerically more robust if used in critical sections. */
 template<class T> inline T interval_range(const T value, const T begin, const T end){return (value - begin)/(end - begin);}
 
 /** Constrain given value within [begin, end]. If it's outside these ranges then truncate to closest extrema. */
@@ -605,6 +605,9 @@ template<class T> inline T constrain(const T value, const T begin, const T end){
     return value > end ? end : (value < begin?  begin : value);
 }
 
+template<class T> inline bool in_range_inclusive(const T value, const T begin, const T end){
+    return (value >= begin) && (value <= end);
+}
 
 /** Smoothstep polynomial between [0,1] range. */
 inline float smoothstep(const float x){return (1.0f - 2.0f*(-1.0f + x))* x * x;}

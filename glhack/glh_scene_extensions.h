@@ -53,7 +53,7 @@ class TextField {
 public:
     std::vector<std::shared_ptr<TextLine>> text_fields_;
 
-    std::vector<std::tuple<vec2, vec2>> glyph_coords_;
+    GlyphCoords glyph_coords_;
 
     float line_height_; /* Multiples of font size. */
 
@@ -100,8 +100,9 @@ struct Modifiers
 //   cursor key, etc.
 // - 
 
+enum class Movement{ Up, Down, Left, Right, None };
 
-class GlyphPane : public SceneObject
+class GlyphPane: public SceneObject
 {
 public:
 
@@ -113,7 +114,7 @@ public:
 
         default_origin_ = vec2(0.f, 0.f);
         fontmesh_ = gm_->create_mesh();
-        renderable_= gm_->create_renderable();
+        renderable_ = gm_->create_renderable();
 
         cursor_mesh_ = gm->create_mesh();
         cursor_renderable_ = gm_->create_renderable();
@@ -134,6 +135,9 @@ public:
         cursor_renderable_->set_mesh(cursor_mesh_);
 
         name_ = pane_name;
+
+        cursor_pos_index_ = vec2i(0, 0);
+        cursor_pos_ = vec3(0.0, 0.0, 0.0);
     }
 
     ~GlyphPane(){
@@ -145,25 +149,95 @@ public:
         }
     }
 
-    void update_cursor_pos()
+    float height_of_nth_row(int i){ return (float) (line_height_ * font_handle_.second * (i)); }
+
+    //void update_cursor_pos_to_end_of_line()
+    //{
+
+    //    cursor_pos_index_[0] = 0;
+    //    cursor_pos_index_[1] = 0;
+
+    //    if(!text_field_.glyph_coords_.empty()){
+
+    //        // there are one more positions for the cursor than there are glyphs per row
+    //        cursor_pos_index_[0] = text_field_.glyph_coords_.last().size();
+    //        cursor_pos_index_[1] = text_field_.glyph_coords_.size();
+
+    //        std::tuple<vec2, vec2> last;
+
+    //        if(!text_field_.glyph_coords_.last().empty())
+    //            last = text_field_.glyph_coords_.pos(cursor_pos_index_[1]);
+    //        else
+    //            last = std::make_tuple(vec2(0.f, 0.f), vec2(0.f, 0.f));
+
+    //        float cursor_y = height_of_nth_row(text_field_.text_fields_.size() - 1);
+
+    //        cursor_pos_[0] = std::get<0>(last)[0];
+    //        //cursor_pos[1] = std::get<0>(last)[1];
+    //        cursor_pos_[1] = cursor_y;
+    //    }
+    //    else{
+    //        cursor_pos_[0] = default_origin_[0];
+    //        cursor_pos_[1] = default_origin_[1];
+    //    }
+
+    //    update_cursor_pos();
+    //}
+
+    //void update_cursor_pos(){
+
+    //    cursor_node_->transform_.position_ = cursor_pos_;
+    //}
+
+    void update_cursor_pos_to_end_of_line()
     {
-        vec3 cursor_pos(0.f, 0.f, 0.f);
+        cursor_pos_index_[0] = 0;
+        cursor_pos_index_[1] = 0;
 
         if(!text_field_.glyph_coords_.empty()){
-            std::tuple<vec2, vec2>& last = text_field_.glyph_coords_[text_field_.glyph_coords_.size() - 2];
-
-            float cursor_y = (float) (line_height_ * font_handle_.second * (text_field_.text_fields_.size() - 1));
-
-            cursor_pos[0] = std::get<0>(last)[0];
-            //cursor_pos[1] = std::get<0>(last)[1];
-            cursor_pos[1] = cursor_y;
-        }
-        else{
-            cursor_pos[0] = default_origin_[0];
-            cursor_pos[1] = default_origin_[1];
+            // there are one more positions for the cursor than there are glyphs per row
+            cursor_pos_index_[0] = text_field_.glyph_coords_.last().size()/4;
+            cursor_pos_index_[1] = text_field_.glyph_coords_.size() - 1;
         }
 
-        cursor_node_->transform_.position_ = cursor_pos;
+        update_cursor_pos();
+    }
+
+    void update_cursor_pos(){
+        GlyphCoords& coords(text_field_.glyph_coords_);
+
+        cursor_pos_[1] = height_of_nth_row(cursor_pos_index_[1]);
+        cursor_pos_[0] = default_origin_[0];
+
+        if(cursor_pos_index_[0] > 0){
+            std::tuple<vec2, vec2> loc = coords.pos(cursor_pos_index_[0], cursor_pos_index_[1]);
+            cursor_pos_[0] = std::get<0>(loc)[0];
+        }
+
+        cursor_node_->transform_.position_ = cursor_pos_;
+    }
+
+    vec2i limit_to_valid_visual_row_indices(const vec2i& ind){
+        int x = ind[0], y = ind[1];
+
+        int max_height = text_field_.glyph_coords_.size() - 1;
+        y = constrain(y, 0, max_height);
+
+        int row_len = text_field_.glyph_coords_.row_len(y) / 4;
+        x = constrain(x, 0, row_len);
+
+        return vec2i(x, y);
+    }
+
+    void move_cursor(Movement m){
+        if(m == Movement::Up)         cursor_pos_index_[1]--;
+        else if(m == Movement::Down)  cursor_pos_index_[1]++;
+        else if(m == Movement::Left)  cursor_pos_index_[0]--;
+        else if(m == Movement::Right) cursor_pos_index_[0]++;
+
+        cursor_pos_index_ = limit_to_valid_visual_row_indices(cursor_pos_index_);
+
+        update_cursor_pos();
     }
 
     void init_cursor()
@@ -175,7 +249,7 @@ public:
             cursor_renderable_->resend_data_on_render();
         }
 
-        update_cursor_pos();
+        update_cursor_pos_to_end_of_line();
     }
 
     SceneTree::Node* root(){ return pane_root_; }
@@ -224,12 +298,11 @@ public:
             render_glyph_coordinates_to_mesh(fontmanager_->context_, text_field_, font_handle_, default_origin, line_height_, *fontmesh_);
             renderable_->resend_data_on_render();
 
-            update_cursor_pos();
+            update_cursor_pos_to_end_of_line();
         }
 
         dirty_ = false;
     }
-
 
     // TODO add handle mouse click method. Gets x,y in screen coordinates. Invert the local matrix and 
     // multiply coordinates to get them in the local coordinates for this element. See which row
@@ -237,18 +310,20 @@ public:
 
     // TODO Paint option along with copy and paste to clipboard.
 
-
     Texture*         fonttexture_;
     SceneTree*       scene_;
 
     // TODO: Implement background texture and texture painting routines to
     // implement the highlight and cursor
+    // other option to render highlight: use character mesh. Render character mesh to back with opaque color.
     SceneTree::Node* background_mesh_node_; //> The background for highlights.
     SceneTree::Node* cursor_node_;          //> The cursor node
     SceneTree::Node* parent_;
     SceneTree::Node* pane_root_;
     SceneTree::Node* glyph_node_;
 
+    vec2i            cursor_pos_index_;
+    vec3             cursor_pos_;
 
     vec2             default_origin_; // TODO do we need this when layout finished
 

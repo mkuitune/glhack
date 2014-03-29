@@ -1,5 +1,20 @@
 /** 
 
+    Create a simple vector shape editing app with
+    - storage serialized into masp strings.
+    - directory browser for loading files
+    - save dialog for saving scene
+
+    - shapes can be additive or diffing
+
+    - three buttons up: Save, Load, Open
+
+    - Shape ops: Mode: - / + (first will render as hole but will render)
+    - Shape ops: group, ungroup (will cut shapes with holes and hide holes)
+    - Fill: Fill style: textured, gradient, solid, empty. For interior and stroke
+    - Stroke style: width, dash
+
+    Plan to use the vector ops in implementing UI elements later on.
 */
 
 #include "glh_app_services.h"
@@ -67,9 +82,6 @@ const char* sh_vertex_obj_tex =
 "void main()                "
 "{                          "
 "    v_texcoord = TexCoord.xy;"
-"    /* mat4 override = LocalToWorld;*/"
-"    /* override[3][0] = 500.f;*/"
-"    /* override[3][1] = 500.f;*/"
 "    gl_Position = WorldToScreen * LocalToWorld * vec4( VertexPosition, 1.0 );"
 "    /*gl_Position = WorldToScreen * override * vec4( VertexPosition, 1.0 );*/"
 "}";
@@ -112,6 +124,8 @@ glh::RenderPass*  render_pass;
 glh::Camera*      camera;
 
 glh::GlyphPane* glyph_pane;
+
+
 
 void load_font_resources(glh::GraphicsManager* gm)
 {
@@ -246,7 +260,8 @@ void key_callback(int key, const glh::Input::ButtonState& s)
     }
     else if(key == Input::Left){ radial_speed -= 0.1f * PIf;}
     else if(key == Input::Right){ radial_speed += 0.1f * PIf;}
-    else if(s == Input::Held){
+
+    if(s == Input::Held){
         glyph_pane->recieve_characters(key, modifiers);
     }
 }

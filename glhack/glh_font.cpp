@@ -126,11 +126,13 @@ FontCharData* FontContext::get_font_char_data(const BakedFontHandle& handle) {
     return chardata_[handle];
 }
 
+
+
 std::tuple<float, float> FontContext::write_pixel_coords_for_string(const std::string& string,
                                           const BakedFontHandle& handle, 
                                           const float x,
                                           const float y,
-                                          std::vector<std::tuple<vec2, vec2>>& coords)
+                                          GlyphCoords::row_coords_t& coords)
 {
     Image8*       charimg  = get_font_map(handle);
     FontCharData* chardata = get_font_char_data(handle);
@@ -152,7 +154,7 @@ std::tuple<float, float> FontContext::write_pixel_coords_for_string(const std::s
          vec2 v1(q.x1,q.y0); vec2 t1(q.s1,q.t0);
          vec2 v2(q.x1,q.y1); vec2 t2(q.s1,q.t1);
          vec2 v3(q.x0,q.y1); vec2 t3(q.s0,q.t1);
-         
+
          coords.push_back(std::make_tuple(v1, t1));
          coords.push_back(std::make_tuple(v2, t2));
          coords.push_back(std::make_tuple(v3, t3));
