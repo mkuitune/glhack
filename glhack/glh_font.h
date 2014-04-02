@@ -11,10 +11,62 @@
 
 namespace glh{
 
+/** 2D quadrangle encoded into two triangles. */
+// TODO: Use directly two triangles instead.
+typedef std::array<vec2, 6> quad2d_coord_t;
+
+inline vec2 max(const quad2d_coord_t& coord){
+    vec2 res = coord[0];
+    for(auto& c : coord){ 
+        res[0] = std::max(res[0], c[0]);
+        res[1] = std::max(res[1], c[1]);
+    }
+    return res;
+}
+
+inline vec2 min(const quad2d_coord_t& coord){
+    vec2 res = coord[0];
+    for(auto& c : coord){
+        res[0] = std::min(res[0], c[0]);
+        res[1] = std::min(res[1], c[1]);
+    }
+    return res;
+}
+
+struct textured_quad2d_t{
+
+    struct iterator{
+        static const int end_index = 6;
+        textured_quad2d_t& quad_;
+        int index_;
+
+        struct pos_ref_t{ vec2& pos; vec2& tex; };
+
+        iterator(textured_quad2d_t& q):iterator(q, 0){}
+        iterator(textured_quad2d_t& q, int index):quad_(q), index_(index){}
+
+        void operator++(){ index_++;}
+        bool operator!=(const iterator& i){ return index_ != i.index_; }
+        pos_ref_t operator*(){ return{quad_.pos_[index_], quad_.tex_[index_]}; }
+    };
+
+    quad2d_coord_t pos_; 
+    quad2d_coord_t tex_;
+
+    void set_at(vec2 pos, vec2 tex, size_t index){
+        pos_[index] = pos;
+        tex_[index] = tex;
+    }
+
+    iterator begin(){ return iterator(*this); }
+    iterator end(){ return iterator(*this, iterator::end_index); }
+
+};
+
 struct GlyphCoords{
-    typedef std::array<std::tuple<vec2, vec2>, 4> glyph_quad_t;
-    typedef std::vector<std::tuple<vec2, vec2>>   row_coords_t;
-    typedef std::vector<row_coords_t>             row_coords_container_t;
+
+    typedef std::vector<textured_quad2d_t> row_coords_t;
+    typedef std::vector<row_coords_t>      row_coords_container_t;
 
     row_coords_container_t coords_;
 
@@ -26,6 +78,8 @@ struct GlyphCoords{
 
     row_coords_t& last(){ return coords_.back(); }
 
+    row_coords_t& at(int i){ return coords_.at(i); }
+
     int row_len(int row_index){
         if(in_range_inclusive(row_index, 0, ((int) size()) - 1)){
             return coords_[row_index].size();
@@ -34,13 +88,11 @@ struct GlyphCoords{
     }
 
     // TODO remove temp method to port existing code to new struct
-    std::tuple<vec2, vec2> last_pos(){
-        return coords_.back()[coords_.back().size() - 2]; }
+    textured_quad2d_t& last_quad(){
+        return coords_.back()[coords_.back().size()]; }
 
-    std::tuple<vec2, vec2> pos(int j, int i){
-
-
-        return coords_[i][j * 4 - 2];
+    quad2d_coord_t& pos(int j, int i){
+        return coords_[i][j].pos_;
     }
 
     row_coords_t* push_row(){

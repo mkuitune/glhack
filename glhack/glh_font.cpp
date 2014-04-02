@@ -153,14 +153,17 @@ std::tuple<float, float> FontContext::write_pixel_coords_for_string(const std::s
          vec2 v0(q.x0,q.y0); vec2 t0(q.s0,q.t0);
          vec2 v1(q.x1,q.y0); vec2 t1(q.s1,q.t0);
          vec2 v2(q.x1,q.y1); vec2 t2(q.s1,q.t1);
-         vec2 v3(q.x0,q.y1); vec2 t3(q.s0,q.t1);
+         vec2 v3(q.x0, q.y1); vec2 t3(q.s0, q.t1);
 
-         coords.push_back(std::make_tuple(v1, t1));
-         coords.push_back(std::make_tuple(v2, t2));
-         coords.push_back(std::make_tuple(v3, t3));
-         coords.push_back(std::make_tuple(v0, t0));
-         coords.push_back(std::make_tuple(v1, t1));
-         coords.push_back(std::make_tuple(v3, t3));
+         coords.emplace_back(textured_quad2d_t{{v1, v2, v3, v0, v1, v3}, 
+                                               {t1, t2, t3, t0, t1, t3}});
+
+         //coords.push_back(std::make_tuple(v1, t1));
+         //coords.push_back(std::make_tuple(v2, t2));
+         //coords.push_back(std::make_tuple(v3, t3));
+         //coords.push_back(std::make_tuple(v0, t0));
+         //coords.push_back(std::make_tuple(v1, t1));
+         //coords.push_back(std::make_tuple(v3, t3));
       }
       ++text;
     }

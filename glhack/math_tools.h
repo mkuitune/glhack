@@ -609,6 +609,30 @@ template<class T> inline bool in_range_inclusive(const T value, const T begin, c
     return (value >= begin) && (value <= end);
 }
 
+/** Perform a numerically stable Kahan summation on the input numbers. */
+template<class T> inline T kahan_sum(const T& numbers){
+    typedef numbers::value_type t;
+    t sum = (t) 0;
+    t c = (t) 0;
+    for(auto& n : numbers){
+        t y = n - c;
+        t tally = sum + y;
+        c = (tally - sum) - y;
+        sum = tally;
+    }
+    return sum;
+}
+
+
+template<class T, int N> inline T kahan_average(const std::array<T,N>& numbers){
+    T mul = (T) 1.0 / N;
+    return mul * kahan_sum(numbers);
+}
+
+template<class T> inline T average(const T& fst, const T& snd){
+    return ((T) 0.5) * (fst + snd);
+}
+
 /** Smoothstep polynomial between [0,1] range. */
 inline float smoothstep(const float x){return (1.0f - 2.0f*(-1.0f + x))* x * x;}
 inline double smoothstep(const double x){return (1.0 - 2.0*(-1.0 + x))* x * x;}

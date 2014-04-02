@@ -857,7 +857,9 @@ struct Inserter1{
     }
 };
 
-/** Inserter2. Facilitates linked ()-calls to add for two parameters.*/
+/** Inserter2. Facilitates linked ()-calls to add for two parameters.
+TODO: Probably not needed with c11 inserter syntax anymore.
+*/
 template<class Container>
 struct Inserter2{
     Container& parent_;
@@ -944,6 +946,72 @@ bool has_pair(const std::map<KEY, VAL>& map, const KEY& key, const VAL& expected
 }
 
 //////////// Container functions //////////////
+
+/** Return elements up to index-1:th element.  */
+template<class T>
+T head_to(const T& container, const size_t index){
+    auto first = container.begin();
+
+    auto last = (index < container.size()) ? first + index : container.end();
+
+    return T(first, last);
+}
+
+/** Return elements up from index:th element to end.  */
+template<class T>
+T tail_from(const T& container, size_t index){
+    if(index < container.size())
+        return T(container.begin() + index, container.end());
+    else
+        return T();
+}
+
+/** Vector and array utils */
+
+class OutOfRangeException{
+public:
+
+    OutOfRangeException(const char* msg):msg_(msg){}
+    OutOfRangeException(const std::string& msg):msg_(msg){}
+    ~OutOfRangeException(){}
+
+    std::string get_message(){ return msg_; }
+
+    std::string msg_;
+};
+
+template<class T>
+void insert_after(T& container, size_t pos, const typename T::value_type& v){
+    size_t insertpos = pos + 1;
+    if(insertpos < container.size()) container.emplace(container.begin() + insertpos, v);
+    else                       container.emplace_back(v);
+}
+
+template<class T>
+void insert_before(T& container, size_t pos, const typename T::value_type& v){
+    size_t insertpos = pos;
+    if(insertpos < container.size()) container.emplace(container.begin() + insertpos, v);
+    else                       container.emplace_back(v);
+}
+
+template<class T>
+void remove_at(T& container, size_t pos){
+    if(pos < container.size()){
+        container.erase(container.begin() + pos);
+    }
+    else{
+        throw OutOfRangeException("remove_at");
+    }
+}
+
+/** Operate on the sequence starting at nth element */
+template<class T, class F>
+void apply_partial_tail(T& container, size_t index, F fun){
+    auto size = container.size();
+    for(size_t i = index; i < size; ++i){
+        fun(container[i]);
+    }
+}
 
 /** Create lists from input parameters*/
 

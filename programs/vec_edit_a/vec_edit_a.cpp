@@ -258,8 +258,15 @@ void key_callback(int key, const glh::Input::ButtonState& s)
             modifiers.shift_ = true;
         else modifiers.shift_ = false;
     }
+    if(key == Input::Rctrl || key == Input::Lctrl){
+        if(s == glh::Input::Held)
+            modifiers.ctrl_ = true;
+        else modifiers.ctrl_ = false;
+    }
     else if(key == Input::Left){ radial_speed -= 0.1f * PIf;}
     else if(key == Input::Right){ radial_speed += 0.1f * PIf;}
+
+    // TODO: Add repeat functionality for characters fed into glyph pane.
 
     if(s == Input::Held){
         glyph_pane->recieve_characters(key, modifiers);

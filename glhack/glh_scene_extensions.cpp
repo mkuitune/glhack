@@ -7,8 +7,6 @@
 
 namespace glh{
 
-
-
 void transfer_position_data_to_mesh(GlyphCoords& coords,
     glh::DefaultMesh* fontmesh)
 {
@@ -22,19 +20,19 @@ void transfer_position_data_to_mesh(GlyphCoords& coords,
 
     std::vector<float> posdata;
     std::vector<float> texdata;
+
     // transfer tex_coords to mesh
     for(auto& row : text_coords){
-        for(auto& pt : row){
-            vec2 pos;
-            vec2 tex;
-            std::tie(pos, tex) = pt;
-            posdata.push_back(pos[0]);
-            posdata.push_back(pos[1]);
-            posdata.push_back(0.f);
+        for(textured_quad2d_t& quad : row){
+            for(auto ref : quad){
+                posdata.push_back(ref.pos[0]);
+                posdata.push_back(ref.pos[1]);
+                posdata.push_back(0.f);
 
-            texdata.push_back(tex[0]);
-            texdata.push_back(tex[1]);
-            texdata.push_back(0.f);
+                texdata.push_back(ref.tex[0]);
+                texdata.push_back(ref.tex[1]);
+                texdata.push_back(0.f);
+            }
         }
     }
 
@@ -168,31 +166,92 @@ Movement key_to_movement(int key){
     else return Movement::None;
 }
 
+void GlyphPane::move_cursor(Movement m){
+    if(m == Movement::Up){
+        cursor_pos_index_[1]--;
+    }
+    else if(m == Movement::Down){
+        cursor_pos_index_[1]++;
+    }
+    else if(m == Movement::Left){
+        if(cursor_pos_index_[0] > 0){
+            cursor_pos_index_[0]--;
+        } else if(cursor_pos_index_[1] > 0){
+            cursor_pos_index_[1]--;
+            cursor_pos_index_[0] = text_field_.glyph_coords_.at(cursor_pos_index_[1]).size();
+        }
+    }
+    else if(m == Movement::Right){
+        cursor_pos_index_[0]++;
+    }
+    else if(m == Movement::RightBound){
+        cursor_pos_index_[0] = text_field_.glyph_coords_.at(cursor_pos_index_[1]).size();;
+    }
+    else if(m == Movement::LeftBound){
+        cursor_pos_index_[0] = 0;
+    }
+
+    update_cursor_pos();
+}
+
 void GlyphPane::recieve_characters(int key, Modifiers modifiers)
 {
-    char c;
-
+    // TODO: For indices that are passed onto text field, add the
+    // current row - take into account a technique to scroll the text.
+    
     Movement movement = key_to_movement(key);
+    char c = key_to_char(key, modifiers);
+
+    if(key == Input::Space){
+        c = ' ';
+    }
+
+    if(key == Input::Tab){
+        // TODO
+    }
 
     if(key == Input::Key::Enter){
-        text_field_.push_line("");
-        dirty_ = true;
-    }
-    else if(key == Input::Space){
-        text_field_.last().push_back(' ');
+        text_field_.break_line(cursor_pos_index_[0], cursor_pos_index_[1]);
+        cursor_pos_index_[1]++;
+        cursor_pos_index_[0] = 0;
         dirty_ = true;
     }
     else if(movement != Movement::None){
+        if(modifiers.ctrl_)
+        {
+            if(movement == Movement::Left) movement = Movement::LeftBound;
+            if(movement == Movement::Right) movement = Movement::RightBound;
+        }
         move_cursor(movement);
     }
     else if(any_of(key, Input::Del, Input::Backspace)){
         if(text_field_.size() > 0){
-            if(text_field_.last().size() > 0){ text_field_.last().erase_from_back(); dirty_ = true; }
-            else if(text_field_.size() > 1){ text_field_.erase(text_field_.last()); dirty_ = true; }
+            if(cursor_pos_index_[0] == 0){
+                if(cursor_pos_index_[1] > 0){
+                    // Join lines.
+                    const int prev_row = cursor_pos_index_[1] - 1;
+                    const int rm_row = cursor_pos_index_[1];
+                    const int new_cursor_x = text_field_.at(prev_row).size();
+
+                    text_field_.at(prev_row).string += text_field_.at(rm_row).string;
+
+                    text_field_.erase_line(rm_row);
+
+                    cursor_pos_index_[1]--;
+                    cursor_pos_index_[0] = new_cursor_x;
+                    dirty_ = true;
+                }
+            }
+            else if(cursor_pos_index_[0] > 0){
+                text_field_.at(cursor_pos_index_[1]).string.erase(cursor_pos_index_[0] - 1, 1);
+                cursor_pos_index_[0]--;
+                dirty_ = true;
+            }
         }
     }
-    else if(c = key_to_char(key, modifiers)){
-        text_field_.last().push_back(c);
+    else if(c){
+        text_field_.insert_char_after(cursor_pos_index_[0], cursor_pos_index_[1], c);
+        cursor_pos_index_[0]++;
         dirty_ = true;
     }
 }

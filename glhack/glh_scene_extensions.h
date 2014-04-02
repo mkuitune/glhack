@@ -51,7 +51,8 @@ typedef std::unique_ptr<FontManager> FontManagerPtr;
 /** Collection of text fields and their rendering options. */
 class TextField {
 public:
-    std::vector<std::shared_ptr<TextLine>> text_fields_;
+    typedef std::shared_ptr<TextLine> TextLinePtr;
+    std::vector<TextLinePtr> text_fields_;
 
     GlyphCoords glyph_coords_;
 
@@ -63,8 +64,61 @@ public:
         return *text_fields_.back().get();
     }
 
+    void update_line_numbers(){
+        for(int i = 0; i < text_fields_.size(); i++) text_fields_[i]->line_number = i;
+    }
+
+    /** Insert new line after 'char_pos' at 'row'. */
+    TextLine& break_line(const int char_pos, const int row){
+
+        if(row >= (int) size()){
+            return push_line("");
+        }
+        else if(char_pos == 0){
+            auto line = std::make_shared<TextLine>("", row + 1);
+            insert_before(text_fields_, row, line);
+            update_line_numbers();
+            return *line;
+        }
+        else{
+            auto new_head = head_to(text_fields_[row]->string, char_pos);
+            auto new_tail = tail_from(text_fields_[row]->string, char_pos);
+
+            text_fields_[row]->string = new_head;
+
+            auto line = std::make_shared<TextLine>(new_tail, row + 1);
+            insert_after(text_fields_, row, line);
+            update_line_numbers();
+            return *line;
+        }
+    }
+
+    void erase_line(const int row){
+        if(row < text_fields_.size()){
+            remove_at(text_fields_, row);
+            update_line_numbers();
+        }
+    }
+
+    /** Insert new character to line after char_pos. */
+    void insert_char_after(const int char_pos, const int row, const char c){
+        if(row < (int) text_fields_.size() && row >= 0){
+            std::string& str(text_fields_[row]->string);
+            if(char_pos <= (int) str.size() && char_pos >= 0){
+                if(char_pos == str.size())
+                    str.push_back(c);
+                else
+                    str.insert(char_pos, 1, c);
+            }
+        }
+    }
+
     TextLine& last(){
         return *text_fields_.back().get();
+    }
+
+    TextLine& at(int i){
+        return *text_fields_.at(i);
     }
 
     size_t size(){return text_fields_.size();}
@@ -100,7 +154,7 @@ struct Modifiers
 //   cursor key, etc.
 // - 
 
-enum class Movement{ Up, Down, Left, Right, None };
+enum class Movement{ Up, Down, Left, Right, LeftBound, RightBound, None };
 
 class GlyphPane: public SceneObject
 {
@@ -151,44 +205,6 @@ public:
 
     float height_of_nth_row(int i){ return (float) (line_height_ * font_handle_.second * (i)); }
 
-    //void update_cursor_pos_to_end_of_line()
-    //{
-
-    //    cursor_pos_index_[0] = 0;
-    //    cursor_pos_index_[1] = 0;
-
-    //    if(!text_field_.glyph_coords_.empty()){
-
-    //        // there are one more positions for the cursor than there are glyphs per row
-    //        cursor_pos_index_[0] = text_field_.glyph_coords_.last().size();
-    //        cursor_pos_index_[1] = text_field_.glyph_coords_.size();
-
-    //        std::tuple<vec2, vec2> last;
-
-    //        if(!text_field_.glyph_coords_.last().empty())
-    //            last = text_field_.glyph_coords_.pos(cursor_pos_index_[1]);
-    //        else
-    //            last = std::make_tuple(vec2(0.f, 0.f), vec2(0.f, 0.f));
-
-    //        float cursor_y = height_of_nth_row(text_field_.text_fields_.size() - 1);
-
-    //        cursor_pos_[0] = std::get<0>(last)[0];
-    //        //cursor_pos[1] = std::get<0>(last)[1];
-    //        cursor_pos_[1] = cursor_y;
-    //    }
-    //    else{
-    //        cursor_pos_[0] = default_origin_[0];
-    //        cursor_pos_[1] = default_origin_[1];
-    //    }
-
-    //    update_cursor_pos();
-    //}
-
-    //void update_cursor_pos(){
-
-    //    cursor_node_->transform_.position_ = cursor_pos_;
-    //}
-
     void update_cursor_pos_to_end_of_line()
     {
         cursor_pos_index_[0] = 0;
@@ -196,22 +212,36 @@ public:
 
         if(!text_field_.glyph_coords_.empty()){
             // there are one more positions for the cursor than there are glyphs per row
-            cursor_pos_index_[0] = text_field_.glyph_coords_.last().size()/4;
+            cursor_pos_index_[0] = text_field_.glyph_coords_.last().size();
             cursor_pos_index_[1] = text_field_.glyph_coords_.size() - 1;
         }
 
         update_cursor_pos();
     }
 
+    /** Set position of cursor. Note! Call only after text_field_ has updated the
+    *   glyph coordinates.*/
     void update_cursor_pos(){
         GlyphCoords& coords(text_field_.glyph_coords_);
+
+        cursor_pos_index_ = limit_to_valid_visual_row_indices(cursor_pos_index_);
 
         cursor_pos_[1] = height_of_nth_row(cursor_pos_index_[1]);
         cursor_pos_[0] = default_origin_[0];
 
         if(cursor_pos_index_[0] > 0){
-            std::tuple<vec2, vec2> loc = coords.pos(cursor_pos_index_[0], cursor_pos_index_[1]);
-            cursor_pos_[0] = std::get<0>(loc)[0];
+            quad2d_coord_t& loc = coords.pos(cursor_pos_index_[0] - 1, cursor_pos_index_[1]);
+
+            int line_len = coords.row_len(cursor_pos_index_[1]);
+
+            if(cursor_pos_index_[0] < line_len){
+                quad2d_coord_t& loc2 = coords.pos(cursor_pos_index_[0], cursor_pos_index_[1]);
+                cursor_pos_[0] = average(max(loc)[0], min(loc2)[0]);
+            }
+            else
+            {
+                cursor_pos_[0] = max(loc)[0];
+            }
         }
 
         cursor_node_->transform_.position_ = cursor_pos_;
@@ -223,22 +253,13 @@ public:
         int max_height = text_field_.glyph_coords_.size() - 1;
         y = constrain(y, 0, max_height);
 
-        int row_len = text_field_.glyph_coords_.row_len(y) / 4;
+        int row_len = text_field_.glyph_coords_.row_len(y);
         x = constrain(x, 0, row_len);
 
         return vec2i(x, y);
     }
 
-    void move_cursor(Movement m){
-        if(m == Movement::Up)         cursor_pos_index_[1]--;
-        else if(m == Movement::Down)  cursor_pos_index_[1]++;
-        else if(m == Movement::Left)  cursor_pos_index_[0]--;
-        else if(m == Movement::Right) cursor_pos_index_[0]++;
-
-        cursor_pos_index_ = limit_to_valid_visual_row_indices(cursor_pos_index_);
-
-        update_cursor_pos();
-    }
+    void move_cursor(Movement m);
 
     void init_cursor()
     {
@@ -297,10 +318,9 @@ public:
             vec2 default_origin(0.f, 0.f);
             render_glyph_coordinates_to_mesh(fontmanager_->context_, text_field_, font_handle_, default_origin, line_height_, *fontmesh_);
             renderable_->resend_data_on_render();
-
-            update_cursor_pos_to_end_of_line();
         }
 
+        update_cursor_pos();
         dirty_ = false;
     }
 
