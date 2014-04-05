@@ -36,6 +36,7 @@
     <ClCompile Include="..\glhack\glsystem.cpp" />
     <ClCompile Include="..\glhack\gltexture.cpp" />
     <ClCompile Include="..\glhack\iotools.cpp" />
+    <ClCompile Include="..\glhack\glh_layout_tools.cpp" />
     <ClCompile Include="..\glhack\managed_structures.cpp" />
     <ClCompile Include="..\glhack\masp.cpp" />
     <ClCompile Include="..\glhack\masp_classwrap.cpp" />
@@ -80,6 +81,7 @@
     <ClInclude Include="..\glhack\glsystem.h" />
     <ClInclude Include="..\glhack\gltexture.h" />
     <ClInclude Include="..\glhack\iotools.h" />
+    <ClInclude Include="..\glhack\glh_layout_tools.h" />
     <ClInclude Include="..\glhack\managed_structures.h" />
     <ClInclude Include="..\glhack\masp.h" />
     <ClInclude Include="..\glhack\masp_classwrap.h" />

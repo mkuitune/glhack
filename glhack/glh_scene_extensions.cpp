@@ -37,13 +37,13 @@ void transfer_position_data_to_mesh(GlyphCoords& coords,
     }
 
     if(posdata.size() > 0){
-        fontmesh->get(ChannelType::Position).set(&posdata[0], posdata.size());
-        fontmesh->get(ChannelType::Texture).set(&texdata[0], texdata.size());
+        fontmesh->set(ChannelType::Position, &posdata[0], posdata.size());
+        fontmesh->set(ChannelType::Texture, &texdata[0], texdata.size());
     }
     else {
         float* nul = 0;
-        fontmesh->get(ChannelType::Position).set(nul, 0);
-        fontmesh->get(ChannelType::Texture).set(nul, 0);
+        fontmesh->set(ChannelType::Position, nul, 0);
+        fontmesh->set(ChannelType::Texture, nul, 0);
     }
 }
 

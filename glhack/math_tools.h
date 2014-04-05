@@ -232,6 +232,14 @@ Eigen::Matrix<T, N+1, 1> increase_dim(const Eigen::Matrix<T, N, 1>& v){
 }
 
 template<class T, int N>
+Eigen::Matrix<T, N + 1, 1> increase_dim(const Eigen::Matrix<T, N, 1>& v, const T& default_value){
+    Eigen::Matrix<T, N + 1, 1> out;
+    for(int i = 0; i < N; ++i){ out[i] = v[i]; }
+    out[N] = default_value;
+    return out;
+}
+
+template<class T, int N>
 Eigen::Matrix<T, N-1, 1> decrease_dim(const Eigen::Matrix<T, N, 1>& v){
     Eigen::Matrix<T, N-1, 1> out;
     for(int i = 0; i < N - 1; ++i){out[i] = v[i];}

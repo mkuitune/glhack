@@ -6,7 +6,7 @@
 #include "glbase.h"
 #include "glh_names.h"
 #include "shims_and_types.h"
-
+#include "glh_layout_tools.h"
 
 namespace glh{
 
@@ -18,6 +18,7 @@ PathArray string_to_patharray(const std::string& str);
 DeclInterface(SceneObject,
     virtual const std::string& name() const = 0;
     virtual EntityType::t      entity_type() const = 0; 
+    virtual void               apply_layout(const Layout& l) = 0;
 );
 
 class SceneTree{
@@ -55,6 +56,7 @@ public:
 
         virtual const std::string& name() const override  {return name_;}
         virtual EntityType::t entity_type() const override  {return EntityType::SceneTreeNode;}
+        virtual void apply_layout(const Layout& l) override {}
 
         void reset_data(){
             pickable_ = true;
@@ -437,6 +439,7 @@ public:
 
     virtual const std::string& name() const override  {return name_;}
     virtual EntityType::t entity_type() const override  {return EntityType::Camera;}
+    virtual void apply_layout(const Layout& l) override{}
 
 };
 
@@ -458,6 +461,7 @@ public:
 
     virtual const std::string& name() const override  {return name_;}
     virtual EntityType::t entity_type() const override  {return EntityType::RenderPass;}
+    virtual void apply_layout(const Layout& l) override{}
 
     void set_camera(Camera* camera){ camera_ = camera; }
 
@@ -704,75 +708,5 @@ public:
 
     bool event_handling_done_ ;
 };
-
-
-
-//class RenderPickerService{
-//public:
-//    RenderPicker* picker_;
-//    RenderPass*   picker_pass_;
-//    FocusContext* focus_context_;
-//
-//    void init(RenderPicker* picker, RenderPass* picker_pass, FocusContext* focus_context){
-//        picker_ = picker;
-//        focus_context_ = focus_context;
-//        picker_pass_ = picker_pass;
-//
-//        picker_pass_->set_queue_filter(glh::pass_pickable);
-//
-//        picker->render_pass_ = picker_pass_;
-//    }
-//
-//    void update(SceneTree& scene){
-//        picker_pass_->update_queue_filtered(scene);
-//        picker_->update_ids();
-//    }
-//
-//
-//    void do_selection_pass(int x, int y){
-//        glh::FocusContext::Focus focus = focus_context_->start_event_handling();
-//
-//        auto picked = picker_->render_selectables(x, y);
-//
-//        for(auto p : picked){
-//            focus.on_focus(p);
-//        }
-//        focus.update_event_state();
-//    }
-//
-//};
-
-// TODO remove below
-//class TransformGadget{
-//public:
-//
-//    glh::App& app_;
-//
-//    TransformGadget(glh::App& app):app_(app){
-//        // Transforms mouse movement to normalized device coordinates.
-//    }
-//
-//     //TODO: Into a graph node. Graph drives Gadget transform by forwarding mouse/pointer/vec source data
-//    // to it. TransformableSet (add definition and instance) is then transformed through the gadget transform.
-//    // Items are removed from transformable set when items are removed from selection.
-//    void mouse_move_node(vec2i mouse_delta, glh::SceneTree::Node* node)
-//    {
-//        glh::mat4 screen_to_view   = app_orthographic_pixel_projection(&app_);
-//        glh::mat4 view_to_world    = glh::mat4::Identity();
-//        glh::mat4 world_to_object  = glh::mat4::Identity();
-//        glh::mat4 screen_to_object = world_to_object * view_to_world * screen_to_view ;
-//    
-//        // should be replaced with view specific change vector...
-//        // projection of the view change vector onto the workplane...
-//        // etc.
-//    
-//        glh::vec4 v((float) mouse_delta[0], (float) mouse_delta[1], 0, 0);
-//        glh::vec3 node_pos_delta = glh::decrease_dim<float, 4>(screen_to_object * v);
-//    
-//        node->transform_.position_ = node->transform_.position_ + node_pos_delta;
-//    }
-//
-//};
-
 
 } // namespace glh

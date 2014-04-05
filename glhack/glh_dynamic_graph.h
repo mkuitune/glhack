@@ -852,7 +852,5 @@ struct DynamicNodeRef{
 
 };
 
-
-
 } // namespace glh
 

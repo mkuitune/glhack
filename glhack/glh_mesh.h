@@ -21,6 +21,8 @@ public:
     //void         update_normals();
 
     static void load_defaults(DefaultMesh& d);
+
+    template<class T> void set(const ChannelType::s& s, T* data, size_t count){ get(s).set(data, count); }
 };
 
 typedef std::shared_ptr<DefaultMesh> DefaultMeshPtr;

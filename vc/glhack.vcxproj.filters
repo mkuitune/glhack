@@ -35,6 +35,7 @@
     <ClCompile Include="..\glhack\glh_default_assets.cpp" />
     <ClCompile Include="..\glhack\glh_scene_util.cpp" />
     <ClCompile Include="..\glhack\glh_app_services.cpp" />
+    <ClCompile Include="..\glhack\glh_layout_tools.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\glhack\glbase.h" />
@@ -74,5 +75,6 @@
     <ClInclude Include="..\glhack\glh_default_assets.h" />
     <ClInclude Include="..\glhack\glh_scene_util.h" />
     <ClInclude Include="..\glhack\glh_app_services.h" />
+    <ClInclude Include="..\glhack\glh_layout_tools.h" />
   </ItemGroup>
 </Project>

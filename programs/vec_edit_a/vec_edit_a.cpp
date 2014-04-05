@@ -137,8 +137,6 @@ void load_font_resources(glh::GraphicsManager* gm)
     float fontsize = 15.0f;
 
     glyph_pane = services.assets().create_glyph_pane(font_program_name, object_colored_program_name);  // TODO: font program should be automatically handled by scene assets I think
-    vec3 glyph_pane_loc(500.f, 500.f, 0.f); // TODO to glyph pane loc node
-    glyph_pane->root()->transform_.position_ = glyph_pane_loc;
 
     glyph_pane->set_font(junction, fontsize);
 
@@ -148,7 +146,7 @@ void load_font_resources(glh::GraphicsManager* gm)
     glyph_pane->dirty_ = true;
 
     glyph_pane->cursor_node_->material_.set_vec4(GLH_COLOR_ALBEDO, glh::vec4(0.f, 0.f, 0.f, 1.f));
-    glyph_pane->background_mesh_node_->material_.set_vec4(GLH_COLOR_ALBEDO, glh::vec4(0.5f, 0.51f, 0.51f, 1.f));
+    glyph_pane->background_mesh_node_->material_.set_vec4(GLH_COLOR_ALBEDO, glh::vec4(0.35f, 0.351f, 0.351f, 1.f));
 
     // TODO: View layouter that aligns glyph_pane
 }
@@ -210,6 +208,10 @@ bool update(glh::App* app)
 
     float cursor_albedo = abs(sin(5.f * app->time()));
     glyph_pane->cursor_node_->material_.set_vec4(GLH_COLOR_ALBEDO, glh::vec4(0.f, 0.f, 0.f, cursor_albedo));
+
+    Layout l = {{300.f, 10.f}, {300.f, 300.f}};
+
+    glyph_pane->apply_layout(l);
 
     //Math<float>::quaternion_t rot(1.f, 0.f, 0.f, 0.f);
     //rot.z() = 0.01f;

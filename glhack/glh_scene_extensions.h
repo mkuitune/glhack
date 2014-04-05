@@ -7,6 +7,7 @@
 #include "glh_scenemanagement.h"
 #include "glh_scene_util.h"
 #include "shims_and_types.h"
+
 #include <vector>
 
 namespace glh{
@@ -65,7 +66,7 @@ public:
     }
 
     void update_line_numbers(){
-        for(int i = 0; i < text_fields_.size(); i++) text_fields_[i]->line_number = i;
+        for(int i = 0; i < (int) text_fields_.size(); i++) text_fields_[i]->line_number = i;
     }
 
     /** Insert new line after 'char_pos' at 'row'. */
@@ -94,7 +95,7 @@ public:
     }
 
     void erase_line(const int row){
-        if(row < text_fields_.size()){
+        if(row < (int) text_fields_.size()){
             remove_at(text_fields_, row);
             update_line_numbers();
         }
@@ -164,21 +165,28 @@ public:
         :gm_(gm), glyph_node_(0), line_height_(1.0), fontmanager_(fontmanager),
         font_handle_(invalid_font_handle()), dirty_(true){
 
-        text_field_bounds_ = Box2f(vec2(100.f, 100.f), vec2(400.f, 500.f));
+        background_mesh_node_ = 0;
+        cursor_node_ = 0;
+        parent_ = 0;
+        pane_root_ = 0;
+        glyph_node_ = 0;
 
-        default_origin_ = vec2(0.f, 0.f);
         fontmesh_ = gm_->create_mesh();
         renderable_ = gm_->create_renderable();
 
         cursor_mesh_ = gm->create_mesh();
         cursor_renderable_ = gm_->create_renderable();
 
+        // Create background renderable and mesh
         auto background_program_handle = gm->program(background_program_name);
         background_renderable_ = gm_->create_renderable();
         background_renderable_->bind_program(*background_program_handle);
+
         background_mesh_ = gm->create_mesh();
-        load_screenquad(text_field_bounds_.size(), *background_mesh_);
         background_renderable_->set_mesh(background_mesh_);
+
+        apply_layout({{100.f, 100.f}, {100.f, 300.f}});
+
 
         auto font_program_handle = gm->program(program_name);
 
@@ -203,7 +211,10 @@ public:
         }
     }
 
-    float height_of_nth_row(int i){ return (float) (line_height_ * font_handle_.second * (i)); }
+    float height_of_nth_row(int i){ return (float) (lineheight_screenunits() * (i)); }
+    float glypheight(){ return font_handle_.second; }
+    float lineheight_screenunits(){ return line_height_ * glypheight(); }
+    vec2 glyphs_origin(){ return vec2(0.f, glypheight()); }
 
     void update_cursor_pos_to_end_of_line()
     {
@@ -227,7 +238,7 @@ public:
         cursor_pos_index_ = limit_to_valid_visual_row_indices(cursor_pos_index_);
 
         cursor_pos_[1] = height_of_nth_row(cursor_pos_index_[1]);
-        cursor_pos_[0] = default_origin_[0];
+        cursor_pos_[0] = text_field_bounds_.min_[0];
 
         if(cursor_pos_index_[0] > 0){
             quad2d_coord_t& loc = coords.pos(cursor_pos_index_[0] - 1, cursor_pos_index_[1]);
@@ -265,7 +276,9 @@ public:
     {
         // Init cursor
         if(handle_valid(font_handle_)){
-            render_glyph_coordinates_to_mesh(fontmanager_->context_, "|", font_handle_, default_origin_, *cursor_mesh_);
+
+            vec2 coordinate_origin = glyphs_origin();
+            render_glyph_coordinates_to_mesh(fontmanager_->context_, "|", font_handle_, coordinate_origin, *cursor_mesh_);
             //render_glyph_coordinates_to_mesh(fontmanager_->context_, "THIS IS A LONG DEBUG STRING", font_handle_, default_origin_, *cursor_mesh_);
             cursor_renderable_->resend_data_on_render();
         }
@@ -277,6 +290,37 @@ public:
 
     virtual const std::string& name() const override  {return name_;}
     virtual EntityType::t entity_type() const override  {return EntityType::GlyphPane;}
+
+    virtual void apply_layout(const Layout& l) override {
+        Layout oldlayout = layout_ ;
+
+        layout_ = l;
+        text_field_bounds_ = Box2f(vec2(0.f, 0.f), layout_.size_);
+
+        if(pane_root_){
+            pane_root_->transform_.position_ = increase_dim(layout_.origin_, 0.f);
+        }
+
+        if(background_mesh_node_){
+            vec2 backround_half = 0.5f * text_field_bounds_.size();
+            background_mesh_node_->transform_.position_ = increase_dim(backround_half, 0.f);
+        }
+
+        if(oldlayout.size_  != layout_.size_)
+        {
+            update_background_mesh();
+        }
+
+        // need to udpate text field as well!
+    }
+
+    void update_background_mesh(){
+        load_screenquad(text_field_bounds_.size(), *background_mesh_);
+
+        if(background_mesh_node_){
+            background_mesh_node_->renderable_->resend_data_on_render();
+        }
+    }
 
     void set_font(const std::string& name, float size){
         FontConfig config = get_font_config(name, size);
@@ -295,18 +339,19 @@ public:
 
         pane_root_ = scene->add_node(parent);
         pane_root_->name_ = name_ + std::string("/Root");
+        pane_root_->transform_.position_ = increase_dim(layout_.origin_, 0.f);
 
         background_mesh_node_ = scene->add_node(pane_root_, background_renderable_);
         background_mesh_node_->name_ = name_ + std::string("/Background");
-
-        vec2 backround_half = 0.5f * text_field_bounds_.size();
-        background_mesh_node_->transform_.position_ = vec3(backround_half[0], backround_half[1], 0.f);
 
         cursor_node_ = scene->add_node(pane_root_, cursor_renderable_);
         cursor_node_->name_ = name_ + std::string("/Cursor");
 
         glyph_node_ = scene->add_node(pane_root_, renderable_);
         glyph_node_->name_ = name_ + std::string("/Glyph");
+
+        apply_layout(layout_);
+
         //init_background();
     }
 
@@ -314,8 +359,10 @@ public:
 
     void update_representation()
     {
+        // TODO take layout_ and current top row into account when assigning glyph coordinates
+
         if(dirty_ && handle_valid(font_handle_)){
-            vec2 default_origin(0.f, 0.f);
+            vec2 default_origin = glyphs_origin();
             render_glyph_coordinates_to_mesh(fontmanager_->context_, text_field_, font_handle_, default_origin, line_height_, *fontmesh_);
             renderable_->resend_data_on_render();
         }
@@ -345,8 +392,6 @@ public:
     vec2i            cursor_pos_index_;
     vec3             cursor_pos_;
 
-    vec2             default_origin_; // TODO do we need this when layout finished
-
     Box2f            text_field_bounds_;
 
     FontManager*     fontmanager_;
@@ -367,6 +412,8 @@ public:
     std::string      name_;
 
     bool             dirty_;
+
+    Layout           layout_;
 };
 
 

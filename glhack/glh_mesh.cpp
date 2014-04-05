@@ -9,9 +9,13 @@ namespace glh{
 
 //////////////////////// DefaultMesh ////////////////////////
 
-DefaultMesh::DefaultMesh(){load_defaults(*this);}
+DefaultMesh::DefaultMesh(){
+    load_defaults(*this);
+}
 
-VertexChunk& DefaultMesh::get(const ChannelType::s& s){return chunks_[s];}
+VertexChunk& DefaultMesh::get(const ChannelType::s& s){
+    return chunks_[s];
+}
 
 //void DefaultMesh::update_normals()
 //{
@@ -132,10 +136,10 @@ void mesh_load_quad_xy(vec2 low, vec2 high, glh::DefaultMesh& mesh)
     };
     size_t texdatasize = static_array_size(texdata);
 
-    mesh.get(glh::ChannelType::Position).set(posdata, posdatasize);
-    mesh.get(glh::ChannelType::Color).set(coldata, coldatasize);
-    mesh.get(glh::ChannelType::Normal).set(normaldata, normaldatasize);
-    mesh.get(glh::ChannelType::Texture).set(texdata, texdatasize);
+    mesh.set(glh::ChannelType::Position, posdata, posdatasize);
+    mesh.set(glh::ChannelType::Color, coldata, coldatasize);
+    mesh.set(glh::ChannelType::Normal, normaldata, normaldatasize);
+    mesh.set(glh::ChannelType::Texture, texdata, texdatasize);
 }
 
 
