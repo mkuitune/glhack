@@ -7,6 +7,7 @@
 #include "glh_timebased_signals.h"
 #include "glh_dynamic_graph.h"
 #include "geometry.h"
+#include "shims_and_types.h"
 
 namespace glh{
 
@@ -19,6 +20,7 @@ struct SelectionWorld{
     RenderPass       render_pass_;
     selection_list_t selected_list_;
     FocusContext     focus_context_;
+    std::set<SceneTree::Node*> dragged_;
     std::string      name_;
 
     SelectionWorld(const std::string& name):name_(name){
@@ -157,11 +159,16 @@ public:
             //       Try to use closures in the map instead of explicit reference to node pointers.
 
             if(is_left_mouse_button_activated(e)){
+
                 for(auto& sw:selection_worlds_){
+
+                    if(!keyboard_is_held(Input::Lctrl)) sw.dragged_.clear();
+
                     for(SceneTree::Node* node : sw.focus_context_.currently_focused_){
                         Camera* active_camera = sw.render_pass_.camera_;
                         if(!active_camera) throw GraphicsException("UiContext::update selection world active camera not set");
-                        dragged.push_back(node);
+
+                        sw.dragged_.insert(node);
                         node->interaction_lock_ = true;
                         movement_mappers_[node->id_] = mapper_gen_(&app_, active_camera->world_to_screen_.inverse(), &scene_, node);
                         //GLH_LOG_EXPR("added to dragged:" << node->id_ );
@@ -174,14 +181,17 @@ public:
                 // If a dragging stops on a node, figure out
                 // a) is there a rule to handle this specific dragged on-to situation
                 // b) apply the rule.
-                for(auto node : dragged){
-                    node->interaction_lock_ = false;
-                    movement_mappers_.erase(node->id_);
-                    //GLH_LOG_EXPR("clean from dragged:" << node->id_ );
+                for(auto& sw : selection_worlds_){
+                    if(!keyboard_is_held(Input::Lctrl)){
+                        for(auto node : sw.dragged_){
+                            node->interaction_lock_ = false;
+                            movement_mappers_.erase(node->id_);
+                            //GLH_LOG_EXPR("clean from dragged:" << node->id_ );
+                        }
+
+                        sw.dragged_.clear();
+                    }
                 }
-
-                dragged.clear();
-
             }
 
             // TODO: Can graph operations be used to replace this?
@@ -193,9 +203,12 @@ public:
             {
                 vec2i delta = mouse_current_ - mouse_prev_;
                 vec3 deltaf((float) delta[0], (float) delta[1], 0.f);
-                if(is_left_mouse_button_down()){
-                    for(SceneTree::Node* node : dragged){
-                        movement_mappers_[node->id_](deltaf, node);
+
+                for(auto& sw : selection_worlds_){
+                    if(is_left_mouse_button_down()){
+                        for(SceneTree::Node* node : sw.dragged_){
+                            movement_mappers_[node->id_](deltaf, node);
+                        }
                     }
                 }
             }
@@ -206,6 +219,10 @@ public:
         selection_worlds_.emplace_back(name);
         selection_worlds_.back().render_pass_.camera_ = pass_camera;
         return &selection_worlds_.back();
+    }
+
+    bool keyboard_is_held(int button){
+        return has_pair(buttons_, Input::any_button(Input::Keyboard, button), Input::Held);
     }
 
     void pick_passes(){
@@ -244,7 +261,6 @@ public:
     vec2i mouse_prev_;
 
     std::stack<Event>             events_;
-    std::vector<SceneTree::Node*> dragged;
 
     SceneTree&       scene_;
     GraphicsManager& manager_;

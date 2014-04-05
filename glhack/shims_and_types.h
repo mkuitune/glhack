@@ -124,6 +124,12 @@ bool contains(const std::string& str, const T& t){
     return str.find(t) != std::string::npos;
 }
 
+template<class T>
+bool contains(const T& container, const typename T::value_type& t){
+    return container.find(t) != container.end();
+}
+
+
 /** String sorting comparator.*/
 bool elements_are_ordered(const std::string& first, const std::string& second);
 ///////////// Container operations ////////////////

@@ -52,6 +52,8 @@ void add_color_interpolation_to_graph(glh::App* app, glh::DynamicGraph& graph, g
 
 void add_focus_action(glh::App* app, glh::SceneTree::Node* node, glh::FocusContext& focus_context, glh::DynamicGraph& graph){
     using namespace glh;
+    // TODO: Figure this out. Events are for discrete actions. Graph is for continuous signals.
+    // Figure out which formalism is best for which. Try to use graph when possible.
     auto f = DynamicNodeRef::factory_enumerate_names(graph, app->string_numerator());
 
     float decspeed = -2.f;
