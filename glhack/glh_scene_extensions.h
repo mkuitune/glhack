@@ -133,7 +133,7 @@ public:
 };
 
 void render_glyph_coordinates_to_mesh(FontContext& context, TextField& t,
-    BakedFontHandle handle, vec2 origin, double line_height /* Multiples of font height */,
+    BakedFontHandle handle, vec2 origin, double line_height /* Multiples of font height */, Box2 text_field_bounds,
     DefaultMesh& mesh);
 
 void render_glyph_coordinates_to_mesh(FontContext& context, const std::string& row,
@@ -170,6 +170,7 @@ public:
         parent_ = 0;
         pane_root_ = 0;
         glyph_node_ = 0;
+        scene_ = 0;
 
         fontmesh_ = gm_->create_mesh();
         renderable_ = gm_->create_renderable();
@@ -187,7 +188,6 @@ public:
 
         apply_layout({{100.f, 100.f}, {100.f, 300.f}});
 
-
         auto font_program_handle = gm->program(program_name);
 
         renderable_->bind_program(*font_program_handle);
@@ -198,7 +198,8 @@ public:
 
         name_ = pane_name;
 
-        cursor_pos_index_ = vec2i(0, 0);
+        cursor_index_visual_ = vec2i(0, 0);
+        uca();
         cursor_pos_ = vec3(0.0, 0.0, 0.0);
     }
 
@@ -211,42 +212,70 @@ public:
         }
     }
 
-    float height_of_nth_row(int i){ return (float) (lineheight_screenunits() * (i)); }
-    float glypheight(){ return font_handle_.second; }
-    float lineheight_screenunits(){ return line_height_ * glypheight(); }
+    //vec2i get_actual_cursor_index(){
+    //    // TODO FIXME implement movement
+    //    return ;
+    //}
+
+    double height_of_nth_row(int i_visual){
+        // TODO FIXME verify this is ok
+        return (lineheight_screenunits() * (i_visual));
+    }
+    double glypheight(){ return font_handle_.second; }
+    double lineheight_screenunits(){ return line_height_ * glypheight(); }
     vec2 glyphs_origin(){ return vec2(0.f, glypheight()); }
 
     void update_cursor_pos_to_end_of_line()
     {
-        cursor_pos_index_[0] = 0;
-        cursor_pos_index_[1] = 0;
+        cursor_index_visual_ = vec2i(0, 0);
+        uca();
 
         if(!text_field_.glyph_coords_.empty()){
             // there are one more positions for the cursor than there are glyphs per row
-            cursor_pos_index_[0] = text_field_.glyph_coords_.last().size();
-            cursor_pos_index_[1] = text_field_.glyph_coords_.size() - 1;
+            // TODO FIXME
+
+            cursor_index_visual_ = vec2i(text_field_.glyph_coords_.last().size(),
+                                         text_field_.glyph_coords_.size() - 1);
+
+            uca();
+
         }
 
         update_cursor_pos();
     }
 
     /** Set position of cursor. Note! Call only after text_field_ has updated the
-    *   glyph coordinates.*/
+    *   glyph coordinates.
+    *   Cursor moves in screen indices of the glyphs. 
+    *   Changes to layout are triggered when cursor reaches left, right, top or bottom
+    *   extremum of the visible glyphs. Then if there are glyphs in the indicated
+    *   extremum direction of the TextField left, move the text field bounds
+    *   one visible glyph spacing to the direction. In vertical movement the
+    *   text field bounds should be locked to the topmost visible row. In
+    *   horizontal movement peek the location of the previous glyph and move
+    *   the text field to that.
+    *
+    */
     void update_cursor_pos(){
         GlyphCoords& coords(text_field_.glyph_coords_);
 
-        cursor_pos_index_ = limit_to_valid_visual_row_indices(cursor_pos_index_);
+        // TODO FIXME
+        cursor_index_visual_ = limit_to_valid_visual_row_indices(cursor_index_visual_);
 
-        cursor_pos_[1] = height_of_nth_row(cursor_pos_index_[1]);
+        uca();
+
+        // TODO FIXME make sure 
+        cursor_pos_[1] = (float) height_of_nth_row(cursor_index_visual_[1]);
         cursor_pos_[0] = text_field_bounds_.min_[0];
 
-        if(cursor_pos_index_[0] > 0){
-            quad2d_coord_t& loc = coords.pos(cursor_pos_index_[0] - 1, cursor_pos_index_[1]);
+        if(cursor_index_visual_[0] > 0){
+            quad2d_coord_t& loc = coords.pos(cursor_index_visual_[0] - 1, cursor_index_visual_[1]);
 
-            int line_len = coords.row_len(cursor_pos_index_[1]);
+            // TODO 
+            int line_len = coords.row_len(cursor_index_visual_[1]);
 
-            if(cursor_pos_index_[0] < line_len){
-                quad2d_coord_t& loc2 = coords.pos(cursor_pos_index_[0], cursor_pos_index_[1]);
+            if(cursor_index_visual_[0] < line_len){
+                quad2d_coord_t& loc2 = coords.pos(cursor_index_visual_[0], cursor_index_visual_[1]);
                 cursor_pos_[0] = average(max(loc)[0], min(loc2)[0]);
             }
             else
@@ -295,7 +324,7 @@ public:
         Layout oldlayout = layout_ ;
 
         layout_ = l;
-        text_field_bounds_ = Box2f(vec2(0.f, 0.f), layout_.size_);
+        text_field_bounds_ = Box2(vec2(0.f, 0.f), layout_.size_);
 
         if(pane_root_){
             pane_root_->transform_.position_ = increase_dim(layout_.origin_, 0.f);
@@ -312,6 +341,7 @@ public:
         }
 
         // need to udpate text field as well!
+        update_representation();
     }
 
     void update_background_mesh(){
@@ -359,16 +389,23 @@ public:
 
     void update_representation()
     {
-        // TODO take layout_ and current top row into account when assigning glyph coordinates
+        if(!scene_) return;
 
+        // TODO take layout_ and current top row into account when assigning glyph coordinates
         if(dirty_ && handle_valid(font_handle_)){
             vec2 default_origin = glyphs_origin();
-            render_glyph_coordinates_to_mesh(fontmanager_->context_, text_field_, font_handle_, default_origin, line_height_, *fontmesh_);
+            render_glyph_coordinates_to_mesh(fontmanager_->context_, text_field_, font_handle_, default_origin, line_height_, text_field_bounds_,*fontmesh_);
             renderable_->resend_data_on_render();
         }
 
         update_cursor_pos();
         dirty_ = false;
+    }
+
+    /** Update cursor actual. */
+    void uca(){
+        // TODO FIXME use proper mapping
+        cursor_index_actual_ = cursor_index_visual_;
     }
 
     // TODO add handle mouse click method. Gets x,y in screen coordinates. Invert the local matrix and 
@@ -389,10 +426,12 @@ public:
     SceneTree::Node* pane_root_;
     SceneTree::Node* glyph_node_;
 
-    vec2i            cursor_pos_index_;
+    vec2i            cursor_index_visual_;
+    vec2i            cursor_index_actual_;
+
     vec3             cursor_pos_;
 
-    Box2f            text_field_bounds_;
+    Box2            text_field_bounds_;
 
     FontManager*     fontmanager_;
     DefaultMesh*     fontmesh_;

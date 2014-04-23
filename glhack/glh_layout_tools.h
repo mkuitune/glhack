@@ -13,7 +13,7 @@ struct Layout{
 
     bool operator!=(const Layout& l){ return origin_ != l.origin_ && size_ != l.size_; }
 
-    Box2f coverage() const { return Box2f(origin_, origin_ + size_); }
+    Box2 coverage() const { return Box2(origin_, origin_ + size_); }
 };
 
 } // namespace glh

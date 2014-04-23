@@ -174,6 +174,51 @@ struct ArrayN{
 
 typedef ArrayN<float, 4> array4;
 
+////////////////// Mappings /////////////////////
+
+/** Given value within [begin, end], map it's position to range [0,1]. TODO:Make numerically more robust if used in critical sections. */
+template<class T> inline T interval_range(const T value, const T begin, const T end){ return (value - begin) / (end - begin); }
+
+/** Constrain given value within [begin, end]. If it's outside these ranges then truncate to closest extrema. */
+template<class T> inline T constrain(const T value, const T begin, const T end){
+    return value > end ? end : (value < begin ? begin : value);
+}
+
+template<class T> inline bool in_range_inclusive(const T value, const T begin, const T end){
+    return (value >= begin) && (value <= end);
+}
+
+/** Perform a numerically stable Kahan summation on the input numbers. */
+template<class T> inline T kahan_sum(const T& numbers){
+    typedef numbers::value_type t;
+    t sum = (t) 0;
+    t c = (t) 0;
+    for(auto& n : numbers){
+        t y = n - c;
+        t tally = sum + y;
+        c = (tally - sum) - y;
+        sum = tally;
+    }
+    return sum;
+}
+
+template<class T, int N> inline T kahan_average(const std::array<T, N>& numbers){
+    T mul = (T) 1.0 / N;
+    return mul * kahan_sum(numbers);
+}
+
+template<class T> inline T average(const T& fst, const T& snd){
+    return ((T) 0.5) * (fst + snd);
+}
+
+/** Smoothstep polynomial between [0,1] range. */
+inline float smoothstep(const float x){ return (1.0f - 2.0f*(-1.0f + x))* x * x; }
+
+inline double smoothstep(const double x){ return (1.0 - 2.0*(-1.0 + x))* x * x; }
+
+/** Linear interpolation between [a,b] range (range of x goes from 0 to 1). */
+template<class I, class G> inline G lerp(const I x, const G& a, const G& b){ return a + x * (b - a); }
+
 /////////////// Bit operations //////////////
 
 
@@ -258,8 +303,6 @@ Eigen::Transform<T,3, Eigen::Affine> generate_transform(Eigen::Matrix<T, 3, 1>& 
 
 template<class T>
 struct ExplicitTransform{
-
-
     // TODO FIXME: Store rotations as euler angles
 
     typename Math<T>::vec3_t       position_;
@@ -293,6 +336,19 @@ struct ExplicitTransform{
 
 //////////////////// Geometric entities ///////////////////////////
 
+/** Edge. */
+template<class T, int N>
+struct Edge{
+    typedef Eigen::Matrix<T, N, 1> vec_t;
+
+    vec_t first_;
+    vec_t second_;
+
+    Edge(const vec_t& first, const vec_t& second):first_(first), second_(second){}
+
+};
+
+typedef Edge<float, 2> Edge2;
 
 /** All points in box are min + s * (max - min) where 0 <= s <= 1*/
 template<class T, int N>
@@ -315,7 +371,7 @@ struct Box
     vec_t size() const {return max_ - min_;}
 
     /** In 2D returns area, in 3D volume, etc. */
-    T content() const {
+    T measure() const {
         vec_t s = size();
         T res = Math<T>::to_type(1);
         for(int i = 0; i < N; ++i) res *= s[i];
@@ -324,8 +380,8 @@ struct Box
 };
 
 typedef Box<int, 2>   Box2i;
-typedef Box<float, 2> Box2f;
-typedef Box<float, 3> Box3f;
+typedef Box<float, 2> Box2;
+typedef Box<float, 3> Box3;
 
 template<class T>
 Box<T, 2> make_box2(T xlow, T ylow, T xhigh, T yhigh){return Box<T, 2>(Box<T, 2>::vec_t(xlow, ylow), Box<T, 2>::vec_t(xhigh, yhigh));}
@@ -398,7 +454,7 @@ template<class T>
 bool span_is_empty(const typename Math<T>::span_t& span){return span[0] >= span[1];}
 
 /**
- * @return (box, boxHasVolume) - in case of n = 2 this means the area of course
+ * @return (box, boxHasVolume) - in case of n = 2 this means the area and whether it is larger than 0.
  */
 template<class T, int N>
 std::tuple<Box<T,N>, bool> intersect(const Box<T,N>& a, const Box<T,N>& b)
@@ -447,6 +503,47 @@ Box<T,N> cover(const Box<T,N>& a, const Box<T,N>& b)
     }
 
     return box;
+}
+
+/** Return the bounding box for the input vertices. */
+template<class T, int N>
+Box<T, N> cover_points(const std::vector<Eigen::Matrix<T, N, 1>>& points){
+    Eigen::Matrix<T, N, 1> min = points[0];
+    Eigen::Matrix<T, N, 1> max = points[0];
+    for(auto&p : points){
+        for(int i = 0; i < N; ++i){
+            min[i] = std::min(min[i], p[i]);
+            max[i] = std::max(max[i], p[i]);
+        }
+    }
+    return Box<T, N>(min, max);
+}
+
+/** @return Returns true if point is inside box. */
+template<class T, int N>
+bool inside(const Box<T, N>& box, const Eigen::Matrix<T, N, 1>& point){
+    bool is_inside = true;
+    for(int i = 0; i < N; ++i)
+        is_inside &= in_range_inclusive(point[i], box.min_[i], box.max_[i]);
+    
+    return is_inside;
+}
+
+/** @return Returns true if edge is inside box. */
+template<class T, int N>
+bool inside(const Box<T, N>& box, const Edge<T, N>& edge){
+    bool is_inside = true;
+    for(int i = 0; i < N; ++i)
+        is_inside &= in_range_inclusive(edge.first_[i], box.min_[i], box.max_[i]) && 
+                     in_range_inclusive(edge.second_[i], box.min_[i], box.max_[i]);
+
+    return is_inside;
+}
+
+/** @return Returns true if box is inside outer box. */
+template<class T, int N>
+bool inside(const Box<T, N>& outer_box, const Box<T, N>& inner_box){
+    return inside(outer_box, inner_box.min_) && inside(outer_box, inner_box.max_);
 }
 
 
@@ -602,51 +699,6 @@ struct RandomRange<float>
         return start + offset * tinymt32_generate_float(&random.state);
     }
 };
-
-////////////////// Mappings /////////////////////
-
-/** Given value within [begin, end], map it's position to range [0,1]. TODO:Make numerically more robust if used in critical sections. */
-template<class T> inline T interval_range(const T value, const T begin, const T end){return (value - begin)/(end - begin);}
-
-/** Constrain given value within [begin, end]. If it's outside these ranges then truncate to closest extrema. */
-template<class T> inline T constrain(const T value, const T begin, const T end){
-    return value > end ? end : (value < begin?  begin : value);
-}
-
-template<class T> inline bool in_range_inclusive(const T value, const T begin, const T end){
-    return (value >= begin) && (value <= end);
-}
-
-/** Perform a numerically stable Kahan summation on the input numbers. */
-template<class T> inline T kahan_sum(const T& numbers){
-    typedef numbers::value_type t;
-    t sum = (t) 0;
-    t c = (t) 0;
-    for(auto& n : numbers){
-        t y = n - c;
-        t tally = sum + y;
-        c = (tally - sum) - y;
-        sum = tally;
-    }
-    return sum;
-}
-
-
-template<class T, int N> inline T kahan_average(const std::array<T,N>& numbers){
-    T mul = (T) 1.0 / N;
-    return mul * kahan_sum(numbers);
-}
-
-template<class T> inline T average(const T& fst, const T& snd){
-    return ((T) 0.5) * (fst + snd);
-}
-
-/** Smoothstep polynomial between [0,1] range. */
-inline float smoothstep(const float x){return (1.0f - 2.0f*(-1.0f + x))* x * x;}
-inline double smoothstep(const double x){return (1.0 - 2.0*(-1.0 + x))* x * x;}
-
-/** Linear interpolation between [a,b] range (range of x goes from 0 to 1). */
-template<class I, class G> inline G lerp(const I x, const G& a, const G& b){return a + x * (b - a);}
 
 // Interpolators
 template<class I, class G> class Lerp { public: 

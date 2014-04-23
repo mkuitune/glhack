@@ -126,12 +126,11 @@ FontCharData* FontContext::get_font_char_data(const BakedFontHandle& handle) {
     return chardata_[handle];
 }
 
-
-
 std::tuple<float, float> FontContext::write_pixel_coords_for_string(const std::string& string,
                                           const BakedFontHandle& handle, 
                                           const float x,
                                           const float y,
+                                          const float max_x,
                                           GlyphCoords::row_coords_t& coords)
 {
     Image8*       charimg  = get_font_map(handle);
@@ -142,32 +141,80 @@ std::tuple<float, float> FontContext::write_pixel_coords_for_string(const std::s
 
     const char* text = string.c_str();
 
-    float xx = x;
-    float yy = y;
-
+    // Glyph placement
+    float glyph_placement_xx = x;
+    float glyph_placement_yy = y;
+    int i = 0;
     while (*text) {
       if(*text >= ASCII_CHARMIN && *text < ASCII_CHARMAX){
          stbtt_aligned_quad q;
-         stbtt_GetBakedQuad(chardata->cdata, w, h, *text - ASCII_CHARMIN, &xx, &yy, &q,1);//1=opengl,0=old d3d
+         float xx_in = glyph_placement_xx;
+         float yy_in = glyph_placement_yy;
+         stbtt_GetBakedQuad(chardata->cdata, w, h, *text - ASCII_CHARMIN, &xx_in, &yy_in, &q,1);//1=opengl,0=old d3d
 
          vec2 v0(q.x0,q.y0); vec2 t0(q.s0,q.t0);
          vec2 v1(q.x1,q.y0); vec2 t1(q.s1,q.t0);
          vec2 v2(q.x1,q.y1); vec2 t2(q.s1,q.t1);
          vec2 v3(q.x0, q.y1); vec2 t3(q.s0, q.t1);
 
-         coords.emplace_back(textured_quad2d_t{{v1, v2, v3, v0, v1, v3}, 
-                                               {t1, t2, t3, t0, t1, t3}});
-
-         //coords.push_back(std::make_tuple(v1, t1));
-         //coords.push_back(std::make_tuple(v2, t2));
-         //coords.push_back(std::make_tuple(v3, t3));
-         //coords.push_back(std::make_tuple(v0, t0));
-         //coords.push_back(std::make_tuple(v1, t1));
-         //coords.push_back(std::make_tuple(v3, t3));
+         if(q.x0 < max_x && q.x1 < max_x){
+            coords.emplace_back(textured_quad2d_t{{v1, v2, v3, v0, v1, v3}, 
+                                               {t1, t2, t3, t0, t1, t3}}, i);
+            glyph_placement_xx = xx_in;
+            glyph_placement_yy = yy_in;
+         }
+         else
+         {
+             break;
+         }
       }
       ++text;
+      ++i;
     }
-    return std::make_tuple(xx, yy);
+    return std::make_tuple(glyph_placement_xx, glyph_placement_yy);
 }
 
+void FontContext::write_pixel_coords_for_string(const std::string& string,
+    const BakedFontHandle& handle,
+    float x,
+    float y,
+    const Box2& bounds,
+    GlyphCoords::row_coords_t& row_coords)
+{
+    Image8*       charimg = get_font_map(handle);
+    FontCharData* chardata = get_font_char_data(handle);
+
+    int w = charimg->width_;
+    int h = charimg->height_;
+
+    int size = (int) string.size();
+    const char* c = string.c_str();
+    char str = ' ';
+    if(size == 0)
+    {
+        c = &str;
+        size = 1;
+    }
+
+    for(int i = 0; i < size; ++i) {
+        if(*c >= ASCII_CHARMIN && *c < ASCII_CHARMAX){
+            stbtt_aligned_quad q;
+            stbtt_GetBakedQuad(chardata->cdata, w, h, *c - ASCII_CHARMIN, &x, &y, &q, 1);//1=opengl,0=old d3d
+
+            vec2 v0(q.x0, q.y0); vec2 t0(q.s0, q.t0);
+            vec2 v1(q.x1, q.y0); vec2 t1(q.s1, q.t0);
+            vec2 v2(q.x1, q.y1); vec2 t2(q.s1, q.t1);
+            vec2 v3(q.x0, q.y1); vec2 t3(q.s0, q.t1);
+
+            Box2 coverage = cover_points<float, 2>({v0, v1, v2, v3});
+
+            if(inside(bounds, coverage)){
+                row_coords.emplace_back(textured_quad2d_t{{v1, v2, v3, v0, v1, v3},
+                                                      {t1, t2, t3, t0, t1, t3}}, i);
+            }
+            c++;
+        }
+    }
 }
+
+}// namespace glh

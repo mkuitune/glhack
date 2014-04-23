@@ -39,9 +39,9 @@ public:
 
         Transform transform_; // local to parent transform
 
-        Box3f local_bounds_AAB_;
-        Box3f world_bounds_AAB_;
-        Box3f tree_world_bounds_AAB_; // Bounds of object and children in world coordinates
+        Box3 local_bounds_AAB_;
+        Box3 world_bounds_AAB_;
+        Box3 tree_world_bounds_AAB_; // Bounds of object and children in world coordinates
 
         FullRenderable* renderable_;
 
@@ -94,7 +94,7 @@ public:
             for(auto c:children_) c->update_transforms(local_to_world_);
         }
 
-        Box3f& update_bounds(){
+        Box3& update_bounds(){
             world_bounds_AAB_ = transform_box<float,3>(local_to_world_, local_bounds_AAB_);
             tree_world_bounds_AAB_ = world_bounds_AAB_;
             for(auto c:children_){

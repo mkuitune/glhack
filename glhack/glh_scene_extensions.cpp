@@ -4,6 +4,7 @@
 #pragma once
 
 #include "glh_scene_extensions.h"
+#include<limits>
 
 namespace glh{
 
@@ -23,8 +24,8 @@ void transfer_position_data_to_mesh(GlyphCoords& coords,
 
     // transfer tex_coords to mesh
     for(auto& row : text_coords){
-        for(textured_quad2d_t& quad : row){
-            for(auto ref : quad){
+        for(auto& iquad : row){
+            for(auto ref : iquad.quad_){
                 posdata.push_back(ref.pos[0]);
                 posdata.push_back(ref.pos[1]);
                 posdata.push_back(0.f);
@@ -53,6 +54,7 @@ void render_glyph_coordinates_to_mesh(
     BakedFontHandle handle,
     vec2 origin,
     double line_height /* Multiples of font height */,
+    Box2 text_field_bounds, /* Text field bounds */
     DefaultMesh& mesh){
         t.glyph_coords_.clear();
         float line_number = 0.f;
@@ -60,11 +62,30 @@ void render_glyph_coordinates_to_mesh(
 
         for(auto&line : t.text_fields_){
 
-            t.glyph_coords_.push_row();
+            float x = origin[0];
+            float y = origin[1] + line_number * spacing;
 
-            context.write_pixel_coords_for_string(line->string, 
-                handle, origin[0], origin[1] + line_number * spacing, t.glyph_coords_.last());
+            float ymin = text_field_bounds.min_[1];
+            float ymax = text_field_bounds.max_[1];
+
+            if(!span_is_empty<float>(
+                    intersect_spans<float>(Math<float>::span_t(ymin, ymax), Math<float>::span_t(y, y + (float) handle.second)))){
+
+                GlyphCoords::row_coords_t tempcoords;
+
+                context.write_pixel_coords_for_string(line->string, handle, x, y, text_field_bounds, tempcoords);
+
+                GlyphCoords::row_coords_t::iterator first_quad = tempcoords.begin();
+                GlyphCoords::row_coords_t::iterator last_quad = tempcoords.end();
+
+                // TODO: Filter quads so they all fit in text_field_bounds. 
+                // TODO: Then, figure out a better algorithm to do it
+
+                if(first_quad != last_quad) t.glyph_coords_.emplace_back(first_quad, last_quad);
+                
+            }
             line_number += 1.0f;
+            if(y > ymax) break;
         }
 
         transfer_position_data_to_mesh(t.glyph_coords_, &mesh);
@@ -75,7 +96,7 @@ void render_glyph_coordinates_to_mesh(FontContext& context, const std::string& r
 {
     GlyphCoords glyph_coords;
     glyph_coords.push_row();
-    context.write_pixel_coords_for_string(row, handle, origin[0], origin[1], glyph_coords.last());
+    context.write_pixel_coords_for_string(row, handle, origin[0], origin[1], std::numeric_limits<float>::max(),glyph_coords.last());
     transfer_position_data_to_mesh(glyph_coords, &mesh);
 }
 
@@ -167,28 +188,44 @@ Movement key_to_movement(int key){
 }
 
 void GlyphPane::move_cursor(Movement m){
+    // TODO FIXME take into account visible area moves
     if(m == Movement::Up){
-        cursor_pos_index_[1]--;
+        cursor_index_visual_[1]--;
+        uca();
     }
     else if(m == Movement::Down){
-        cursor_pos_index_[1]++;
+        cursor_index_visual_[1]++;
+        uca();
     }
     else if(m == Movement::Left){
-        if(cursor_pos_index_[0] > 0){
-            cursor_pos_index_[0]--;
-        } else if(cursor_pos_index_[1] > 0){
-            cursor_pos_index_[1]--;
-            cursor_pos_index_[0] = text_field_.glyph_coords_.at(cursor_pos_index_[1]).size();
+        if(cursor_index_visual_[0] > 0){
+            cursor_index_visual_[0]--;
+            uca();
+
+        } else if(cursor_index_visual_[1] > 0){
+            cursor_index_visual_[1]--;
+
+            // Moving rows. Snap index to beginning
+            // TODO FIXME take into accoutn visual != actual
+            // TODO add possible movement to bounds
+
+            cursor_index_visual_[0] = text_field_.glyph_coords_.at(cursor_index_visual_[1]).size();
+            uca();
         }
     }
     else if(m == Movement::Right){
-        cursor_pos_index_[0]++;
+        cursor_index_visual_[0]++;
+        uca();
     }
     else if(m == Movement::RightBound){
-        cursor_pos_index_[0] = text_field_.glyph_coords_.at(cursor_pos_index_[1]).size();;
+        // TODO FIXME better mapping between visual and actual coordinates
+        // actual coordinates should be computed actually always from visual coordinates!
+        cursor_index_visual_[0] = text_field_.glyph_coords_.at(cursor_index_visual_[1]).size();
+        uca();
     }
     else if(m == Movement::LeftBound){
-        cursor_pos_index_[0] = 0;
+        cursor_index_visual_[0] = 0;
+        uca();
     }
 
     update_cursor_pos();
@@ -211,9 +248,10 @@ void GlyphPane::recieve_characters(int key, Modifiers modifiers)
     }
 
     if(key == Input::Key::Enter){
-        text_field_.break_line(cursor_pos_index_[0], cursor_pos_index_[1]);
-        cursor_pos_index_[1]++;
-        cursor_pos_index_[0] = 0;
+        text_field_.break_line(cursor_index_visual_[0], cursor_index_visual_[1]);
+        cursor_index_visual_[1]++;
+        cursor_index_visual_[0] = 0;
+        uca();
         dirty_ = true;
     }
     else if(movement != Movement::None){
@@ -226,32 +264,37 @@ void GlyphPane::recieve_characters(int key, Modifiers modifiers)
     }
     else if(any_of(key, Input::Del, Input::Backspace)){
         if(text_field_.size() > 0){
-            if(cursor_pos_index_[0] == 0){
-                if(cursor_pos_index_[1] > 0){
+            if(cursor_index_visual_[0] == 0){
+                // At beginning of line before first letter
+                if(cursor_index_visual_[1] > 0){
                     // Join lines.
-                    const int prev_row = cursor_pos_index_[1] - 1;
-                    const int rm_row = cursor_pos_index_[1];
+                    const int prev_row = cursor_index_visual_[1] - 1;
+                    const int rm_row = cursor_index_visual_[1];
                     const int new_cursor_x = text_field_.at(prev_row).size();
 
                     text_field_.at(prev_row).string += text_field_.at(rm_row).string;
 
                     text_field_.erase_line(rm_row);
 
-                    cursor_pos_index_[1]--;
-                    cursor_pos_index_[0] = new_cursor_x;
+                    cursor_index_visual_[1]--;
+                    cursor_index_visual_[0] = new_cursor_x;
+                    uca();
                     dirty_ = true;
                 }
             }
-            else if(cursor_pos_index_[0] > 0){
-                text_field_.at(cursor_pos_index_[1]).string.erase(cursor_pos_index_[0] - 1, 1);
-                cursor_pos_index_[0]--;
+            else if(cursor_index_visual_[0] > 0){
+                // If not at first position
+                text_field_.at(cursor_index_visual_[1]).string.erase(cursor_index_visual_[0] - 1, 1);
+                cursor_index_visual_[0]--;
+                uca();
                 dirty_ = true;
             }
         }
     }
     else if(c){
-        text_field_.insert_char_after(cursor_pos_index_[0], cursor_pos_index_[1], c);
-        cursor_pos_index_[0]++;
+        text_field_.insert_char_after(cursor_index_visual_[0], cursor_index_visual_[1], c);
+        cursor_index_visual_[0]++;
+        uca();
         dirty_ = true;
     }
 }

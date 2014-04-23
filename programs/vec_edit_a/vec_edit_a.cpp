@@ -135,6 +135,7 @@ void load_font_resources(glh::GraphicsManager* gm)
     std::string junction("Junction-webfont.ttf");
 
     float fontsize = 15.0f;
+    //float fontsize = 10.0f;
 
     glyph_pane = services.assets().create_glyph_pane(font_program_name, object_colored_program_name);  // TODO: font program should be automatically handled by scene assets I think
 
@@ -142,8 +143,8 @@ void load_font_resources(glh::GraphicsManager* gm)
 
     glyph_pane->text_field_.push_line("Hello, world.");
     glyph_pane->text_field_.push_line("This is another line, then.");
-    glyph_pane->update_representation();
     glyph_pane->dirty_ = true;
+    glyph_pane->update_representation();
 
     glyph_pane->cursor_node_->material_.set_vec4(GLH_COLOR_ALBEDO, glh::vec4(0.f, 0.f, 0.f, 1.f));
     glyph_pane->background_mesh_node_->material_.set_vec4(GLH_COLOR_ALBEDO, glh::vec4(0.35f, 0.351f, 0.351f, 1.f));
@@ -191,6 +192,8 @@ Eigen::Affine3f rotating_transform(glh::App* app){
     return transform;
 }
 
+
+
 bool update(glh::App* app)
 {
     using namespace glh;
@@ -206,7 +209,7 @@ bool update(glh::App* app)
 
     glyph_pane->glyph_node_->material_.set_vec4(GLH_COLOR_ALBEDO, glh::vec4(1.f, 1.f, 1.f, 1.f));
 
-    float cursor_albedo = abs(sin(5.f * app->time()));
+    float cursor_albedo = (float) abs(sin(5.0 * app->time()));
     glyph_pane->cursor_node_->material_.set_vec4(GLH_COLOR_ALBEDO, glh::vec4(0.f, 0.f, 0.f, cursor_albedo));
 
     Layout l = {{300.f, 10.f}, {300.f, 300.f}};
