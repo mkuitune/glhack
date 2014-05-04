@@ -1,6 +1,8 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Express 2012 for Windows Desktop
+# Visual Studio Express 2013 for Windows Desktop
+VisualStudioVersion = 12.0.21005.1
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "glhack-unittest", "glhack-unittest.vcxproj", "{FDDCFC6E-BF8A-44E1-B437-B45B53D2D70F}"
 	ProjectSection(ProjectDependencies) = postProject
 		{44F323EF-6A0E-4F1C-989F-ED5CEE4FC70F} = {44F323EF-6A0E-4F1C-989F-ED5CEE4FC70F}
@@ -38,6 +40,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "vec_edit_a", "vec_edit_a.vc
 	ProjectSection(ProjectDependencies) = postProject
 		{44F323EF-6A0E-4F1C-989F-ED5CEE4FC70F} = {44F323EF-6A0E-4F1C-989F-ED5CEE4FC70F}
 	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test_prog_glyph_pane", "test_prog_glyph_pane.vcxproj", "{4340FB91-34FE-4EF0-B69A-2268F744F2BC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -85,6 +89,10 @@ Global
 		{93BF68E8-1DED-4EAA-8CE0-A28C8A4ABED8}.Debug|Win32.Build.0 = Debug|Win32
 		{93BF68E8-1DED-4EAA-8CE0-A28C8A4ABED8}.Release|Win32.ActiveCfg = Release|Win32
 		{93BF68E8-1DED-4EAA-8CE0-A28C8A4ABED8}.Release|Win32.Build.0 = Release|Win32
+		{4340FB91-34FE-4EF0-B69A-2268F744F2BC}.Debug|Win32.ActiveCfg = Debug|Win32
+		{4340FB91-34FE-4EF0-B69A-2268F744F2BC}.Debug|Win32.Build.0 = Debug|Win32
+		{4340FB91-34FE-4EF0-B69A-2268F744F2BC}.Release|Win32.ActiveCfg = Release|Win32
+		{4340FB91-34FE-4EF0-B69A-2268F744F2BC}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

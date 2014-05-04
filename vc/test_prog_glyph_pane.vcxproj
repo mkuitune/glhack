@@ -11,9 +11,10 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{93BF68E8-1DED-4EAA-8CE0-A28C8A4ABED8}</ProjectGuid>
+    <ProjectGuid>{4340FB91-34FE-4EF0-B69A-2268F744F2BC}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>vec_edit_a</RootNamespace>
+    <RootNamespace>test_prog_glyph_pane</RootNamespace>
+    <ProjectName>test_prog_text_layouts</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -92,17 +93,13 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\programs\vec_edit_a\testdata.cpp" />
-    <ClCompile Include="..\programs\vec_edit_a\vec_edit_a.cpp" />
+    <ClCompile Include="..\programs\test_prog_text_layouts\test_prog_text_layouts.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="dummy.txt">
       <DeploymentContent>true</DeploymentContent>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
     </Text>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\programs\vec_edit_a\testdata.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

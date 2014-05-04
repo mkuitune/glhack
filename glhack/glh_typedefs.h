@@ -93,6 +93,7 @@ public:
         TextField      = 2003,
         SceneTreeNode  = 2004,
         GlyphPane      = 2005,
+        LayoutGroup    = 2006,
 
 
         LAST_TYPE

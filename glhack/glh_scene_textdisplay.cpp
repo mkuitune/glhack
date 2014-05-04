@@ -1,9 +1,9 @@
-/**\file glh_scene_extensions.h
+/**\file glh_scene_textdisplay.cpp
 \author Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)
 */
 #pragma once
 
-#include "glh_scene_extensions.h"
+#include "glh_scene_textdisplay.h"
 #include<limits>
 
 namespace glh{
@@ -191,16 +191,13 @@ void GlyphPane::move_cursor(Movement m){
     // TODO FIXME take into account visible area moves
     if(m == Movement::Up){
         cursor_index_visual_[1]--;
-        uca();
     }
     else if(m == Movement::Down){
         cursor_index_visual_[1]++;
-        uca();
     }
     else if(m == Movement::Left){
         if(cursor_index_visual_[0] > 0){
             cursor_index_visual_[0]--;
-            uca();
 
         } else if(cursor_index_visual_[1] > 0){
             cursor_index_visual_[1]--;
@@ -208,24 +205,21 @@ void GlyphPane::move_cursor(Movement m){
             // Moving rows. Snap index to beginning
             // TODO FIXME take into accoutn visual != actual
             // TODO add possible movement to bounds
-
-            cursor_index_visual_[0] = text_field_.glyph_coords_.at(cursor_index_visual_[1]).size();
-            uca();
+            auto actual = cursor_index_actual();
+            cursor_index_visual_[0] = text_field_.glyph_coords_.at(actual[1]).size();
         }
     }
     else if(m == Movement::Right){
         cursor_index_visual_[0]++;
-        uca();
     }
     else if(m == Movement::RightBound){
         // TODO FIXME better mapping between visual and actual coordinates
         // actual coordinates should be computed actually always from visual coordinates!
-        cursor_index_visual_[0] = text_field_.glyph_coords_.at(cursor_index_visual_[1]).size();
-        uca();
+        auto actual = cursor_index_actual();
+        cursor_index_visual_[0] = text_field_.glyph_coords_.at(actual[1]).size();
     }
     else if(m == Movement::LeftBound){
         cursor_index_visual_[0] = 0;
-        uca();
     }
 
     update_cursor_pos();
@@ -248,10 +242,10 @@ void GlyphPane::recieve_characters(int key, Modifiers modifiers)
     }
 
     if(key == Input::Key::Enter){
-        text_field_.break_line(cursor_index_visual_[0], cursor_index_visual_[1]);
+        auto actual = cursor_index_actual();
+        text_field_.break_line(actual[0], actual[1]);
         cursor_index_visual_[1]++;
         cursor_index_visual_[0] = 0;
-        uca();
         dirty_ = true;
     }
     else if(movement != Movement::None){
@@ -268,8 +262,9 @@ void GlyphPane::recieve_characters(int key, Modifiers modifiers)
                 // At beginning of line before first letter
                 if(cursor_index_visual_[1] > 0){
                     // Join lines.
-                    const int prev_row = cursor_index_visual_[1] - 1;
-                    const int rm_row = cursor_index_visual_[1];
+                    auto actual = cursor_index_actual();
+                    const int prev_row = actual[1] - 1;
+                    const int rm_row = actual[1];
                     const int new_cursor_x = text_field_.at(prev_row).size();
 
                     text_field_.at(prev_row).string += text_field_.at(rm_row).string;
@@ -278,25 +273,187 @@ void GlyphPane::recieve_characters(int key, Modifiers modifiers)
 
                     cursor_index_visual_[1]--;
                     cursor_index_visual_[0] = new_cursor_x;
-                    uca();
                     dirty_ = true;
                 }
             }
             else if(cursor_index_visual_[0] > 0){
                 // If not at first position
-                text_field_.at(cursor_index_visual_[1]).string.erase(cursor_index_visual_[0] - 1, 1);
+                auto actual = cursor_index_actual();
+                text_field_.at(actual[1]).string.erase(actual[0] - 1, 1);
                 cursor_index_visual_[0]--;
-                uca();
                 dirty_ = true;
             }
         }
     }
     else if(c){
-        text_field_.insert_char_after(cursor_index_visual_[0], cursor_index_visual_[1], c);
+        auto actual = cursor_index_actual();
+        text_field_.insert_char_after(actual[0], actual[1], c);
         cursor_index_visual_[0]++;
-        uca();
         dirty_ = true;
     }
 }
+
+
+class TextLabelImpl{
+public:
+
+    TextLabelImpl(GraphicsManager* gm, const std::string& program_name, const std::string& background_program_name, FontManager* fontmanager, const std::string& pane_name)
+        :gm_(gm), glyph_node_(0), line_height_(1.0), fontmanager_(fontmanager),
+        font_handle_(invalid_font_handle()), dirty_(true){
+
+        background_mesh_node_ = 0;
+        parent_ = 0;
+        pane_root_ = 0;
+        glyph_node_ = 0;
+        scene_ = 0;
+
+        fontmesh_ = gm_->create_mesh();
+        renderable_ = gm_->create_renderable();
+
+        // Create background renderable and mesh
+        auto background_program_handle = gm->program(background_program_name);
+        background_renderable_ = gm_->create_renderable();
+        background_renderable_->bind_program(*background_program_handle);
+
+        background_mesh_ = gm->create_mesh();
+        background_renderable_->set_mesh(background_mesh_);
+
+        apply_layout({{100.f, 100.f}, {100.f, 300.f}});
+
+        auto font_program_handle = gm->program(program_name);
+
+        renderable_->bind_program(*font_program_handle);
+        renderable_->set_mesh(fontmesh_);
+
+        name_ = pane_name;
+    }
+
+    ~TextLabelImpl(){
+        gm_->release_mesh(fontmesh_);
+        gm_->release_renderable(renderable_);
+        if(glyph_node_ && parent_ && scene_){
+            parent_->remove_child(glyph_node_);
+            scene_->finalize(glyph_node_);
+        }
+    }
+
+
+    double height_of_nth_row(int i_visual){
+        return (lineheight_screenunits() * (i_visual));
+    }
+    double glypheight(){ return font_handle_.second; }
+    double lineheight_screenunits(){ return line_height_ * glypheight(); }
+    vec2 glyphs_origin(){ return vec2(0.f, glypheight()); }
+
+
+    SceneTree::Node* root(){ return pane_root_; }
+
+    virtual const std::string& name() const { return name_; }
+    virtual EntityType::t entity_type() const  { return EntityType::GlyphPane; }
+
+    virtual void apply_layout(const Layout& l) {
+        Layout oldlayout = layout_;
+
+        layout_ = l;
+        text_field_bounds_ = Box2(vec2(0.f, 0.f), layout_.size_);
+
+        if(pane_root_){
+            pane_root_->transform_.position_ = increase_dim(layout_.origin_, 0.f);
+        }
+
+        if(background_mesh_node_){
+            vec2 backround_half = 0.5f * text_field_bounds_.size();
+            background_mesh_node_->transform_.position_ = increase_dim(backround_half, 0.f);
+        }
+
+        if(oldlayout.size_ != layout_.size_)
+        {
+            update_background_mesh();
+        }
+
+        // need to udpate text field as well!
+        update_representation();
+    }
+
+    void update_background_mesh(){
+        load_screenquad(text_field_bounds_.size(), *background_mesh_);
+
+        if(background_mesh_node_){
+            background_mesh_node_->renderable_->resend_data_on_render();
+        }
+    }
+
+    void set_font(const std::string& name, float size){
+        FontConfig config = get_font_config(name, size);
+        FontContext& context(fontmanager_->context_);
+        font_handle_ = context.render_bitmap(config); // May throw GraphicsException
+        // fontimage_ = context.get_font_map(font_handle_);
+        //write_image_png(*fontimage, "font.png");
+        fonttexture_ = fontmanager_->get_font_texture(font_handle_);
+
+    }
+
+    void attach(SceneTree* scene, SceneTree::Node* parent){
+        parent_ = parent;
+        scene_ = scene;
+
+        pane_root_ = scene->add_node(parent);
+        pane_root_->name_ = name_ + std::string("/Root");
+        pane_root_->transform_.position_ = increase_dim(layout_.origin_, 0.f);
+
+        background_mesh_node_ = scene->add_node(pane_root_, background_renderable_);
+        background_mesh_node_->name_ = name_ + std::string("/Background");
+
+        glyph_node_ = scene->add_node(pane_root_, renderable_);
+        glyph_node_->name_ = name_ + std::string("/Glyph");
+
+        apply_layout(layout_);
+
+    }
+
+    void update_representation()
+    {
+        if(!scene_) return;
+
+        // TODO take layout_ and current top row into account when assigning glyph coordinates
+        if(dirty_ && handle_valid(font_handle_)){
+            vec2 default_origin = glyphs_origin();
+            render_glyph_coordinates_to_mesh(fontmanager_->context_, text_field_, font_handle_, default_origin, line_height_, text_field_bounds_, *fontmesh_);
+            renderable_->resend_data_on_render();
+        }
+
+        dirty_ = false;
+    }
+
+    Texture*         fonttexture_;
+    SceneTree*       scene_;
+
+    SceneTree::Node* background_mesh_node_; //> The background for highlights.
+    SceneTree::Node* parent_;
+    SceneTree::Node* pane_root_;
+    SceneTree::Node* glyph_node_;
+
+    Box2             text_field_bounds_;
+
+    FontManager*     fontmanager_;
+    DefaultMesh*     fontmesh_;
+    DefaultMesh*     background_mesh_;
+
+    FullRenderable*  renderable_;
+    FullRenderable*  background_renderable_;
+
+    GraphicsManager* gm_;
+    BakedFontHandle  font_handle_;
+    double           line_height_; // Multiple of font height
+
+    TextField        text_field_;
+
+    std::string      name_;
+
+    bool             dirty_;
+
+    Layout           layout_;
+};
+
 
 }

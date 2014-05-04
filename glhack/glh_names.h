@@ -36,8 +36,9 @@ namespace glh{
 
 //////////////// Program names. ////////////////
 
-#define GLH_COLOR_PICKER_PROGRAM "GLHColorPickerProgram"
-#define GLH_CONSTANT_ALBEDO_PROGRAM "GLHConstantAlbedoProgram"
+#define GLH_COLOR_PICKER_PROGRAM             "GLHColorPickerProgram"
+#define GLH_CONSTANT_ALBEDO_PROGRAM          "GLHConstantAlbedoProgram"
+#define GLH_TEXTURED_FONT_PROGRAM_SOLID_FILL "GLHTexturedFontProgramSolidFill"
 
 //////////////// Shader parameters. ////////////////
 

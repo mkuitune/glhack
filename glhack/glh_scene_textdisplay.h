@@ -1,4 +1,4 @@
-/**\file glh_scene_extensions.h
+/**\file glh_scene_textdisplay.h
     \author Mikko Kuitunen (mikko <dot> kuitunen <at> iki <dot> fi)
 */
 #pragma once
@@ -148,12 +148,8 @@ struct Modifiers
 };
 
 //TODO:
-// - add mesh for row background
-// - embed Glyphpane in specific shape, bind to background node (outside glyphpane)
-// - add a mesh for cursor
-// - add a datum for cursor, an interface for moving it (accept mouse position, accept
-//   cursor key, etc.
-// - 
+// - figure out a better way to implement glyph pane
+// - implement a TextLabel that displays a row of text and is not as complex as glyphpane
 
 enum class Movement{ Up, Down, Left, Right, LeftBound, RightBound, None };
 
@@ -199,7 +195,8 @@ public:
         name_ = pane_name;
 
         cursor_index_visual_ = vec2i(0, 0);
-        uca();
+        cursor_index_origin_ = vec2i(0, 0);
+
         cursor_pos_ = vec3(0.0, 0.0, 0.0);
     }
 
@@ -228,7 +225,6 @@ public:
     void update_cursor_pos_to_end_of_line()
     {
         cursor_index_visual_ = vec2i(0, 0);
-        uca();
 
         if(!text_field_.glyph_coords_.empty()){
             // there are one more positions for the cursor than there are glyphs per row
@@ -236,8 +232,6 @@ public:
 
             cursor_index_visual_ = vec2i(text_field_.glyph_coords_.last().size(),
                                          text_field_.glyph_coords_.size() - 1);
-
-            uca();
 
         }
 
@@ -261,8 +255,6 @@ public:
 
         // TODO FIXME
         cursor_index_visual_ = limit_to_valid_visual_row_indices(cursor_index_visual_);
-
-        uca();
 
         // TODO FIXME make sure 
         cursor_pos_[1] = (float) height_of_nth_row(cursor_index_visual_[1]);
@@ -402,10 +394,10 @@ public:
         dirty_ = false;
     }
 
-    /** Update cursor actual. */
-    void uca(){
+    /** Get actual cursor index. */
+    vec2i cursor_index_actual(){
         // TODO FIXME use proper mapping
-        cursor_index_actual_ = cursor_index_visual_;
+        return  cursor_index_visual_ + cursor_index_origin_;
     }
 
     // TODO add handle mouse click method. Gets x,y in screen coordinates. Invert the local matrix and 
@@ -427,7 +419,7 @@ public:
     SceneTree::Node* glyph_node_;
 
     vec2i            cursor_index_visual_;
-    vec2i            cursor_index_actual_;
+    vec2i            cursor_index_origin_;
 
     vec3             cursor_pos_;
 
@@ -456,100 +448,170 @@ public:
 };
 
 
-class SceneAssets{
+class TextLabelImpl;
+/** class TextLabel.*/
+class TextLabel : public SceneObject{
 public:
 
-    SceneTree tree_; // TODO: Split SceneTree from SceneAssets?
+    TextLabel(GraphicsManager* gm, const std::string& program_name, const std::string& background_program_name, FontManager* fontmanager, const std::string& pane_name)
+        :gm_(gm), glyph_node_(0), line_height_(1.0), fontmanager_(fontmanager),
+        font_handle_(invalid_font_handle()), dirty_(true){
 
-    std::list<GlyphPane>                                glyph_panes_;
-    std::list<Camera> cameras_;
-    std::list<RenderPass>                               render_passes_;
+        background_mesh_node_ = 0;
+        parent_ = 0;
+        pane_root_ = 0;
+        glyph_node_ = 0;
+        scene_ = 0;
+
+        fontmesh_ = gm_->create_mesh();
+        renderable_ = gm_->create_renderable();
+
+        // Create background renderable and mesh
+        auto background_program_handle = gm->program(background_program_name);
+        background_renderable_ = gm_->create_renderable();
+        background_renderable_->bind_program(*background_program_handle);
+
+        background_mesh_ = gm->create_mesh();
+        background_renderable_->set_mesh(background_mesh_);
+
+        apply_layout({{100.f, 100.f}, {100.f, 300.f}});
+
+        auto font_program_handle = gm->program(program_name);
+
+        renderable_->bind_program(*font_program_handle);
+        renderable_->set_mesh(fontmesh_);
+
+        name_ = pane_name;
+    }
+
+    ~TextLabel(){
+        gm_->release_mesh(fontmesh_);
+        gm_->release_renderable(renderable_);
+        if(glyph_node_ && parent_ && scene_){
+            parent_->remove_child(glyph_node_);
+            scene_->finalize(glyph_node_);
+        }
+    }
+
+
+    double height_of_nth_row(int i_visual){
+        return (lineheight_screenunits() * (i_visual));
+    }
+    double glypheight(){ return font_handle_.second; }
+    double lineheight_screenunits(){ return line_height_ * glypheight(); }
+    vec2 glyphs_origin(){ return vec2(0.f, glypheight()); }
+
+
+    SceneTree::Node* root(){ return pane_root_; }
+
+    virtual const std::string& name() const override  { return name_; }
+    virtual EntityType::t entity_type() const override  { return EntityType::GlyphPane; }
+
+    virtual void apply_layout(const Layout& l) override {
+        Layout oldlayout = layout_;
+
+        layout_ = l;
+        text_field_bounds_ = Box2(vec2(0.f, 0.f), layout_.size_);
+
+        if(pane_root_){
+            pane_root_->transform_.position_ = increase_dim(layout_.origin_, 0.f);
+        }
+
+        if(background_mesh_node_){
+            vec2 backround_half = 0.5f * text_field_bounds_.size();
+            background_mesh_node_->transform_.position_ = increase_dim(backround_half, 0.f);
+        }
+
+        if(oldlayout.size_ != layout_.size_)
+        {
+            update_background_mesh();
+        }
+
+        // need to udpate text field as well!
+        update_representation();
+    }
+
+    void update_background_mesh(){
+        load_screenquad(text_field_bounds_.size(), *background_mesh_);
+
+        if(background_mesh_node_){
+            background_mesh_node_->renderable_->resend_data_on_render();
+        }
+    }
+
+    void set_font(const std::string& name, float size){
+        FontConfig config = get_font_config(name, size);
+        FontContext& context(fontmanager_->context_);
+        font_handle_ = context.render_bitmap(config); // May throw GraphicsException
+        // fontimage_ = context.get_font_map(font_handle_);
+        //write_image_png(*fontimage, "font.png");
+        fonttexture_ = fontmanager_->get_font_texture(font_handle_);
+
+    }
+
+    void attach(SceneTree* scene, SceneTree::Node* parent){
+        parent_ = parent;
+        scene_ = scene;
+
+        pane_root_ = scene->add_node(parent);
+        pane_root_->name_ = name_ + std::string("/Root");
+        pane_root_->transform_.position_ = increase_dim(layout_.origin_, 0.f);
+
+        background_mesh_node_ = scene->add_node(pane_root_, background_renderable_);
+        background_mesh_node_->name_ = name_ + std::string("/Background");
+
+        glyph_node_ = scene->add_node(pane_root_, renderable_);
+        glyph_node_->name_ = name_ + std::string("/Glyph");
+
+        apply_layout(layout_);
+
+    }
+
+    void update_representation()
+    {
+        if(!scene_) return;
+
+        // TODO take layout_ and current top row into account when assigning glyph coordinates
+        if(dirty_ && handle_valid(font_handle_)){
+            vec2 default_origin = glyphs_origin();
+            render_glyph_coordinates_to_mesh(fontmanager_->context_, text_field_, font_handle_, default_origin, line_height_, text_field_bounds_, *fontmesh_);
+            renderable_->resend_data_on_render();
+        }
+
+        dirty_ = false;
+    }
+
+    Texture*         fonttexture_;
+    SceneTree*       scene_;
+
+    SceneTree::Node* background_mesh_node_; //> The background for highlights.
+    SceneTree::Node* parent_;
+    SceneTree::Node* pane_root_;
+    SceneTree::Node* glyph_node_;
+
+    Box2             text_field_bounds_;
+
+    FontManager*     fontmanager_;
+    DefaultMesh*     fontmesh_;
+    DefaultMesh*     background_mesh_;
+
+    FullRenderable*  renderable_;
+    FullRenderable*  background_renderable_;
 
     GraphicsManager* gm_;
-    FontManager*     font_manager_;
-    App*             app_;
+    BakedFontHandle  font_handle_;
+    double           line_height_; // Multiple of font height
+
+    TextField        text_field_;
+
+    std::string      name_;
+
+    bool             dirty_;
+
+    Layout           layout_;
 
 
-    // TODO: App.env: a wrapper for all addressable assets in the app.
-    // Contains references to the lower level constructs so it can refer queries onwards, such as
-    // "scenes/tree1/node3" would return a pointer with the object type (SceneTreeNode) 
-
-    GlyphPane* create_glyph_pane(const std::string& program_name, const std::string& background_program_name){
-        glyph_panes_.emplace_back(gm_, program_name, background_program_name, font_manager_, app_->string_numerator()("GlyphPane"));
-        GlyphPane* pane = &glyph_panes_.back();
-        SceneTree::Node* root = tree_.root();
-        pane->attach(&tree_, root);
-
-        return pane;
-    }
-
-    Camera* create_camera(Camera::Projection projection_type){
-         SceneTree::Node* node = tree_.add_node(tree_.root());
-         cameras_.emplace_back(node);
-         Camera* camera = &cameras_.back();
-         camera->name_ = app_->string_numerator()("Camera");
-         camera->node_ = node;
-         camera->projection_ = projection_type;
-         return camera;
-    }
-
-    RenderPass* create_render_pass(){
-        render_passes_.emplace_back();
-        RenderPass* pass = &render_passes_.back();
-        pass->name_ = app_->string_numerator()("RenderPass");
-        return pass;
-    }
-
-    RenderPass* create_render_pass(const std::string& name){
-        render_passes_.emplace_back();
-        RenderPass* pass = &render_passes_.back();
-        pass->name_ = app_->string_numerator()(name);
-        return pass;
-    }
-
-    // Manages per-frame updates. Basically should be implementable as a DynamicGraph graph (just assigns values to keys). But is not right now.
-    void update(){
-
-        tree_.update();
-        tree_.apply_to_render_env();
-
-        for(auto& c : cameras_){
-            c.update(app_);
-        }
-
-        for(auto& g : glyph_panes_){
-            g.update_representation();
-        }
-    }
-
-    SceneTree& scene(){ return tree_; }
-
-
-private:
-    SceneAssets(){}
-
-    void xcept(const std::string& msg){
-        throw GraphicsException(std::string("SceneAssets:") + msg);
-    }
-
-    void init(App* app, GraphicsManager* gm, FontManager* font_manager){
-        app_ = app;
-        gm_ = gm;
-        font_manager_ = font_manager;
-
-        if(!app_) xcept("Invalid app.");
-        if(!gm_) xcept("Invalid graphics manager.");
-        if(!font_manager_) xcept("Invalid font  manager.");
-
-    }
-public:
-
-    static std::shared_ptr<SceneAssets> create(App* app, GraphicsManager* gm, FontManager* font_manager){
-        std::shared_ptr<SceneAssets> assets_(new SceneAssets);
-        assets_->init(app, gm, font_manager);
-        return assets_;
-    }
-
+    TextLabelImpl* impl_;
 };
 
 }

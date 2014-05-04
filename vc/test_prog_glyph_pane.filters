@@ -2,12 +2,8 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="..\programs\vec_edit_a\vec_edit_a.cpp" />
-    <ClCompile Include="..\programs\vec_edit_a\testdata.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="dummy.txt" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\programs\vec_edit_a\testdata.h" />
   </ItemGroup>
 </Project>

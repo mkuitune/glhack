@@ -10,7 +10,7 @@
 #include "glh_image.h"
 #include "glh_typedefs.h"
 #include "shims_and_types.h"
-#include "glh_scene_extensions.h"
+#include "glh_scene_assets.h"
 #include "iotools.h"
 #include "glh_uicontext.h"
 
